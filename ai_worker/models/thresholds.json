@@ -1,0 +1,53 @@
+{
+  "diabetes": {
+    "model": "XGBoost",
+    "test_auc": 0.85,
+    "pos_rate": 0.0865,
+    "screening": {
+      "threshold": 0.055,
+      "precision": 0.1907,
+      "recall": 0.8512,
+      "f1": 0.3116
+    },
+    "diagnostic": {
+      "threshold": 0.264,
+      "precision": 0.4538,
+      "recall": 0.4083,
+      "f1": 0.4299
+    }
+  },
+  "hypertension": {
+    "model": "LGBM+HistGB",
+    "test_auc": 0.7754,
+    "pos_rate": 0.1341,
+    "screening": {
+      "threshold": 0.096,
+      "precision": 0.2316,
+      "recall": 0.8501,
+      "f1": 0.364
+    },
+    "diagnostic": {
+      "threshold": 0.254,
+      "precision": 0.3396,
+      "recall": 0.4832,
+      "f1": 0.3989
+    }
+  },
+  "kidney": {
+    "model": "XGBoost",
+    "test_auc": 0.957,
+    "pos_rate": 0.0301,
+    "screening": {
+      "threshold": 0.059,
+      "precision": 0.212,
+      "recall": 0.85,
+      "f1": 0.3393
+    },
+    "diagnostic": {
+      "threshold": 0.263,
+      "precision": 0.5159,
+      "recall": 0.65,
+      "f1": 0.5752
+    }
+  }
+}
