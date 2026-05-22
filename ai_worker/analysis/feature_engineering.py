@@ -1,9 +1,7 @@
-
 from __future__ import annotations
 
 import numpy as np
 import pandas as pd
-
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 1. 누수 피처 제거
@@ -31,7 +29,8 @@ SMOKING_NUM_COLS = [
     "smoking_status_2.0",
 ]
 
-def fix_smoking_encoding(df: pd.DataFrame) -> pd.DataFrame:
+
+def fix_smoking_encoding(df: pd.DataFrame) -> pd.DataFrame:  # noqa: C901
     """smoking_status 더미 5개 → smoking_ordinal(0/1/2) 단일 변수로 통합"""
     df = df.copy()
 
@@ -39,7 +38,7 @@ def fix_smoking_encoding(df: pd.DataFrame) -> pd.DataFrame:
     has_num = any(c in df.columns for c in SMOKING_NUM_COLS)
 
     if has_text and has_num:
-        # 텍스트 기준으로 통합 
+        # 텍스트 기준으로 통합
         smoking = pd.Series(0, index=df.index, dtype="int8")  # default: never
         if "smoking_status_current" in df.columns:
             smoking = smoking.where(df["smoking_status_current"] == 0, 2)
@@ -85,6 +84,7 @@ def fix_smoking_encoding(df: pd.DataFrame) -> pd.DataFrame:
 # 3. 파생변수 생성
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def _safe_div(a: pd.Series, b: pd.Series, fill: float = 0.0) -> pd.Series:
     """0으로 나누기 방지"""
     return a.div(b.replace(0, np.nan)).fillna(fill)
@@ -101,12 +101,16 @@ def add_derived_common(df: pd.DataFrame) -> pd.DataFrame:
 
     # BMI 범주 (KSSO 2022 한국 기준)
     if "bmi" in df.columns:
-        df["bmi_category"] = pd.cut(
-            df["bmi"],
-            bins=[0, 18.5, 23, 25, 30, 35, 100],
-            labels=[0, 1, 2, 3, 4, 5],  # 저체중/정상/과체중/1단계/2단계/3단계
-            right=False,
-        ).astype("float32").fillna(1)
+        df["bmi_category"] = (
+            pd.cut(
+                df["bmi"],
+                bins=[0, 18.5, 23, 25, 30, 35, 100],
+                labels=[0, 1, 2, 3, 4, 5],  # 저체중/정상/과체중/1단계/2단계/3단계
+                right=False,
+            )
+            .astype("float32")
+            .fillna(1)
+        )
 
     # 연령대 (10세 단위) — 40대 이후 만성질환 급증 비선형 패턴
     if "age" in df.columns:
@@ -177,16 +181,12 @@ def add_derived_hypertension(df: pd.DataFrame) -> pd.DataFrame:
 
     # HbA1c 범주화 — 당뇨 전단계(5.7-6.4)는 고혈압 동반 위험 높음
     if "hba1c" in df.columns:
-        df["hba1c_prediabetic"] = (
-            (df["hba1c"] >= 5.7) & (df["hba1c"] < 6.5)
-        ).astype("int8")
+        df["hba1c_prediabetic"] = ((df["hba1c"] >= 5.7) & (df["hba1c"] < 6.5)).astype("int8")
         df["hba1c_diabetic"] = (df["hba1c"] >= 6.5).astype("int8")
 
     # 공복혈당 범주화
     if "glucose_fasting" in df.columns:
-        df["glucose_prediabetic"] = (
-            (df["glucose_fasting"] >= 100) & (df["glucose_fasting"] < 126)
-        ).astype("int8")
+        df["glucose_prediabetic"] = ((df["glucose_fasting"] >= 100) & (df["glucose_fasting"] < 126)).astype("int8")
         df["glucose_diabetic"] = (df["glucose_fasting"] >= 126).astype("int8")
 
     # 가족력 복합
@@ -241,12 +241,12 @@ def add_derived_kidney(df: pd.DataFrame) -> pd.DataFrame:
 # 4. 피처 정리 — 상관분석 기반 중복 제거
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def remove_high_correlation(
     df: pd.DataFrame,
     threshold: float = 0.85,
     protect: list[str] | None = None,
 ) -> tuple[pd.DataFrame, list[str]]:
-    
     protect = set(protect or [])
     numeric = df.select_dtypes(include="number")
     corr = numeric.corr().abs()
@@ -271,7 +271,7 @@ def remove_high_correlation(
                 to_drop.add(col)
 
     dropped = sorted(to_drop)
-    return df.drop(columns=dropped, errors="ignore"), dropped   # 제거된 컬럼 목록도 반환
+    return df.drop(columns=dropped, errors="ignore"), dropped  # 제거된 컬럼 목록도 반환
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -299,7 +299,6 @@ def engineer_features(
     remove_correlated: bool = True,
     corr_threshold: float = 0.85,
 ) -> pd.DataFrame:
-
     result = df.copy()
 
     # 추가 누수 제거
@@ -333,19 +332,21 @@ def engineer_features(
 # 6. 진단 유틸리티
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+
 def feature_report(
     df: pd.DataFrame,
     disease: str,
     y: pd.Series | None = None,
 ) -> pd.DataFrame:
-    
-    report = pd.DataFrame({
-        "dtype": df.dtypes,
-        "null_pct": (df.isnull().sum() / len(df) * 100).round(2),
-        "nunique": df.nunique(),
-        "mean": df.select_dtypes("number").mean(),
-        "std": df.select_dtypes("number").std(),
-    })
+    report = pd.DataFrame(
+        {
+            "dtype": df.dtypes,
+            "null_pct": (df.isnull().sum() / len(df) * 100).round(2),
+            "nunique": df.nunique(),
+            "mean": df.select_dtypes("number").mean(),
+            "std": df.select_dtypes("number").std(),
+        }
+    )
 
     if y is not None:
         corr_with_target = df.select_dtypes("number").corrwith(y).abs()
@@ -360,15 +361,14 @@ def feature_report(
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 if __name__ == "__main__":
-
     from pathlib import Path
 
     DATA_DIR = Path("/Users/rogan/파이널프로젝트_4조/dataset/unified")
 
     for disease in ["diabetes", "hypertension", "kidney"]:
-        print(f"\n{'='*60}")
+        print(f"\n{'=' * 60}")
         print(f"  {disease.upper()} 피처 엔지니어링")
-        print(f"{'='*60}")
+        print(f"{'=' * 60}")
 
         x_train = pd.read_parquet(DATA_DIR / f"v7_{disease}_train_X.parquet")
         y_train = pd.read_parquet(DATA_DIR / f"v7_{disease}_train_y.parquet")
@@ -387,5 +387,5 @@ if __name__ == "__main__":
 
         # 피처 리포트
         report = feature_report(x_engineered, disease, y_binary)
-        print(f"\n  [Target 상관 TOP 10]")
+        print("\n  [Target 상관 TOP 10]")
         print(report[["target_corr", "mean", "null_pct"]].head(10).to_string())
