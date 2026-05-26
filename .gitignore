@@ -12,3 +12,13 @@ wheels/
 .coverage
 *.coverage
 .coverage.*
+.DS_Store
+
+# Local ML artifacts and validation datasets
+ai_worker/models/*.pkl
+ai_worker/models/V8/dataset/
+
+# Local planning documents
+/API명세서*.xlsx
+/요구사항정의서*.xlsx
+/erd*.dbml
