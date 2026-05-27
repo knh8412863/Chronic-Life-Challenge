@@ -14,8 +14,7 @@ wheels/
 .coverage.*
 .DS_Store
 
-# Local ML artifacts and validation datasets
-ai_worker/models/*.pkl
+# Training datasets remain local; final runtime model artifacts are versioned.
 ai_worker/models/V8/dataset/
 
 # Local planning documents
