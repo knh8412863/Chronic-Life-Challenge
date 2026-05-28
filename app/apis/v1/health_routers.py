@@ -9,6 +9,7 @@ from app.dtos.predictions import (
     HealthSurveyCreateRequest,
     HealthSurveyCreateResponse,
     LipidObesityRecordCreateRequest,
+    MetricAssessmentResponse,
     OptionalRecordCreateResponse,
     RenalRecordCreateRequest,
 )
@@ -58,3 +59,16 @@ async def create_renal_record(
 ) -> Response:
     result = await service.create_renal_record(user, request)
     return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_201_CREATED)
+
+
+@health_router.get(
+    "/health/metric-assessments",
+    response_model=DataResponse[MetricAssessmentResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_metric_assessments(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+) -> Response:
+    result = await service.get_metric_assessments(user)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)

@@ -133,6 +133,17 @@ class OptionalRecordCreateResponse(BaseModel):
     created_at: datetime
 
 
+class MetricAssessmentItemResponse(BaseModel):
+    status: Literal["NORMAL", "CAUTION", "HIGH", "UNAVAILABLE"]
+    reasons: list[str] = Field(default_factory=list)
+    missing_fields: list[str] = Field(default_factory=list)
+
+
+class MetricAssessmentResponse(BaseModel):
+    dyslipidemia: MetricAssessmentItemResponse
+    obesity: MetricAssessmentItemResponse
+
+
 class PredictionTaskCreateRequest(BaseModel):
     health_input_id: int
     prediction_mode: Literal["SCREENING"] = "SCREENING"

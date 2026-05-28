@@ -15,6 +15,8 @@ from app.dtos.predictions import (
     HealthSurveyCreateResponse,
     InputCompletenessResponse,
     LipidObesityRecordCreateRequest,
+    MetricAssessmentItemResponse,
+    MetricAssessmentResponse,
     OptionalRecordCreateResponse,
     PredictionResultResponse,
     PredictionTaskCreateRequest,
@@ -44,6 +46,13 @@ DISEASE_MAPPINGS = {
     "diabetes": ("DIABETES", "당뇨"),
     "hypertension": ("HYPERTENSION", "고혈압"),
     "kidney": ("CKD", "만성신장질환"),
+}
+
+DYSLIPIDEMIA_FIELDS = ["total_cholesterol", "hdl_cholesterol", "ldl_cholesterol", "triglycerides"]
+DYSLIPIDEMIA_UPPER_RULES = {
+    "total_cholesterol": (200, 240, "총콜레스테롤"),
+    "ldl_cholesterol": (130, 160, "LDL 콜레스테롤"),
+    "triglycerides": (150, 200, "중성지방"),
 }
 
 
@@ -159,6 +168,131 @@ class HealthInputService:
     async def create_renal_record(self, user: User, data: RenalRecordCreateRequest) -> OptionalRecordCreateResponse:
         record = await RenalRecord.create(user=user, **data.model_dump())
         return OptionalRecordCreateResponse(record_id=record.id, created_at=record.created_at)
+
+    async def get_metric_assessments(self, user: User) -> MetricAssessmentResponse:
+        profile = await UserProfile.get_or_none(user_id=user.id)
+        latest_health = await ChronicHealthInput.filter(user_id=user.id).order_by("-created_at").first()
+        latest_lipid = await LipidObesityRecord.filter(user_id=user.id).order_by("-record_date", "-created_at").first()
+
+        return MetricAssessmentResponse(
+            dyslipidemia=self._assess_dyslipidemia(user, latest_lipid),
+            obesity=self._assess_obesity(user, profile, latest_health, latest_lipid),
+        )
+
+    @staticmethod
+    def _assess_dyslipidemia(user: User, lipid: LipidObesityRecord | None) -> MetricAssessmentItemResponse:
+        if lipid is None:
+            return MetricAssessmentItemResponse(
+                status="UNAVAILABLE",
+                reasons=["지질 수치가 입력되지 않았습니다."],
+                missing_fields=DYSLIPIDEMIA_FIELDS,
+            )
+
+        values = {field: getattr(lipid, field) for field in DYSLIPIDEMIA_FIELDS}
+        missing_fields = [field for field, value in values.items() if value is None]
+        if all(value is None for value in values.values()):
+            return MetricAssessmentItemResponse(
+                status="UNAVAILABLE",
+                reasons=["지질 수치가 입력되지 않았습니다."],
+                missing_fields=missing_fields,
+            )
+
+        status_rank = 0
+        reasons: list[str] = []
+        for field, (caution, high, label) in DYSLIPIDEMIA_UPPER_RULES.items():
+            rank, reason = HealthInputService._assess_upper_metric(values[field], caution, high, label)
+            status_rank = max(status_rank, rank)
+            if reason:
+                reasons.append(reason)
+
+        hdl = values["hdl_cholesterol"]
+        hdl_threshold = 40 if user.gender == Gender.MALE else 50
+        if hdl is not None and hdl < hdl_threshold:
+            status_rank = max(status_rank, 2)
+            reasons.append("HDL 콜레스테롤이 낮은 범위입니다.")
+
+        if not reasons:
+            reasons.append("입력된 지질 수치가 정상 범위입니다.")
+
+        return MetricAssessmentItemResponse(
+            status=HealthInputService._status_from_rank(status_rank),
+            reasons=reasons,
+            missing_fields=missing_fields,
+        )
+
+    @staticmethod
+    def _assess_obesity(
+        user: User,
+        profile: UserProfile | None,
+        health: ChronicHealthInput | None,
+        lipid: LipidObesityRecord | None,
+    ) -> MetricAssessmentItemResponse:
+        bmi = HealthInputService._first_float(
+            lipid.bmi if lipid else None,
+            profile.bmi if profile else None,
+            health.bmi if health else None,
+        )
+        waist = HealthInputService._first_float(
+            lipid.waist_circumference if lipid else None,
+            health.waist_circumference if health else None,
+        )
+        missing_fields = []
+        if bmi is None:
+            missing_fields.append("bmi")
+        if waist is None:
+            missing_fields.append("waist_circumference")
+        if bmi is None and waist is None:
+            return MetricAssessmentItemResponse(
+                status="UNAVAILABLE",
+                reasons=["BMI와 허리둘레가 입력되지 않았습니다."],
+                missing_fields=missing_fields,
+            )
+
+        status_rank = 0
+        reasons: list[str] = []
+        if bmi is not None:
+            if bmi >= 25:
+                status_rank = max(status_rank, 2)
+                reasons.append("BMI가 비만 범위입니다.")
+            elif bmi >= 23:
+                status_rank = max(status_rank, 1)
+                reasons.append("BMI가 과체중 범위입니다.")
+
+        waist_threshold = 90 if user.gender == Gender.MALE else 85
+        if waist is not None:
+            if waist >= waist_threshold:
+                status_rank = max(status_rank, 2)
+                reasons.append("허리둘레가 복부비만 기준 이상입니다.")
+
+        if not reasons:
+            reasons.append("BMI와 허리둘레가 정상 범위입니다.")
+
+        return MetricAssessmentItemResponse(
+            status=HealthInputService._status_from_rank(status_rank),
+            reasons=reasons,
+            missing_fields=missing_fields,
+        )
+
+    @staticmethod
+    def _first_float(*values: Any) -> float | None:
+        for value in values:
+            if value is not None:
+                return float(value)
+        return None
+
+    @staticmethod
+    def _assess_upper_metric(value: int | None, caution: int, high: int, label: str) -> tuple[int, str | None]:
+        if value is None:
+            return 0, None
+        if value >= high:
+            return 2, f"{label}이 위험 범위입니다."
+        if value >= caution:
+            return 1, f"{label}이 주의 범위입니다."
+        return 0, None
+
+    @staticmethod
+    def _status_from_rank(rank: int) -> str:
+        return {0: "NORMAL", 1: "CAUTION", 2: "HIGH"}[rank]
 
 
 class PredictionService:
