@@ -39,6 +39,7 @@ class HealthSurveyCreateRequest(BaseModel):
     birth_date: date
     height: Annotated[float, Field(ge=130, le=210)]
     weight: Annotated[float, Field(ge=30, le=200)]
+    waist_circumference: Annotated[float | None, Field(default=None, ge=50, le=150)]
     diagnosed_diseases: set[DiseaseCode] = Field(default_factory=set)
     medications: set[MedicationCode] = Field(default_factory=set)
     last_checkup_period: LastCheckupPeriod | None = None
