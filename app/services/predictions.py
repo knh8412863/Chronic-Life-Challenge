@@ -85,6 +85,9 @@ class HealthInputService:
                 height=Decimal(str(data.height)),
                 weight=Decimal(str(data.weight)),
                 bmi=Decimal(str(bmi)),
+                waist_circumference=(
+                    Decimal(str(data.waist_circumference)) if data.waist_circumference is not None else None
+                ),
                 sbp=data.sbp,
                 dbp=data.dbp,
                 glucose_fasting=data.glucose_fasting,
@@ -166,7 +169,8 @@ class PredictionService:
 
         lipid = await LipidObesityRecord.filter(user_id=user.id).order_by("-record_date", "-created_at").first()
         renal = await RenalRecord.filter(user_id=user.id).order_by("-record_date", "-created_at").first()
-        missing_fields = self._missing_optional_measurements(lipid, renal)
+        survey_health = await ChronicHealthInput.get(id=survey_snapshot.chronic_health_input_id)
+        missing_fields = self._missing_optional_measurements(survey_health, lipid, renal)
 
         snapshot = await PredictionInputSnapshot.create(
             user=user,
@@ -257,19 +261,19 @@ class PredictionService:
         )
 
     @staticmethod
-    def _missing_optional_measurements(lipid: LipidObesityRecord | None, renal: RenalRecord | None) -> list[str]:
+    def _missing_optional_measurements(
+        health: ChronicHealthInput,
+        lipid: LipidObesityRecord | None,
+        renal: RenalRecord | None,
+    ) -> list[str]:
         fields: list[str] = []
-        lipid_fields = [
-            "total_cholesterol",
-            "hdl_cholesterol",
-            "ldl_cholesterol",
-            "triglycerides",
-            "waist_circumference",
-        ]
+        lipid_fields = ["total_cholesterol", "hdl_cholesterol", "ldl_cholesterol", "triglycerides"]
         renal_fields = ["creatinine", "bun", "urine_protein_pos"]
         for field in lipid_fields:
             if lipid is None or getattr(lipid, field) is None:
                 fields.append(field)
+        if (lipid is None or lipid.waist_circumference is None) and health.waist_circumference is None:
+            fields.append("waist_circumference")
         for field in renal_fields:
             if renal is None or getattr(renal, field) is None:
                 fields.append(field)
@@ -306,6 +310,9 @@ class PredictionService:
             "sbp": health.sbp,
             "dbp": health.dbp,
             "glucose_fasting": health.glucose_fasting,
+            "waist_circumference": (
+                float(health.waist_circumference) if health.waist_circumference is not None else None
+            ),
             "dx_diabetes": int("DIABETES" in diagnoses),
             "dx_hypertension": int("HYPERTENSION" in diagnoses),
             "dx_dyslipidemia": int("DYSLIPIDEMIA" in diagnoses),
@@ -328,11 +335,10 @@ class PredictionService:
                     "hdl_cholesterol": lipid.hdl_cholesterol,
                     "ldl_cholesterol": lipid.ldl_cholesterol,
                     "triglycerides": lipid.triglycerides,
-                    "waist_circumference": (
-                        float(lipid.waist_circumference) if lipid.waist_circumference is not None else None
-                    ),
                 }
             )
+            if lipid.waist_circumference is not None:
+                raw["waist_circumference"] = float(lipid.waist_circumference)
         if renal:
             raw.update(
                 {

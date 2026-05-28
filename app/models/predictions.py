@@ -38,6 +38,7 @@ class ChronicHealthInput(models.Model):
     height = fields.DecimalField(max_digits=5, decimal_places=2)
     weight = fields.DecimalField(max_digits=5, decimal_places=2)
     bmi = fields.DecimalField(max_digits=5, decimal_places=2)
+    waist_circumference = fields.DecimalField(max_digits=5, decimal_places=2, null=True)
     sbp = fields.IntField(null=True)
     dbp = fields.IntField(null=True)
     glucose_fasting = fields.IntField(null=True)

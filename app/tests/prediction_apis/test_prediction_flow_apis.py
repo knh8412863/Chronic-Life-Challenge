@@ -23,6 +23,7 @@ class TestPredictionFlowAPIs(TestCase):
             "birth_date": "1990-01-01",
             "height": 165,
             "weight": 63,
+            "waist_circumference": 78,
             "smoking_status": 0,
             "alcohol_frequency": 0,
             "exercise_frequency": 3,
@@ -85,3 +86,4 @@ class TestPredictionFlowAPIs(TestCase):
         assert set(result["disease_risks"]) == {"diabetes", "hypertension", "kidney"}
         assert result["input_completeness"]["used_default_values"] is True
         assert "total_cholesterol" in result["input_completeness"]["missing_fields"]
+        assert "waist_circumference" not in result["input_completeness"]["missing_fields"]
