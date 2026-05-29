@@ -55,6 +55,18 @@ class UserRepository:
     async def update_last_login(self, user_id: int) -> None:
         await self._model.filter(id=user_id).update(last_login=datetime.now(config.TIMEZONE))
 
+    async def update_password(self, user_id: int, hashed_password: str) -> None:
+        await self._model.filter(id=user_id).update(
+            hashed_password=hashed_password,
+            updated_at=datetime.now(config.TIMEZONE),
+        )
+
+    async def mark_email_verified(self, user_id: int) -> None:
+        await self._model.filter(id=user_id).update(
+            is_email_verified=True,
+            updated_at=datetime.now(config.TIMEZONE),
+        )
+
     async def update_instance(self, user: User, data: dict[str, Any]) -> None:
         update_fields = []
         for key, value in data.items():

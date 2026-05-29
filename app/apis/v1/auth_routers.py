@@ -6,7 +6,16 @@ from starlette.responses import Response
 
 from app.core import config
 from app.core.config import Env
-from app.dtos.auth import LoginRequest, LoginResponse, SignUpRequest, TokenRefreshResponse
+from app.dependencies.security import get_request_user
+from app.dtos.auth import (
+    LoginRequest,
+    LoginResponse,
+    PasswordResetConfirmRequest,
+    PasswordResetRequest,
+    SignUpRequest,
+    TokenRefreshResponse,
+)
+from app.models.users import User
 from app.services.auth import AuthService
 from app.services.jwt import JwtService
 
@@ -64,6 +73,42 @@ async def logout() -> Response:
         path="/",
     )
     return resp
+
+
+@auth_router.get("/email-verifications", status_code=status.HTTP_200_OK)
+async def verify_email(
+    token: str,
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> JSONResponse:
+    await auth_service.verify_email(token)
+    return JSONResponse(content={"data": {"verified": True}}, status_code=status.HTTP_200_OK)
+
+
+@auth_router.post("/email-verification-requests", status_code=status.HTTP_204_NO_CONTENT)
+async def request_email_verification(
+    user: Annotated[User, Depends(get_request_user)],
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> Response:
+    await auth_service.request_email_verification(user)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@auth_router.post("/password-reset-requests", status_code=status.HTTP_204_NO_CONTENT)
+async def request_password_reset(
+    request: PasswordResetRequest,
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> Response:
+    await auth_service.request_password_reset(request.email)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@auth_router.post("/password-resets", status_code=status.HTTP_204_NO_CONTENT)
+async def reset_password(
+    request: PasswordResetConfirmRequest,
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> Response:
+    await auth_service.reset_password(token=request.token, new_password=request.new_password)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @auth_router.get("/token/refresh", response_model=TokenRefreshResponse, status_code=status.HTTP_200_OK)

@@ -57,5 +57,10 @@ class Config(BaseSettings):
     AUTH_RATE_LIMIT_MAX_IP_FAILURES: int = 30
     AUTH_RATE_LIMIT_WINDOW_SECONDS: int = 60
 
+    EMAIL_VERIFICATION_EXPIRE_HOURS: int = 24
+    EMAIL_VERIFICATION_COOLDOWN_SECONDS: int = 60
+    PASSWORD_RESET_EXPIRE_MINUTES: int = 30
+    PASSWORD_RESET_COOLDOWN_SECONDS: int = 60
+
     def get_cors_allow_origins(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ALLOW_ORIGINS.split(",") if origin.strip()]

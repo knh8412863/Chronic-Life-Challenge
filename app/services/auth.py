@@ -1,14 +1,20 @@
+import hashlib
+import secrets
+from datetime import datetime, timedelta
+
 from fastapi.exceptions import HTTPException
 from pydantic import EmailStr
 from starlette import status
 from tortoise.transactions import in_transaction
 
+from app.core import config
 from app.core.jwt.tokens import AccessToken, RefreshToken
 from app.core.utils.common import normalize_phone_number
 from app.core.utils.security import hash_password, verify_password
 from app.dtos.auth import LoginRequest, SignUpRequest
-from app.models.users import User
+from app.models.users import EmailVerification, PasswordResetToken, User
 from app.repositories.user_repository import UserRepository
+from app.services.email import EmailService
 from app.services.jwt import JwtService
 from app.services.rate_limiter import AuthRateLimiter
 
@@ -18,6 +24,7 @@ class AuthService:
         self.user_repo = UserRepository()
         self.jwt_service = JwtService()
         self.rate_limiter = AuthRateLimiter()
+        self.email_service = EmailService()
 
     async def signup(self, data: SignUpRequest) -> User:
         # 이메일 중복 체크
@@ -74,6 +81,68 @@ class AuthService:
         await self.user_repo.update_last_login(user.id)
         return self.jwt_service.issue_jwt_pair(user)
 
+    async def request_email_verification(self, user: User) -> None:
+        latest = await EmailVerification.filter(user=user, verified_at=None).order_by("-created_at").first()
+        if latest and self._is_in_cooldown(latest.created_at, config.EMAIL_VERIFICATION_COOLDOWN_SECONDS):
+            self.rate_limiter.raise_limited(config.EMAIL_VERIFICATION_COOLDOWN_SECONDS)
+
+        now = datetime.now(config.TIMEZONE)
+        await EmailVerification.filter(user=user, verified_at=None).update(verified_at=now)
+
+        token = self._create_token()
+        await EmailVerification.create(
+            user=user,
+            token_hash=self._hash_token(token),
+            expires_at=now + timedelta(hours=config.EMAIL_VERIFICATION_EXPIRE_HOURS),
+        )
+        await self.email_service.send_email_verification(user=user, token=token)
+
+    async def verify_email(self, token: str) -> None:
+        verification = await EmailVerification.get_or_none(token_hash=self._hash_token(token), verified_at=None)
+        if not verification:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 토큰입니다.")
+
+        now = datetime.now(config.TIMEZONE)
+        if verification.expires_at < now:
+            raise HTTPException(status_code=status.HTTP_410_GONE, detail="토큰이 만료되었습니다. 다시 로그인해주세요.")
+
+        verification.verified_at = now
+        await verification.save(update_fields=["verified_at"])
+        await self.user_repo.mark_email_verified(verification.user_id)
+
+    async def request_password_reset(self, email: EmailStr) -> None:
+        user = await self.user_repo.get_user_by_email(str(email))
+        if not user:
+            return
+
+        latest = await PasswordResetToken.filter(user=user, used_at=None).order_by("-created_at").first()
+        if latest and self._is_in_cooldown(latest.created_at, config.PASSWORD_RESET_COOLDOWN_SECONDS):
+            self.rate_limiter.raise_limited(config.PASSWORD_RESET_COOLDOWN_SECONDS)
+
+        now = datetime.now(config.TIMEZONE)
+        await PasswordResetToken.filter(user=user, used_at=None).update(used_at=now)
+
+        token = self._create_token()
+        await PasswordResetToken.create(
+            user=user,
+            token_hash=self._hash_token(token),
+            expires_at=now + timedelta(minutes=config.PASSWORD_RESET_EXPIRE_MINUTES),
+        )
+        await self.email_service.send_password_reset(user=user, token=token)
+
+    async def reset_password(self, token: str, new_password: str) -> None:
+        reset_token = await PasswordResetToken.get_or_none(token_hash=self._hash_token(token), used_at=None)
+        if not reset_token:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="유효하지 않은 토큰입니다.")
+
+        now = datetime.now(config.TIMEZONE)
+        if reset_token.expires_at < now:
+            raise HTTPException(status_code=status.HTTP_410_GONE, detail="토큰이 만료되었습니다. 다시 요청해주세요.")
+
+        await self.user_repo.update_password(reset_token.user_id, hash_password(new_password))
+        reset_token.used_at = now
+        await reset_token.save(update_fields=["used_at"])
+
     async def check_email_exists(self, email: str | EmailStr) -> None:
         if await self.user_repo.exists_by_email(email):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 사용중인 이메일입니다.")
@@ -81,3 +150,12 @@ class AuthService:
     async def check_phone_number_exists(self, phone_number: str) -> None:
         if await self.user_repo.exists_by_phone_number(phone_number):
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 사용중인 휴대폰 번호입니다.")
+
+    def _create_token(self) -> str:
+        return secrets.token_urlsafe(32)
+
+    def _hash_token(self, token: str) -> str:
+        return hashlib.sha256(token.encode()).hexdigest()
+
+    def _is_in_cooldown(self, created_at: datetime, cooldown_seconds: int) -> bool:
+        return created_at + timedelta(seconds=cooldown_seconds) > datetime.now(config.TIMEZONE)

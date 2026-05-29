@@ -37,6 +37,13 @@ class AuthRateLimiter:
             headers={"Retry-After": str(config.AUTH_RATE_LIMIT_WINDOW_SECONDS)},
         )
 
+    def raise_limited(self, retry_after_seconds: int | None = None) -> None:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="요청 가능 횟수를 초과했습니다. 잠시 후 다시 시도해주세요.",
+            headers={"Retry-After": str(retry_after_seconds or config.AUTH_RATE_LIMIT_WINDOW_SECONDS)},
+        )
+
     async def check_login_allowed(self, email: str, client_ip: str) -> None:
         email_key, ip_key = self._login_keys(email, client_ip)
         if await self._get_failure_count(email_key) >= config.AUTH_RATE_LIMIT_MAX_FAILURES:
