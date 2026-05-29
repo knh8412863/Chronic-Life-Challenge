@@ -10,12 +10,14 @@ from app.dtos.auth import LoginRequest, SignUpRequest
 from app.models.users import User
 from app.repositories.user_repository import UserRepository
 from app.services.jwt import JwtService
+from app.services.rate_limiter import AuthRateLimiter
 
 
 class AuthService:
     def __init__(self):
         self.user_repo = UserRepository()
         self.jwt_service = JwtService()
+        self.rate_limiter = AuthRateLimiter()
 
     async def signup(self, data: SignUpRequest) -> User:
         # 이메일 중복 체크
@@ -40,25 +42,32 @@ class AuthService:
 
             return user
 
-    async def authenticate(self, data: LoginRequest) -> User:
+    async def authenticate(self, data: LoginRequest, client_ip: str) -> User:
         # 이메일로 사용자 조회
         email = str(data.email)
+        await self.rate_limiter.check_login_allowed(email=email, client_ip=client_ip)
+
         user = await self.user_repo.get_user_by_email(email)
         if not user:
+            remaining = await self.rate_limiter.record_login_failure(email=email, client_ip=client_ip)
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="이메일 또는 비밀번호가 올바르지 않습니다."
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"이메일 또는 비밀번호가 올바르지 않습니다. ({remaining}회 시도 남음)",
             )
 
         # 비밀번호 검증
         if not verify_password(data.password, user.hashed_password):
+            remaining = await self.rate_limiter.record_login_failure(email=email, client_ip=client_ip)
             raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST, detail="이메일 또는 비밀번호가 올바르지 않습니다."
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"이메일 또는 비밀번호가 올바르지 않습니다. ({remaining}회 시도 남음)",
             )
 
         # 활성 사용자 체크
         if not user.is_active:
             raise HTTPException(status_code=status.HTTP_423_LOCKED, detail="비활성화된 계정입니다.")
 
+        await self.rate_limiter.reset_login_failures(email=email)
         return user
 
     async def login(self, user: User) -> dict[str, AccessToken | RefreshToken]:

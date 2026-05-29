@@ -1,7 +1,8 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Cookie, Depends, HTTPException, status
-from fastapi.responses import JSONResponse as Response
+from fastapi import APIRouter, Cookie, Depends, HTTPException, Request, status
+from fastapi.responses import JSONResponse
+from starlette.responses import Response
 
 from app.core import config
 from app.core.config import Env
@@ -16,28 +17,51 @@ auth_router = APIRouter(prefix="/auth", tags=["auth"])
 async def signup(
     request: SignUpRequest,
     auth_service: Annotated[AuthService, Depends(AuthService)],
-) -> Response:
+) -> JSONResponse:
     await auth_service.signup(request)
-    return Response(content={"detail": "회원가입이 성공적으로 완료되었습니다."}, status_code=status.HTTP_201_CREATED)
+    return JSONResponse(
+        content={"detail": "회원가입이 성공적으로 완료되었습니다."}, status_code=status.HTTP_201_CREATED
+    )
 
 
 @auth_router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
 async def login(
     request: LoginRequest,
+    http_request: Request,
     auth_service: Annotated[AuthService, Depends(AuthService)],
-) -> Response:
-    user = await auth_service.authenticate(request)
+) -> JSONResponse:
+    client_ip = http_request.client.host if http_request.client else "unknown"
+    user = await auth_service.authenticate(request, client_ip=client_ip)
     tokens = await auth_service.login(user)
-    resp = Response(
+    resp = JSONResponse(
         content=LoginResponse(access_token=str(tokens["access_token"])).model_dump(), status_code=status.HTTP_200_OK
     )
-    resp.set_cookie(
+    cookie_options = {
+        "key": "refresh_token",
+        "value": str(tokens["refresh_token"]),
+        "httponly": True,
+        "secure": config.ENV == Env.PROD,
+        "domain": config.COOKIE_DOMAIN or None,
+        "samesite": "lax",
+        "path": "/",
+    }
+    if request.remember_me:
+        cookie_options["max_age"] = config.REFRESH_TOKEN_EXPIRE_MINUTES * 60
+
+    resp.set_cookie(**cookie_options)
+    return resp
+
+
+@auth_router.delete("/sessions/current", status_code=status.HTTP_204_NO_CONTENT)
+async def logout() -> Response:
+    resp = Response(status_code=status.HTTP_204_NO_CONTENT)
+    resp.delete_cookie(
         key="refresh_token",
-        value=str(tokens["refresh_token"]),
         httponly=True,
-        secure=True if config.ENV == Env.PROD else False,
+        secure=config.ENV == Env.PROD,
         domain=config.COOKIE_DOMAIN or None,
-        expires=tokens["access_token"].payload["exp"],
+        samesite="lax",
+        path="/",
     )
     return resp
 
@@ -46,10 +70,10 @@ async def login(
 async def token_refresh(
     jwt_service: Annotated[JwtService, Depends(JwtService)],
     refresh_token: Annotated[str | None, Cookie()] = None,
-) -> Response:
+) -> JSONResponse:
     if not refresh_token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token is missing.")
     access_token = jwt_service.refresh_jwt(refresh_token)
-    return Response(
+    return JSONResponse(
         content=TokenRefreshResponse(access_token=str(access_token)).model_dump(), status_code=status.HTTP_200_OK
     )
