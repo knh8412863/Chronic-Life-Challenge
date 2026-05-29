@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, EmailStr, Field
+from pydantic import AfterValidator, BaseModel, EmailStr, Field, model_validator
 
 from app.core.validators import validate_birthday, validate_password, validate_phone_number
 from app.models.users import Gender
@@ -30,3 +30,19 @@ class LoginResponse(BaseModel):
 
 
 class TokenRefreshResponse(LoginResponse): ...
+
+
+class PasswordResetRequest(BaseModel):
+    email: EmailStr
+
+
+class PasswordResetConfirmRequest(BaseModel):
+    token: str
+    new_password: Annotated[str, Field(min_length=8), AfterValidator(validate_password)]
+    new_password_confirm: str
+
+    @model_validator(mode="after")
+    def validate_password_match(self):
+        if self.new_password != self.new_password_confirm:
+            raise ValueError("비밀번호가 일치하지 않습니다.")
+        return self
