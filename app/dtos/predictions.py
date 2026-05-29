@@ -30,8 +30,10 @@ class MedicationCode(StrEnum):
 
 
 class LastCheckupPeriod(StrEnum):
-    WITHIN_1_YEAR = "WITHIN_1_YEAR"
+    UNDER_6_MONTHS = "UNDER_6_MONTHS"
+    UNDER_1_YEAR = "UNDER_1_YEAR"
     OVER_1_YEAR = "OVER_1_YEAR"
+    NEVER = "NEVER"
 
 
 class HealthSurveyCreateRequest(BaseModel):
