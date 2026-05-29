@@ -22,6 +22,7 @@ class SignUpRequest(BaseModel):
 class LoginRequest(BaseModel):
     email: EmailStr
     password: Annotated[str, Field(min_length=8)]
+    remember_me: bool = False
 
 
 class LoginResponse(BaseModel):

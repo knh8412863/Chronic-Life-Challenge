@@ -30,9 +30,15 @@ class Config(BaseSettings):
     DB_CONNECT_TIMEOUT: int = 5
     DB_CONNECTION_POOL_MAXSIZE: int = 10
 
+    REDIS_URL: str | None = None
+
     COOKIE_DOMAIN: str = "localhost"
 
     JWT_ALGORITHM: str = "HS256"
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
-    REFRESH_TOKEN_EXPIRE_MINUTES: int = 14 * 24 * 60
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_MINUTES: int = 7 * 24 * 60
     JWT_LEEWAY: int = 5
+
+    AUTH_RATE_LIMIT_MAX_FAILURES: int = 5
+    AUTH_RATE_LIMIT_MAX_IP_FAILURES: int = 30
+    AUTH_RATE_LIMIT_WINDOW_SECONDS: int = 60
