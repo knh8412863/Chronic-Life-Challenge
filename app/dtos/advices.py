@@ -1,13 +1,18 @@
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Literal
+from typing import Annotated, Literal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 
 class AdviceTriggerType(StrEnum):
     AUTO = "AUTO"
     MANUAL = "MANUAL"
+
+
+class AdviceFeedbackType(StrEnum):
+    HELPFUL = "HELPFUL"
+    NOT_HELPFUL = "NOT_HELPFUL"
 
 
 class AdviceGenerateRequest(BaseModel):
@@ -25,3 +30,15 @@ class DailyAdviceResponse(BaseModel):
     generated: bool
     created_at: datetime
     source_type: Literal["RULE_BASED", "LLM"] = "RULE_BASED"
+
+
+class AdviceFeedbackCreateRequest(BaseModel):
+    feedback_type: AdviceFeedbackType
+    comment: Annotated[str | None, Field(default=None, max_length=500)]
+
+
+class AdviceFeedbackCreateResponse(BaseModel):
+    feedback_id: int
+    advice_id: int
+    feedback_type: AdviceFeedbackType
+    created_at: datetime

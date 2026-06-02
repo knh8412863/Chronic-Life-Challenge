@@ -18,3 +18,19 @@ class LLMAdvice(models.Model):
 
     class Meta:
         table = "llm_advices"
+
+
+class AdviceFeedback(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    advice = fields.OneToOneField(
+        "models.LLMAdvice",
+        related_name="feedback",
+        on_delete=fields.CASCADE,
+    )
+    user = fields.ForeignKeyField("models.User", related_name="advice_feedbacks", on_delete=fields.CASCADE)
+    feedback_type = fields.CharField(max_length=15)
+    comment = fields.CharField(max_length=500, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "advice_feedbacks"

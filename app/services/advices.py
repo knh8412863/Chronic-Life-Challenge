@@ -4,8 +4,15 @@ from typing import Any
 from fastapi import HTTPException, status
 
 from app.core import config
-from app.dtos.advices import AdviceGenerateRequest, AdviceTriggerType, DailyAdviceResponse
-from app.models.advices import LLMAdvice
+from app.dtos.advices import (
+    AdviceFeedbackCreateRequest,
+    AdviceFeedbackCreateResponse,
+    AdviceFeedbackType,
+    AdviceGenerateRequest,
+    AdviceTriggerType,
+    DailyAdviceResponse,
+)
+from app.models.advices import AdviceFeedback, LLMAdvice
 from app.models.predictions import ChronicHealthInput, PredictionResult
 from app.models.users import User
 from app.services.predictions import HealthInputService
@@ -50,6 +57,28 @@ class AdviceService:
             trigger_type=data.trigger_type.value,
         )
         return self._to_response(advice, generated=True)
+
+    async def create_feedback(
+        self,
+        user: User,
+        advice_id: int,
+        data: AdviceFeedbackCreateRequest,
+    ) -> AdviceFeedbackCreateResponse:
+        advice = await LLMAdvice.get_or_none(id=advice_id, user_id=user.id)
+        if advice is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="오늘의 조언을 찾을 수 없습니다.")
+
+        exists = await AdviceFeedback.exists(advice_id=advice.id)
+        if exists:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 피드백을 등록한 조언입니다.")
+
+        feedback = await AdviceFeedback.create(
+            advice=advice,
+            user=user,
+            feedback_type=data.feedback_type.value,
+            comment=data.comment,
+        )
+        return self._to_feedback_response(feedback, advice.id)
 
     @staticmethod
     async def _latest_advice(user_id: int, advice_date: date) -> LLMAdvice | None:
@@ -155,4 +184,13 @@ class AdviceService:
             generated=generated,
             created_at=advice.created_at,
             source_type="RULE_BASED",
+        )
+
+    @staticmethod
+    def _to_feedback_response(feedback: AdviceFeedback, advice_id: int) -> AdviceFeedbackCreateResponse:
+        return AdviceFeedbackCreateResponse(
+            feedback_id=feedback.id,
+            advice_id=advice_id,
+            feedback_type=AdviceFeedbackType(feedback.feedback_type),
+            created_at=feedback.created_at,
         )

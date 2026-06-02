@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from types import SimpleNamespace
 
-from app.dtos.advices import AdviceTriggerType
+from app.dtos.advices import AdviceFeedbackType, AdviceTriggerType
 from app.services.advices import ADVICE_TITLE, MAX_ADVICE_LENGTH, AdviceService
 from app.services.home import HomeService
 
@@ -73,3 +73,17 @@ def test_home_today_advice_uses_generated_advice_before_placeholder():
     assert result.advice_id == 3
     assert result.content == "생성된 오늘의 조언"
     assert result.is_placeholder is False
+
+
+def test_advice_feedback_response_uses_feedback_type_enum():
+    feedback = SimpleNamespace(
+        id=12,
+        feedback_type="HELPFUL",
+        created_at=datetime(2026, 6, 2, 11, 30),
+    )
+
+    response = AdviceService._to_feedback_response(feedback, advice_id=5)
+
+    assert response.feedback_id == 12
+    assert response.advice_id == 5
+    assert response.feedback_type == AdviceFeedbackType.HELPFUL
