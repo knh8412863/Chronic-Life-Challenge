@@ -101,3 +101,43 @@ class ChallengeCancelResponse(BaseModel):
     challenge_id: int
     status: ChallengeParticipationStatus
     canceled_at: datetime
+
+
+class ChallengeBadgeItemResponse(BaseModel):
+    badge_id: str
+    badge_name: str
+    badge_type: str
+    is_earned: bool
+    current_streak: int
+    target_streak: int
+    progress_rate: float
+    earned_at: datetime | None = None
+
+
+class ChallengeBadgeListResponse(BaseModel):
+    earned_count: int
+    total_completion_rate: float
+    items: list[ChallengeBadgeItemResponse]
+    recent_earned: list[ChallengeBadgeItemResponse]
+
+
+class ChallengeLeaderboardItemResponse(BaseModel):
+    rank: int
+    user_id: int
+    nickname_masked: str
+    score: int
+    completed_mission_count: int
+
+
+class ChallengeLeaderboardMyRankResponse(BaseModel):
+    rank: int | None = None
+    score: int = 0
+    completed_mission_count: int = 0
+
+
+class ChallengeWeeklyLeaderboardResponse(BaseModel):
+    week_start: date
+    week_end: date
+    top_three: list[ChallengeLeaderboardItemResponse]
+    my_rank: ChallengeLeaderboardMyRankResponse
+    items: list[ChallengeLeaderboardItemResponse]

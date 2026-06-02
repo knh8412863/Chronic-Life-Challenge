@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Query, status
@@ -5,6 +6,7 @@ from fastapi.responses import ORJSONResponse as Response
 
 from app.dependencies.security import get_request_user
 from app.dtos.challenges import (
+    ChallengeBadgeListResponse,
     ChallengeCancelResponse,
     ChallengeCheckinCreateRequest,
     ChallengeCheckinResponse,
@@ -12,6 +14,7 @@ from app.dtos.challenges import (
     ChallengeDetailResponse,
     ChallengeJoinResponse,
     ChallengeSummaryResponse,
+    ChallengeWeeklyLeaderboardResponse,
     MyChallengeResponse,
 )
 from app.dtos.predictions import DataResponse
@@ -117,4 +120,33 @@ async def cancel_challenge_participation(
     service: Annotated[ChallengeService, Depends(ChallengeService)],
 ) -> Response:
     result = await service.cancel_participation(user, participation_id)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@challenge_router.get(
+    "/badges",
+    response_model=DataResponse[ChallengeBadgeListResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_badges(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[ChallengeService, Depends(ChallengeService)],
+    badge_filter: Annotated[str, Query(pattern="^(ALL|STREAK_3|STREAK_7|STREAK_30)$")] = "ALL",
+) -> Response:
+    result = await service.get_badges(user, badge_filter=badge_filter)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@challenge_router.get(
+    "/challenge-leaderboards/weekly",
+    response_model=DataResponse[ChallengeWeeklyLeaderboardResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_weekly_challenge_leaderboard(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[ChallengeService, Depends(ChallengeService)],
+    week_start: date | None = None,
+    limit: Annotated[int, Query(ge=1, le=50)] = 10,
+) -> Response:
+    result = await service.get_weekly_leaderboard(user, week_start=week_start, limit=limit)
     return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
