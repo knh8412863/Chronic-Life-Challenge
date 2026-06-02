@@ -1,12 +1,24 @@
 import uuid
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from typing import Any
 
 from fastapi import HTTPException, status
 
-from app.dtos.foods import FoodAnalysisRequest, FoodAnalysisResponse, FoodNutritionResponse
+from app.core import config
+from app.dtos.foods import (
+    FoodAnalysisRequest,
+    FoodAnalysisResponse,
+    FoodDailyMealSummaryResponse,
+    FoodNutritionResponse,
+    FoodPeriodMealSummaryResponse,
+    FoodTodayMealSummaryResponse,
+    LatestFoodAnalysisAdviceResponse,
+    MealNutritionSummaryResponse,
+)
 from app.dtos.predictions import MealType
 from app.models.foods import FoodAnalysisResult
+from app.models.predictions import MealLog
 from app.models.users import User
 
 MAX_ADVICE_LENGTH = 500
@@ -40,6 +52,40 @@ class FoodAnalysisService:
         if result is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="식단 분석 결과를 찾을 수 없습니다.")
         return self._to_response(result)
+
+    async def get_today_meal_summary(self, user: User) -> FoodTodayMealSummaryResponse:
+        today = self._today()
+        meals = await MealLog.filter(user_id=user.id, meal_date=today).order_by("-id").limit(100)
+        latest_analysis = await FoodAnalysisResult.filter(user_id=user.id).order_by("-created_at").first()
+        return FoodTodayMealSummaryResponse(
+            summary_date=today,
+            nutrition_summary=self._build_meal_summary(meals),
+            latest_analysis_advice=self._to_latest_analysis_advice(latest_analysis) if latest_analysis else None,
+        )
+
+    async def get_period_meal_summary(
+        self,
+        user: User,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> FoodPeriodMealSummaryResponse:
+        period_end = to_date or self._today()
+        period_start = from_date or (period_end - timedelta(days=6))
+        if period_start > period_end:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="조회 시작일은 종료일보다 늦을 수 없습니다."
+            )
+
+        meals = (
+            await MealLog.filter(user_id=user.id, meal_date__gte=period_start, meal_date__lte=period_end)
+            .order_by("-meal_date", "-id")
+            .limit(500)
+        )
+        return FoodPeriodMealSummaryResponse(
+            period_start=period_start,
+            period_end=period_end,
+            daily_summaries=self._build_daily_summaries(meals),
+        )
 
     @staticmethod
     def _analyze_nutrition(data: FoodAnalysisRequest) -> tuple[int, list[str], str]:
@@ -107,6 +153,43 @@ class FoodAnalysisService:
         )
 
     @staticmethod
+    def _to_latest_analysis_advice(result: FoodAnalysisResult) -> LatestFoodAnalysisAdviceResponse:
+        return LatestFoodAnalysisAdviceResponse(
+            food_analysis_result_id=result.id,
+            task_uuid=result.task_uuid,
+            food_name=result.food_name,
+            health_score=result.health_score,
+            risk_flags=result.risk_flags or [],
+            advice_text=result.advice_text,
+            created_at=result.created_at,
+        )
+
+    @staticmethod
+    def _build_daily_summaries(meals: list[MealLog]) -> list[FoodDailyMealSummaryResponse]:
+        grouped: dict[date, list[MealLog]] = {}
+        for meal in meals:
+            grouped.setdefault(meal.meal_date, []).append(meal)
+
+        return [
+            FoodDailyMealSummaryResponse(
+                meal_date=meal_date,
+                nutrition_summary=FoodAnalysisService._build_meal_summary(day_meals),
+            )
+            for meal_date, day_meals in sorted(grouped.items(), reverse=True)
+        ]
+
+    @staticmethod
+    def _build_meal_summary(meals: list[MealLog]) -> MealNutritionSummaryResponse:
+        return MealNutritionSummaryResponse(
+            meal_count=len(meals),
+            total_calories=sum(meal.calories or 0 for meal in meals),
+            total_sodium_mg=round(sum(float(meal.sodium_mg or 0) for meal in meals), 2),
+            total_sugar_g=round(sum(float(meal.sugar_g or 0) for meal in meals), 2),
+            total_fiber_g=round(sum(float(meal.fiber_g or 0) for meal in meals), 2),
+            total_protein_g=round(sum(float(meal.protein_g or 0) for meal in meals), 2),
+        )
+
+    @staticmethod
     def _optional_decimal(value: int | float | None) -> Decimal | None:
         return Decimal(str(value)) if value is not None else None
 
@@ -119,3 +202,7 @@ class FoodAnalysisService:
         if len(text) <= max_length:
             return text
         return text[: max_length - 1].rstrip() + "…"
+
+    @staticmethod
+    def _today() -> date:
+        return datetime.now(config.TIMEZONE).date()

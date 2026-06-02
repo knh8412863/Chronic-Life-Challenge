@@ -79,3 +79,78 @@ def test_food_analysis_response_converts_decimal_nutrition_values():
     assert response.nutrition.carbs_g == 80.5
     assert response.nutrition.sodium_mg == 1200.0
     assert response.risk_flags == ["HIGH_SODIUM"]
+
+
+def test_meal_summary_sums_nutrition_values():
+    meals = [
+        SimpleNamespace(
+            calories=500,
+            sodium_mg=Decimal("800.50"),
+            sugar_g=Decimal("8.00"),
+            fiber_g=Decimal("4.00"),
+            protein_g=Decimal("20.50"),
+        ),
+        SimpleNamespace(
+            calories=None,
+            sodium_mg=None,
+            sugar_g=Decimal("2.30"),
+            fiber_g=None,
+            protein_g=Decimal("5.00"),
+        ),
+    ]
+
+    result = FoodAnalysisService._build_meal_summary(meals)
+
+    assert result.meal_count == 2
+    assert result.total_calories == 500
+    assert result.total_sodium_mg == 800.5
+    assert result.total_sugar_g == 10.3
+    assert result.total_fiber_g == 4.0
+    assert result.total_protein_g == 25.5
+
+
+def test_daily_summaries_group_meals_by_date_descending():
+    meals = [
+        SimpleNamespace(
+            meal_date=date(2026, 6, 1),
+            calories=300,
+            sodium_mg=Decimal("500.00"),
+            sugar_g=None,
+            fiber_g=None,
+            protein_g=Decimal("10.00"),
+        ),
+        SimpleNamespace(
+            meal_date=date(2026, 6, 2),
+            calories=700,
+            sodium_mg=Decimal("900.00"),
+            sugar_g=Decimal("5.00"),
+            fiber_g=Decimal("3.00"),
+            protein_g=Decimal("30.00"),
+        ),
+    ]
+
+    result = FoodAnalysisService._build_daily_summaries(meals)
+
+    assert [item.meal_date for item in result] == [date(2026, 6, 2), date(2026, 6, 1)]
+    assert result[0].nutrition_summary.total_calories == 700
+    assert result[1].nutrition_summary.total_protein_g == 10.0
+
+
+def test_latest_analysis_advice_response_uses_analysis_fields():
+    now = datetime(2026, 6, 2, 19, 0, 0)
+    result = SimpleNamespace(
+        id=3,
+        task_uuid="task-3",
+        food_name="김치찌개",
+        health_score=75,
+        risk_flags=["HIGH_SODIUM"],
+        advice_text="나트륨 조절이 필요합니다.",
+        created_at=now,
+    )
+
+    response = FoodAnalysisService._to_latest_analysis_advice(result)
+
+    assert response.food_analysis_result_id == 3
+    assert response.food_name == "김치찌개"
+    assert response.risk_flags == ["HIGH_SODIUM"]
+    assert response.created_at == now

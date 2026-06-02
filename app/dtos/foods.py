@@ -43,3 +43,39 @@ class FoodAnalysisResponse(BaseModel):
     risk_flags: list[str]
     advice_text: str
     created_at: datetime
+
+
+class MealNutritionSummaryResponse(BaseModel):
+    meal_count: int
+    total_calories: int
+    total_sodium_mg: float
+    total_sugar_g: float
+    total_fiber_g: float
+    total_protein_g: float
+
+
+class LatestFoodAnalysisAdviceResponse(BaseModel):
+    food_analysis_result_id: int
+    task_uuid: str
+    food_name: str
+    health_score: int
+    risk_flags: list[str]
+    advice_text: str
+    created_at: datetime
+
+
+class FoodTodayMealSummaryResponse(BaseModel):
+    summary_date: date
+    nutrition_summary: MealNutritionSummaryResponse
+    latest_analysis_advice: LatestFoodAnalysisAdviceResponse | None = None
+
+
+class FoodDailyMealSummaryResponse(BaseModel):
+    meal_date: date
+    nutrition_summary: MealNutritionSummaryResponse
+
+
+class FoodPeriodMealSummaryResponse(BaseModel):
+    period_start: date
+    period_end: date
+    daily_summaries: list[FoodDailyMealSummaryResponse]
