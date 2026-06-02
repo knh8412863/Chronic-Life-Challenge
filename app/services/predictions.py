@@ -1,7 +1,7 @@
 import asyncio
 import time
 import uuid
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from pathlib import Path
 from typing import Any
@@ -28,6 +28,14 @@ from app.dtos.predictions import (
     PredictionTaskStatusResponse,
     RenalRecordCreateRequest,
     RenalRecordResponse,
+    VitalMeasureType,
+    VitalRecordCreateRequest,
+    VitalRecordDetailResponse,
+    VitalRecordListResponse,
+    VitalRecordResponse,
+    VitalRecordSummaryResponse,
+    VitalRecordUpdateRequest,
+    VitalTrendResponse,
 )
 from app.models.predictions import (
     ChronicHealthInput,
@@ -42,6 +50,7 @@ from app.models.predictions import (
     PredictionTask,
     RenalRecord,
     UserProfile,
+    VitalRecord,
 )
 from app.models.users import Gender, User
 
@@ -231,6 +240,103 @@ class HealthInputService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신장 기록을 찾을 수 없습니다.")
         return self._to_renal_record(record)
 
+    async def create_vital_record(self, user: User, data: VitalRecordCreateRequest) -> OptionalRecordCreateResponse:
+        is_critical = self._is_vital_critical(data.measure_type.value, data.sbp, data.dbp, data.glucose)
+        record = await VitalRecord.create(
+            user=user,
+            record_date=data.measured_at.date(),
+            measured_at=data.measured_at,
+            measure_type=data.measure_type.value,
+            sbp=data.sbp,
+            dbp=data.dbp,
+            glucose=data.glucose,
+            memo=data.memo,
+            is_critical=is_critical,
+        )
+        return OptionalRecordCreateResponse(record_id=record.id, created_at=record.created_at)
+
+    async def get_vital_records(
+        self,
+        user: User,
+        from_date: date | None = None,
+        to_date: date | None = None,
+        measure_type: VitalMeasureType | None = None,
+        limit: int = 100,
+    ) -> VitalRecordListResponse:
+        query = VitalRecord.filter(user_id=user.id)
+        if from_date is not None:
+            query = query.filter(record_date__gte=from_date)
+        if to_date is not None:
+            query = query.filter(record_date__lte=to_date)
+        if measure_type is not None:
+            query = query.filter(measure_type=measure_type.value)
+
+        records = await query.order_by("-measured_at", "-id").limit(limit)
+        items = [self._to_vital_record(record) for record in records]
+        return VitalRecordListResponse(
+            summary=self._build_vital_summary(records),
+            total=len(items),
+            items=items,
+        )
+
+    async def get_vital_record(self, user: User, record_id: int) -> VitalRecordDetailResponse:
+        record = await VitalRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="혈압·혈당 기록을 찾을 수 없습니다.")
+
+        start_date = record.record_date - timedelta(days=6)
+        trend_records = (
+            await VitalRecord.filter(user_id=user.id, record_date__gte=start_date, record_date__lte=record.record_date)
+            .order_by("record_date", "measured_at", "id")
+            .limit(100)
+        )
+        return VitalRecordDetailResponse(
+            record=self._to_vital_record(record),
+            trend=VitalTrendResponse(
+                **self._build_vital_summary(trend_records).model_dump(),
+                recent_7_days=[self._to_vital_record(item) for item in trend_records],
+            ),
+        )
+
+    async def update_vital_record(
+        self,
+        user: User,
+        record_id: int,
+        data: VitalRecordUpdateRequest,
+    ) -> VitalRecordResponse:
+        record = await VitalRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="혈압·혈당 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+
+        update_data = data.model_dump(exclude_unset=True)
+        measured_at = update_data.get("measured_at", record.measured_at)
+        if measured_at.date() != self._today():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="당일 기록만 수정할 수 있습니다.")
+
+        sbp = update_data.get("sbp", record.sbp)
+        dbp = update_data.get("dbp", record.dbp)
+        glucose = update_data.get("glucose", record.glucose)
+        self._validate_vital_values(record.measure_type, sbp, dbp, glucose)
+
+        record.measured_at = measured_at
+        record.record_date = measured_at.date()
+        record.sbp = sbp
+        record.dbp = dbp
+        record.glucose = glucose
+        if "memo" in update_data:
+            record.memo = update_data["memo"]
+        record.is_critical = self._is_vital_critical(record.measure_type, record.sbp, record.dbp, record.glucose)
+        await record.save()
+        return self._to_vital_record(record)
+
+    async def delete_vital_record(self, user: User, record_id: int) -> None:
+        record = await VitalRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="혈압·혈당 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+        await record.delete()
+
     @staticmethod
     def _assess_dyslipidemia(user: User, lipid: LipidObesityRecord | None) -> MetricAssessmentItemResponse:
         if lipid is None:
@@ -416,6 +522,80 @@ class HealthInputService:
             created_at=record.created_at,
             updated_at=record.updated_at,
         )
+
+    @staticmethod
+    def _to_vital_record(record: VitalRecord) -> VitalRecordResponse:
+        return VitalRecordResponse(
+            record_id=record.id,
+            record_date=record.record_date,
+            measured_at=record.measured_at,
+            measure_type=VitalMeasureType(record.measure_type),
+            sbp=record.sbp,
+            dbp=record.dbp,
+            glucose=record.glucose,
+            memo=record.memo,
+            is_critical=record.is_critical,
+            status_label="CRITICAL" if record.is_critical else "NORMAL",
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
+
+    @staticmethod
+    def _build_vital_summary(records: list[VitalRecord]) -> VitalRecordSummaryResponse:
+        sbp_values = [record.sbp for record in records if record.sbp is not None]
+        dbp_values = [record.dbp for record in records if record.dbp is not None]
+        glucose_values = [record.glucose for record in records if record.glucose is not None]
+        return VitalRecordSummaryResponse(
+            avg_sbp=HealthInputService._average(sbp_values),
+            avg_dbp=HealthInputService._average(dbp_values),
+            avg_glucose=HealthInputService._average(glucose_values),
+            critical_count=sum(1 for record in records if record.is_critical),
+        )
+
+    @staticmethod
+    def _average(values: list[int]) -> float | None:
+        return round(sum(values) / len(values), 1) if values else None
+
+    @staticmethod
+    def _validate_vital_values(measure_type: str, sbp: int | None, dbp: int | None, glucose: int | None) -> None:
+        if measure_type.startswith("BP_"):
+            if sbp is None or dbp is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    detail="혈압 기록에는 수축기·이완기 혈압이 필요합니다.",
+                )
+            if glucose is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="혈압 기록에는 혈당을 입력할 수 없습니다."
+                )
+        if measure_type.startswith("GLUCOSE_"):
+            if glucose is None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="혈당 기록에는 혈당 수치가 필요합니다."
+                )
+            if sbp is not None or dbp is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="혈당 기록에는 혈압을 입력할 수 없습니다."
+                )
+
+    @staticmethod
+    def _is_vital_critical(measure_type: str, sbp: int | None, dbp: int | None, glucose: int | None) -> bool:
+        if measure_type.startswith("BP_"):
+            return (sbp is not None and sbp >= 180) or (dbp is not None and dbp >= 110)
+        if measure_type.startswith("GLUCOSE_"):
+            return glucose is not None and glucose >= 200
+        return False
+
+    @staticmethod
+    def _ensure_today_record(record_date: date) -> None:
+        if record_date != HealthInputService._today():
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="당일 기록만 수정 또는 삭제할 수 있습니다."
+            )
+
+    @staticmethod
+    def _today() -> date:
+        return datetime.now(config.TIMEZONE).date()
 
     @staticmethod
     def _optional_float(value: Any) -> float | None:
