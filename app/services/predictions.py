@@ -11,6 +11,11 @@ from tortoise.transactions import in_transaction
 
 from app.core import config
 from app.dtos.predictions import (
+    ActivityLogCreateRequest,
+    ActivityLogListResponse,
+    ActivityLogResponse,
+    ActivityLogSummaryResponse,
+    ActivityLogUpdateRequest,
     HealthSurveyCreateRequest,
     HealthSurveyCreateResponse,
     HealthSurveyRecordResponse,
@@ -38,6 +43,7 @@ from app.dtos.predictions import (
     VitalTrendResponse,
 )
 from app.models.predictions import (
+    ActivityLog,
     ChronicHealthInput,
     LifestyleInput,
     LipidObesityRecord,
@@ -337,6 +343,84 @@ class HealthInputService:
         self._ensure_today_record(record.record_date)
         await record.delete()
 
+    async def create_activity_log(self, user: User, data: ActivityLogCreateRequest) -> OptionalRecordCreateResponse:
+        exists = await ActivityLog.exists(user_id=user.id, record_date=data.record_date)
+        if exists:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 등록된 날짜의 생활습관 기록입니다.")
+
+        record = await ActivityLog.create(
+            user=user,
+            record_date=data.record_date,
+            alcohol_frequency=data.alcohol_frequency,
+            alcohol_amount=data.alcohol_amount,
+            walking_days=data.walking_days,
+            sedentary_hours=self._optional_decimal(data.sedentary_hours),
+            sleep_hours=self._optional_decimal(data.sleep_hours),
+            stress_level=data.stress_level,
+            diet_score=self._optional_decimal(data.diet_score),
+            memo=data.memo,
+        )
+        return OptionalRecordCreateResponse(record_id=record.id, created_at=record.created_at)
+
+    async def get_activity_logs(
+        self,
+        user: User,
+        from_date: date | None = None,
+        to_date: date | None = None,
+        limit: int = 100,
+    ) -> ActivityLogListResponse:
+        query = ActivityLog.filter(user_id=user.id)
+        if from_date is not None:
+            query = query.filter(record_date__gte=from_date)
+        if to_date is not None:
+            query = query.filter(record_date__lte=to_date)
+
+        records = await query.order_by("-record_date", "-id").limit(limit)
+        items = [self._to_activity_log(record) for record in records]
+        return ActivityLogListResponse(
+            summary=self._build_activity_summary(records),
+            total=len(items),
+            items=items,
+        )
+
+    async def get_activity_log(self, user: User, activity_log_id: int) -> ActivityLogResponse:
+        record = await ActivityLog.get_or_none(id=activity_log_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="생활습관 기록을 찾을 수 없습니다.")
+        return self._to_activity_log(record)
+
+    async def update_activity_log(
+        self,
+        user: User,
+        activity_log_id: int,
+        data: ActivityLogUpdateRequest,
+    ) -> ActivityLogResponse:
+        record = await ActivityLog.get_or_none(id=activity_log_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="생활습관 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+
+        update_data = data.model_dump(exclude_unset=True)
+        alcohol_frequency = update_data.get("alcohol_frequency", record.alcohol_frequency)
+        alcohol_amount = update_data.get("alcohol_amount", record.alcohol_amount)
+        self._validate_activity_alcohol(alcohol_frequency, alcohol_amount)
+
+        for field in ["alcohol_frequency", "alcohol_amount", "walking_days", "stress_level", "memo"]:
+            if field in update_data:
+                setattr(record, field, update_data[field])
+        for field in ["sedentary_hours", "sleep_hours", "diet_score"]:
+            if field in update_data:
+                setattr(record, field, self._optional_decimal(update_data[field]))
+        await record.save()
+        return self._to_activity_log(record)
+
+    async def delete_activity_log(self, user: User, activity_log_id: int) -> None:
+        record = await ActivityLog.get_or_none(id=activity_log_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="생활습관 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+        await record.delete()
+
     @staticmethod
     def _assess_dyslipidemia(user: User, lipid: LipidObesityRecord | None) -> MetricAssessmentItemResponse:
         if lipid is None:
@@ -541,6 +625,23 @@ class HealthInputService:
         )
 
     @staticmethod
+    def _to_activity_log(record: ActivityLog) -> ActivityLogResponse:
+        return ActivityLogResponse(
+            activity_log_id=record.id,
+            record_date=record.record_date,
+            alcohol_frequency=record.alcohol_frequency,
+            alcohol_amount=record.alcohol_amount,
+            walking_days=record.walking_days,
+            sedentary_hours=HealthInputService._optional_float(record.sedentary_hours),
+            sleep_hours=HealthInputService._optional_float(record.sleep_hours),
+            stress_level=record.stress_level,
+            diet_score=HealthInputService._optional_float(record.diet_score),
+            memo=record.memo,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
+
+    @staticmethod
     def _build_vital_summary(records: list[VitalRecord]) -> VitalRecordSummaryResponse:
         sbp_values = [record.sbp for record in records if record.sbp is not None]
         dbp_values = [record.dbp for record in records if record.dbp is not None]
@@ -553,8 +654,41 @@ class HealthInputService:
         )
 
     @staticmethod
+    def _build_activity_summary(records: list[ActivityLog]) -> ActivityLogSummaryResponse:
+        walking_days = [record.walking_days for record in records if record.walking_days is not None]
+        sedentary_hours = [float(record.sedentary_hours) for record in records if record.sedentary_hours is not None]
+        sleep_hours = [float(record.sleep_hours) for record in records if record.sleep_hours is not None]
+        stress_levels = [record.stress_level for record in records if record.stress_level is not None]
+        diet_scores = [float(record.diet_score) for record in records if record.diet_score is not None]
+        return ActivityLogSummaryResponse(
+            avg_walking_days=HealthInputService._average_float(walking_days),
+            avg_sedentary_hours=HealthInputService._average_float(sedentary_hours),
+            avg_sleep_hours=HealthInputService._average_float(sleep_hours),
+            avg_stress_level=HealthInputService._average_float(stress_levels),
+            avg_diet_score=HealthInputService._average_float(diet_scores),
+            logged_days=len(records),
+        )
+
+    @staticmethod
     def _average(values: list[int]) -> float | None:
         return round(sum(values) / len(values), 1) if values else None
+
+    @staticmethod
+    def _average_float(values: list[int | float]) -> float | None:
+        return round(sum(values) / len(values), 1) if values else None
+
+    @staticmethod
+    def _validate_activity_alcohol(alcohol_frequency: int | None, alcohol_amount: int | None) -> None:
+        if alcohol_frequency == 0 and alcohol_amount is not None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="음주 빈도가 없음이면 음주량을 입력할 수 없습니다.",
+            )
+        if alcohol_frequency in {1, 3} and alcohol_amount is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="음주 빈도가 있으면 음주량이 필요합니다.",
+            )
 
     @staticmethod
     def _validate_vital_values(measure_type: str, sbp: int | None, dbp: int | None, glucose: int | None) -> None:
@@ -600,6 +734,10 @@ class HealthInputService:
     @staticmethod
     def _optional_float(value: Any) -> float | None:
         return float(value) if value is not None else None
+
+    @staticmethod
+    def _optional_decimal(value: int | float | None) -> Decimal | None:
+        return Decimal(str(value)) if value is not None else None
 
 
 class PredictionService:
