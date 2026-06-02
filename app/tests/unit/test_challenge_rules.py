@@ -125,6 +125,23 @@ def test_challenge_checkin_response_can_mark_completed():
     assert response.completion_rate == 100.0
 
 
+def test_challenge_cancel_response_uses_updated_at_as_canceled_at():
+    canceled_at = datetime(2026, 6, 2, 15, 20)
+    participation = SimpleNamespace(
+        id=8,
+        challenge_id=3,
+        status="CANCELED",
+        updated_at=canceled_at,
+    )
+
+    response = ChallengeService._to_cancel_response(participation)
+
+    assert response.participation_id == 8
+    assert response.challenge_id == 3
+    assert response.status == ChallengeParticipationStatus.CANCELED
+    assert response.canceled_at == canceled_at
+
+
 def test_challenge_dashboard_summary_counts_active_completed_and_today_missions():
     today = date(2026, 6, 3)
     week_start = date(2026, 6, 1)

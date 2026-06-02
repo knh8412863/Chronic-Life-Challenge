@@ -4,6 +4,7 @@ from fastapi import HTTPException, status
 from tortoise.transactions import in_transaction
 
 from app.dtos.challenges import (
+    ChallengeCancelResponse,
     ChallengeCheckinCreateRequest,
     ChallengeCheckinResponse,
     ChallengeDashboardSummaryResponse,
@@ -169,6 +170,20 @@ class ChallengeService:
             await participation.save(update_fields=["progress_count", "status", "completed_at", "updated_at"])
 
         return self._to_checkin_response(checkin, participation)
+
+    async def cancel_participation(self, user: User, participation_id: int) -> ChallengeCancelResponse:
+        participation = await ChallengeParticipation.get_or_none(
+            id=participation_id,
+            user_id=user.id,
+        ).prefetch_related("challenge")
+        if participation is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="참여 중인 챌린지를 찾을 수 없습니다.")
+        if participation.status != ChallengeParticipationStatus.JOINED.value:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="진행 중인 챌린지만 포기할 수 있습니다.")
+
+        participation.status = ChallengeParticipationStatus.CANCELED.value
+        await participation.save(update_fields=["status", "updated_at"])
+        return self._to_cancel_response(participation)
 
     @staticmethod
     async def _get_active_challenge(challenge_id: int) -> Challenge:
@@ -418,6 +433,15 @@ class ChallengeService:
                 participation.challenge.duration_days,
             ),
             created_at=checkin.created_at,
+        )
+
+    @staticmethod
+    def _to_cancel_response(participation: ChallengeParticipation) -> ChallengeCancelResponse:
+        return ChallengeCancelResponse(
+            participation_id=participation.id,
+            challenge_id=participation.challenge_id,
+            status=ChallengeParticipationStatus(participation.status),
+            canceled_at=participation.updated_at,
         )
 
     @staticmethod

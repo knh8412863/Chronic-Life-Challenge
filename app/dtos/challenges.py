@@ -94,3 +94,10 @@ class ChallengeCheckinResponse(BaseModel):
     status: ChallengeParticipationStatus
     completion_rate: float
     created_at: datetime
+
+
+class ChallengeCancelResponse(BaseModel):
+    participation_id: int
+    challenge_id: int
+    status: ChallengeParticipationStatus
+    canceled_at: datetime

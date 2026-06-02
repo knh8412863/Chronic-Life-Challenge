@@ -5,6 +5,7 @@ from fastapi.responses import ORJSONResponse as Response
 
 from app.dependencies.security import get_request_user
 from app.dtos.challenges import (
+    ChallengeCancelResponse,
     ChallengeCheckinCreateRequest,
     ChallengeCheckinResponse,
     ChallengeDashboardSummaryResponse,
@@ -103,3 +104,17 @@ async def checkin_today(
 ) -> Response:
     result = await service.checkin_today(user, participation_id, request)
     return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_201_CREATED)
+
+
+@challenge_router.post(
+    "/challenge-participations/{participation_id}/cancellations",
+    response_model=DataResponse[ChallengeCancelResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def cancel_challenge_participation(
+    participation_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[ChallengeService, Depends(ChallengeService)],
+) -> Response:
+    result = await service.cancel_participation(user, participation_id)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
