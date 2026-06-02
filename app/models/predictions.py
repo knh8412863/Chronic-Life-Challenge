@@ -207,7 +207,12 @@ class ExerciseLog(models.Model):
 class MealLog(models.Model):
     id = fields.BigIntField(primary_key=True)
     user = fields.ForeignKeyField("models.User", related_name="meal_logs", on_delete=fields.CASCADE)
-    food_analysis_result_id = fields.BigIntField(null=True)
+    food_analysis_result = fields.ForeignKeyField(
+        "models.FoodAnalysisResult",
+        related_name="meal_logs",
+        null=True,
+        on_delete=fields.SET_NULL,
+    )
     meal_date = fields.DateField()
     meal_type = fields.CharField(max_length=20)
     food_name = fields.CharField(max_length=100)
