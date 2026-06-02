@@ -215,6 +215,33 @@ class ActivityLogUpdateRequest(BaseModel):
     memo: Annotated[str | None, Field(default=None, max_length=255)] = None
 
 
+class ChronicDiseaseGoalUpdateRequest(BaseModel):
+    target_systolic_bp: Annotated[int | None, Field(default=None, ge=80, le=180)]
+    target_diastolic_bp: Annotated[int | None, Field(default=None, ge=50, le=120)]
+    target_fasting_glucose: Annotated[int | None, Field(default=None, ge=70, le=180)]
+    target_postprandial_glucose: Annotated[int | None, Field(default=None, ge=70, le=250)]
+    target_hba1c: Annotated[float | None, Field(default=None, ge=4.0, le=12.0)]
+    target_ldl_cholesterol: Annotated[int | None, Field(default=None, ge=30, le=200)]
+    target_hdl_cholesterol: Annotated[int | None, Field(default=None, ge=30, le=120)]
+    target_triglycerides: Annotated[int | None, Field(default=None, ge=30, le=500)]
+    target_bmi: Annotated[float | None, Field(default=None, ge=18.5, le=35)]
+    target_weight_kg: Annotated[float | None, Field(default=None, ge=30, le=200)]
+    target_egfr: Annotated[float | None, Field(default=None, ge=15, le=150)]
+
+
+class LifestyleGoalUpdateRequest(BaseModel):
+    target_steps: Annotated[int | None, Field(default=None, ge=1000, le=30000)]
+    target_water_ml: Annotated[int | None, Field(default=None, ge=500, le=5000)]
+    target_exercise_minutes: Annotated[int | None, Field(default=None, ge=0, le=300)]
+    target_sleep_hours: Annotated[float | None, Field(default=None, ge=4, le=12)]
+    target_diet_score: Annotated[float | None, Field(default=None, ge=0, le=10)]
+
+
+class HealthGoalUpdateRequest(BaseModel):
+    chronic_disease_goal: ChronicDiseaseGoalUpdateRequest | None = None
+    lifestyle_goal: LifestyleGoalUpdateRequest | None = None
+
+
 class OptionalRecordCreateResponse(BaseModel):
     record_id: int
     bmi: float | None = None
@@ -352,6 +379,35 @@ class ActivityLogListResponse(BaseModel):
     summary: ActivityLogSummaryResponse
     total: int
     items: list[ActivityLogResponse]
+
+
+class ChronicDiseaseGoalResponse(BaseModel):
+    target_systolic_bp: int | None = None
+    target_diastolic_bp: int | None = None
+    target_fasting_glucose: int | None = None
+    target_postprandial_glucose: int | None = None
+    target_hba1c: float | None = None
+    target_ldl_cholesterol: int | None = None
+    target_hdl_cholesterol: int | None = None
+    target_triglycerides: int | None = None
+    target_bmi: float | None = None
+    target_weight_kg: float | None = None
+    target_egfr: float | None = None
+    updated_at: datetime
+
+
+class LifestyleGoalResponse(BaseModel):
+    target_steps: int
+    target_water_ml: int
+    target_exercise_minutes: int
+    target_sleep_hours: float | None = None
+    target_diet_score: float | None = None
+    updated_at: datetime
+
+
+class HealthGoalResponse(BaseModel):
+    chronic_disease_goal: ChronicDiseaseGoalResponse
+    lifestyle_goal: LifestyleGoalResponse
 
 
 class MetricAssessmentItemResponse(BaseModel):
