@@ -558,22 +558,11 @@ class HealthInputService:
         await record.delete()
 
     async def create_meal_log(self, user: User, data: MealLogCreateRequest) -> MealLogCreateResponse:
-        await self._ensure_owned_food_analysis_result(user, data.food_analysis_result_id)
+        analysis_result = await self._get_owned_food_analysis_result(user, data.food_analysis_result_id)
+        meal_values = self._build_meal_create_values(data, analysis_result)
         record = await MealLog.create(
             user=user,
-            food_analysis_result_id=data.food_analysis_result_id,
-            meal_date=data.meal_date,
-            meal_type=data.meal_type.value,
-            food_name=data.food_name,
-            amount=data.amount,
-            calories=data.calories,
-            carbs_g=self._optional_decimal(data.carbs_g),
-            protein_g=self._optional_decimal(data.protein_g),
-            fat_g=self._optional_decimal(data.fat_g),
-            sodium_mg=self._optional_decimal(data.sodium_mg),
-            sugar_g=self._optional_decimal(data.sugar_g),
-            fiber_g=self._optional_decimal(data.fiber_g),
-            memo=data.memo,
+            **meal_values,
         )
         return MealLogCreateResponse(meal_log_id=record.id, meal_date=record.meal_date, created_at=record.created_at)
 
@@ -1115,11 +1104,69 @@ class HealthInputService:
 
     @staticmethod
     async def _ensure_owned_food_analysis_result(user: User, food_analysis_result_id: int | None) -> None:
+        await HealthInputService._get_owned_food_analysis_result(user, food_analysis_result_id)
+
+    @staticmethod
+    async def _get_owned_food_analysis_result(
+        user: User,
+        food_analysis_result_id: int | None,
+    ) -> FoodAnalysisResult | None:
         if food_analysis_result_id is None:
-            return
-        exists = await FoodAnalysisResult.exists(id=food_analysis_result_id, user_id=user.id)
-        if not exists:
+            return None
+        result = await FoodAnalysisResult.get_or_none(id=food_analysis_result_id, user_id=user.id)
+        if result is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="식단 분석 결과를 찾을 수 없습니다.")
+        return result
+
+    @staticmethod
+    def _build_meal_create_values(
+        data: MealLogCreateRequest,
+        analysis_result: FoodAnalysisResult | None,
+    ) -> dict[str, Any]:
+        meal_date = data.meal_date or (analysis_result.meal_date if analysis_result else None)
+        meal_type = data.meal_type.value if data.meal_type else (analysis_result.meal_type if analysis_result else None)
+        food_name = data.food_name or (analysis_result.food_name if analysis_result else None)
+        if meal_date is None or meal_type is None or food_name is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="식단 기록 저장에는 식사일, 식사 구분, 음식명이 필요합니다.",
+            )
+
+        return {
+            "food_analysis_result_id": data.food_analysis_result_id,
+            "meal_date": meal_date,
+            "meal_type": meal_type,
+            "food_name": food_name,
+            "amount": HealthInputService._prefer_value(
+                data.amount, analysis_result.amount if analysis_result else None
+            ),
+            "calories": HealthInputService._prefer_value(
+                data.calories, analysis_result.calories if analysis_result else None
+            ),
+            "carbs_g": HealthInputService._optional_decimal(
+                HealthInputService._prefer_value(data.carbs_g, analysis_result.carbs_g if analysis_result else None)
+            ),
+            "protein_g": HealthInputService._optional_decimal(
+                HealthInputService._prefer_value(data.protein_g, analysis_result.protein_g if analysis_result else None)
+            ),
+            "fat_g": HealthInputService._optional_decimal(
+                HealthInputService._prefer_value(data.fat_g, analysis_result.fat_g if analysis_result else None)
+            ),
+            "sodium_mg": HealthInputService._optional_decimal(
+                HealthInputService._prefer_value(data.sodium_mg, analysis_result.sodium_mg if analysis_result else None)
+            ),
+            "sugar_g": HealthInputService._optional_decimal(
+                HealthInputService._prefer_value(data.sugar_g, analysis_result.sugar_g if analysis_result else None)
+            ),
+            "fiber_g": HealthInputService._optional_decimal(
+                HealthInputService._prefer_value(data.fiber_g, analysis_result.fiber_g if analysis_result else None)
+            ),
+            "memo": data.memo,
+        }
+
+    @staticmethod
+    def _prefer_value(request_value: Any, fallback_value: Any) -> Any:
+        return request_value if request_value is not None else fallback_value
 
     @staticmethod
     def _validate_activity_alcohol(alcohol_frequency: int | None, alcohol_amount: int | None) -> None:
