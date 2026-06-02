@@ -9,6 +9,7 @@ TORTOISE_APP_MODELS = [
     "app.models.users",
     "app.models.predictions",
     "app.models.advices",
+    "app.models.challenges",
 ]
 
 TORTOISE_ORM = {

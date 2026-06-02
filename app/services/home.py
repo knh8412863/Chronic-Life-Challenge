@@ -11,6 +11,7 @@ from app.dtos.home import (
 )
 from app.dtos.predictions import MetricAssessmentResponse
 from app.models.advices import LLMAdvice
+from app.models.challenges import ChallengeParticipation
 from app.models.predictions import (
     ChronicHealthInput,
     LipidObesityRecord,
@@ -36,15 +37,16 @@ class HomeService:
             await PredictionResult.filter(user_id=user.id).order_by("-created_at").prefetch_related("items").first()
         )
         today_advice = await LLMAdvice.filter(user_id=user.id, advice_date=date.today()).order_by("-created_at").first()
+        active_challenges = await ChallengeParticipation.filter(user_id=user.id, status="JOINED").prefetch_related(
+            "challenge"
+        )
         metric_assessment = await HealthInputService().get_metric_assessments(user)
 
         return HomeSummaryResponse(
             today_score=self._build_health_score(latest_health, latest_prediction, metric_assessment),
             recent_prediction=self._build_recent_prediction(latest_prediction),
             today_advice=self._build_today_advice(today_advice, latest_prediction),
-            challenge_summary=HomeChallengeSummaryResponse(
-                message="진행 중인 챌린지 기능은 준비 중입니다.",
-            ),
+            challenge_summary=self._build_challenge_summary(active_challenges),
             health_metric_summary=HomeHealthMetricSummaryResponse(
                 dyslipidemia=metric_assessment.dyslipidemia,
                 obesity=metric_assessment.obesity,
@@ -158,3 +160,30 @@ class HomeService:
             title="오늘의 건강 조언",
             content="오늘의 건강 기록을 입력하면 더 개인화된 조언을 받을 수 있습니다.",
         )
+
+    @staticmethod
+    def _build_challenge_summary(participations: list[ChallengeParticipation]) -> HomeChallengeSummaryResponse:
+        active_count = len(participations)
+        if active_count == 0:
+            return HomeChallengeSummaryResponse(
+                active_count=0,
+                completion_rate=0.0,
+                message="참여 중인 챌린지가 없습니다.",
+            )
+
+        rates = [
+            HomeService._challenge_completion_rate(item.progress_count, item.challenge.duration_days)
+            for item in participations
+        ]
+        average_rate = round(sum(rates) / active_count, 1)
+        return HomeChallengeSummaryResponse(
+            active_count=active_count,
+            completion_rate=average_rate,
+            message=f"진행 중인 챌린지 {active_count}개가 있습니다.",
+        )
+
+    @staticmethod
+    def _challenge_completion_rate(progress_count: int, duration_days: int) -> float:
+        if duration_days <= 0:
+            return 0.0
+        return round(min(progress_count / duration_days, 1.0) * 100, 1)

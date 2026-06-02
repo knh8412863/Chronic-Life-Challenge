@@ -2,6 +2,7 @@ from fastapi import APIRouter
 
 from app.apis.v1.advice_routers import advice_router
 from app.apis.v1.auth_routers import auth_router
+from app.apis.v1.challenge_routers import challenge_router
 from app.apis.v1.health_routers import health_router
 from app.apis.v1.home_routers import home_router
 from app.apis.v1.prediction_routers import prediction_router
@@ -14,3 +15,4 @@ v1_routers.include_router(health_router)
 v1_routers.include_router(prediction_router)
 v1_routers.include_router(home_router)
 v1_routers.include_router(advice_router)
+v1_routers.include_router(challenge_router)
