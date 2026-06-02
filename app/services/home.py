@@ -1,3 +1,5 @@
+from datetime import date
+
 from app.dtos.home import (
     HomeChallengeSummaryResponse,
     HomeHealthMetricSummaryResponse,
@@ -8,6 +10,7 @@ from app.dtos.home import (
     HomeTodayAdviceResponse,
 )
 from app.dtos.predictions import MetricAssessmentResponse
+from app.models.advices import LLMAdvice
 from app.models.predictions import (
     ChronicHealthInput,
     LipidObesityRecord,
@@ -32,12 +35,13 @@ class HomeService:
         latest_prediction = (
             await PredictionResult.filter(user_id=user.id).order_by("-created_at").prefetch_related("items").first()
         )
+        today_advice = await LLMAdvice.filter(user_id=user.id, advice_date=date.today()).order_by("-created_at").first()
         metric_assessment = await HealthInputService().get_metric_assessments(user)
 
         return HomeSummaryResponse(
             today_score=self._build_health_score(latest_health, latest_prediction, metric_assessment),
             recent_prediction=self._build_recent_prediction(latest_prediction),
-            today_advice=self._build_placeholder_advice(latest_prediction),
+            today_advice=self._build_today_advice(today_advice, latest_prediction),
             challenge_summary=HomeChallengeSummaryResponse(
                 message="진행 중인 챌린지 기능은 준비 중입니다.",
             ),
@@ -132,7 +136,18 @@ class HomeService:
         )
 
     @staticmethod
-    def _build_placeholder_advice(latest_prediction: PredictionResult | None) -> HomeTodayAdviceResponse:
+    def _build_today_advice(
+        advice: LLMAdvice | None,
+        latest_prediction: PredictionResult | None,
+    ) -> HomeTodayAdviceResponse:
+        if advice is not None:
+            return HomeTodayAdviceResponse(
+                advice_id=advice.id,
+                title="오늘의 건강 조언",
+                content=advice.advice_text,
+                is_placeholder=False,
+            )
+
         if latest_prediction and latest_prediction.overall_risk_level == "HIGH":
             return HomeTodayAdviceResponse(
                 title="오늘의 건강 조언",
