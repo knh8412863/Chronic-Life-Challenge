@@ -42,6 +42,14 @@ class PredictionFeedbackType(StrEnum):
     UNSURE = "UNSURE"
 
 
+class VitalMeasureType(StrEnum):
+    BP_MORNING = "BP_MORNING"
+    BP_LUNCH = "BP_LUNCH"
+    BP_EVENING = "BP_EVENING"
+    GLUCOSE_FASTING = "GLUCOSE_FASTING"
+    GLUCOSE_POSTPRANDIAL = "GLUCOSE_POSTPRANDIAL"
+
+
 class HealthSurveyCreateRequest(BaseModel):
     input_mode: InputMode = InputMode.DEEP
     birth_date: date
@@ -135,6 +143,37 @@ class RenalRecordCreateRequest(BaseModel):
         return self
 
 
+class VitalRecordCreateRequest(BaseModel):
+    measured_at: datetime
+    measure_type: VitalMeasureType
+    sbp: Annotated[int | None, Field(default=None, ge=70, le=250)]
+    dbp: Annotated[int | None, Field(default=None, ge=40, le=150)]
+    glucose: Annotated[int | None, Field(default=None, ge=40, le=500)]
+    memo: Annotated[str | None, Field(default=None, max_length=255)]
+
+    @model_validator(mode="after")
+    def validate_measurement_values(self) -> "VitalRecordCreateRequest":
+        if self.measure_type.value.startswith("BP_"):
+            if self.sbp is None or self.dbp is None:
+                raise ValueError("sbp and dbp are required for blood pressure records.")
+            if self.glucose is not None:
+                raise ValueError("glucose must be empty for blood pressure records.")
+        if self.measure_type.value.startswith("GLUCOSE_"):
+            if self.glucose is None:
+                raise ValueError("glucose is required for glucose records.")
+            if self.sbp is not None or self.dbp is not None:
+                raise ValueError("sbp and dbp must be empty for glucose records.")
+        return self
+
+
+class VitalRecordUpdateRequest(BaseModel):
+    measured_at: datetime | None = None
+    sbp: Annotated[int | None, Field(default=None, ge=70, le=250)]
+    dbp: Annotated[int | None, Field(default=None, ge=40, le=150)]
+    glucose: Annotated[int | None, Field(default=None, ge=40, le=500)]
+    memo: Annotated[str | None, Field(default=None, max_length=255)] = None
+
+
 class OptionalRecordCreateResponse(BaseModel):
     record_id: int
     bmi: float | None = None
@@ -202,6 +241,46 @@ class RenalRecordResponse(BaseModel):
     memo: str | None = None
     created_at: datetime
     updated_at: datetime
+
+
+class VitalRecordResponse(BaseModel):
+    record_id: int
+    record_date: date
+    measured_at: datetime
+    measure_type: VitalMeasureType
+    sbp: int | None = None
+    dbp: int | None = None
+    glucose: int | None = None
+    memo: str | None = None
+    is_critical: bool
+    status_label: Literal["NORMAL", "CRITICAL"]
+    created_at: datetime
+    updated_at: datetime
+
+
+class VitalRecordSummaryResponse(BaseModel):
+    avg_sbp: float | None = None
+    avg_dbp: float | None = None
+    avg_glucose: float | None = None
+    critical_count: int
+
+
+class VitalRecordListResponse(BaseModel):
+    summary: VitalRecordSummaryResponse
+    total: int
+    items: list[VitalRecordResponse]
+
+
+class VitalTrendResponse(BaseModel):
+    avg_sbp: float | None = None
+    avg_dbp: float | None = None
+    avg_glucose: float | None = None
+    recent_7_days: list[VitalRecordResponse]
+
+
+class VitalRecordDetailResponse(BaseModel):
+    record: VitalRecordResponse
+    trend: VitalTrendResponse
 
 
 class MetricAssessmentItemResponse(BaseModel):

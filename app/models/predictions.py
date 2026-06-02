@@ -113,6 +113,24 @@ class RenalRecord(models.Model):
         table = "renal_records"
 
 
+class VitalRecord(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="vital_records", on_delete=fields.CASCADE)
+    record_date = fields.DateField()
+    measured_at = fields.DatetimeField()
+    measure_type = fields.CharField(max_length=25)
+    sbp = fields.IntField(null=True)
+    dbp = fields.IntField(null=True)
+    glucose = fields.IntField(null=True)
+    memo = fields.CharField(max_length=255, null=True)
+    is_critical = fields.BooleanField(default=False)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "vital_records"
+
+
 class PredictionInputSnapshot(models.Model):
     id = fields.BigIntField(primary_key=True)
     user = fields.ForeignKeyField("models.User", related_name="prediction_input_snapshots", on_delete=fields.CASCADE)
