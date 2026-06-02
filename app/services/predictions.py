@@ -17,6 +17,12 @@ from app.dtos.predictions import (
     ActivityLogSummaryResponse,
     ActivityLogUpdateRequest,
     ChronicDiseaseGoalResponse,
+    ExerciseLogCreateRequest,
+    ExerciseLogListResponse,
+    ExerciseLogResponse,
+    ExerciseLogSummaryResponse,
+    ExerciseLogUpdateRequest,
+    ExerciseType,
     HealthGoalResponse,
     HealthGoalUpdateRequest,
     HealthSurveyCreateRequest,
@@ -49,6 +55,7 @@ from app.dtos.predictions import (
 from app.models.predictions import (
     ActivityLog,
     ChronicHealthInput,
+    ExerciseLog,
     LifestyleInput,
     LipidObesityRecord,
     PredictionFeedback,
@@ -467,6 +474,78 @@ class HealthInputService:
             lifestyle_goal=self._to_lifestyle_goal(lifestyle_goal),
         )
 
+    async def create_exercise_log(self, user: User, data: ExerciseLogCreateRequest) -> OptionalRecordCreateResponse:
+        record = await ExerciseLog.create(
+            user=user,
+            exercise_date=data.exercise_date,
+            exercise_type=data.exercise_type.value,
+            duration_minutes=data.duration_minutes,
+            calories_burned=data.calories_burned,
+            memo=data.memo,
+        )
+        return OptionalRecordCreateResponse(record_id=record.id, created_at=record.created_at)
+
+    async def get_exercise_logs(
+        self,
+        user: User,
+        from_date: date | None = None,
+        to_date: date | None = None,
+        exercise_type: ExerciseType | None = None,
+        limit: int = 100,
+    ) -> ExerciseLogListResponse:
+        query = ExerciseLog.filter(user_id=user.id)
+        if from_date is not None:
+            query = query.filter(exercise_date__gte=from_date)
+        if to_date is not None:
+            query = query.filter(exercise_date__lte=to_date)
+        if exercise_type is not None:
+            query = query.filter(exercise_type=exercise_type.value)
+
+        records = await query.order_by("-exercise_date", "-id").limit(limit)
+        items = [self._to_exercise_log(record) for record in records]
+        return ExerciseLogListResponse(
+            summary=self._build_exercise_summary(records),
+            total=len(items),
+            items=items,
+        )
+
+    async def get_exercise_log(self, user: User, exercise_log_id: int) -> ExerciseLogResponse:
+        record = await ExerciseLog.get_or_none(id=exercise_log_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="운동 기록을 찾을 수 없습니다.")
+        return self._to_exercise_log(record)
+
+    async def update_exercise_log(
+        self,
+        user: User,
+        exercise_log_id: int,
+        data: ExerciseLogUpdateRequest,
+    ) -> ExerciseLogResponse:
+        record = await ExerciseLog.get_or_none(id=exercise_log_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="운동 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.exercise_date)
+
+        update_data = data.model_dump(exclude_unset=True)
+        exercise_date = update_data.get("exercise_date", record.exercise_date)
+        if exercise_date != self._today():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="당일 운동 기록만 수정할 수 있습니다.")
+
+        if "exercise_type" in update_data:
+            record.exercise_type = update_data["exercise_type"].value
+        for field in ["exercise_date", "duration_minutes", "calories_burned", "memo"]:
+            if field in update_data:
+                setattr(record, field, update_data[field])
+        await record.save()
+        return self._to_exercise_log(record)
+
+    async def delete_exercise_log(self, user: User, exercise_log_id: int) -> None:
+        record = await ExerciseLog.get_or_none(id=exercise_log_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="운동 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.exercise_date)
+        await record.delete()
+
     @staticmethod
     def _assess_dyslipidemia(user: User, lipid: LipidObesityRecord | None) -> MetricAssessmentItemResponse:
         if lipid is None:
@@ -722,6 +801,19 @@ class HealthInputService:
         )
 
     @staticmethod
+    def _to_exercise_log(record: ExerciseLog) -> ExerciseLogResponse:
+        return ExerciseLogResponse(
+            exercise_log_id=record.id,
+            exercise_date=record.exercise_date,
+            exercise_type=ExerciseType(record.exercise_type),
+            duration_minutes=record.duration_minutes,
+            calories_burned=record.calories_burned,
+            memo=record.memo,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
+
+    @staticmethod
     def _build_vital_summary(records: list[VitalRecord]) -> VitalRecordSummaryResponse:
         sbp_values = [record.sbp for record in records if record.sbp is not None]
         dbp_values = [record.dbp for record in records if record.dbp is not None]
@@ -747,6 +839,14 @@ class HealthInputService:
             avg_stress_level=HealthInputService._average_float(stress_levels),
             avg_diet_score=HealthInputService._average_float(diet_scores),
             logged_days=len(records),
+        )
+
+    @staticmethod
+    def _build_exercise_summary(records: list[ExerciseLog]) -> ExerciseLogSummaryResponse:
+        return ExerciseLogSummaryResponse(
+            total_duration_minutes=sum(record.duration_minutes for record in records),
+            total_calories_burned=sum(record.calories_burned or 0 for record in records),
+            logged_count=len(records),
         )
 
     @staticmethod

@@ -50,6 +50,14 @@ class VitalMeasureType(StrEnum):
     GLUCOSE_POSTPRANDIAL = "GLUCOSE_POSTPRANDIAL"
 
 
+class ExerciseType(StrEnum):
+    WALKING = "WALKING"
+    RUNNING = "RUNNING"
+    CYCLING = "CYCLING"
+    SWIMMING = "SWIMMING"
+    ETC = "ETC"
+
+
 class HealthSurveyCreateRequest(BaseModel):
     input_mode: InputMode = InputMode.DEEP
     birth_date: date
@@ -242,6 +250,22 @@ class HealthGoalUpdateRequest(BaseModel):
     lifestyle_goal: LifestyleGoalUpdateRequest | None = None
 
 
+class ExerciseLogCreateRequest(BaseModel):
+    exercise_date: date
+    exercise_type: ExerciseType
+    duration_minutes: Annotated[int, Field(ge=1, le=1440)]
+    calories_burned: Annotated[int | None, Field(default=None, ge=0, le=5000)]
+    memo: Annotated[str | None, Field(default=None, max_length=255)]
+
+
+class ExerciseLogUpdateRequest(BaseModel):
+    exercise_date: date | None = None
+    exercise_type: ExerciseType | None = None
+    duration_minutes: Annotated[int | None, Field(default=None, ge=1, le=1440)]
+    calories_burned: Annotated[int | None, Field(default=None, ge=0, le=5000)]
+    memo: Annotated[str | None, Field(default=None, max_length=255)] = None
+
+
 class OptionalRecordCreateResponse(BaseModel):
     record_id: int
     bmi: float | None = None
@@ -408,6 +432,29 @@ class LifestyleGoalResponse(BaseModel):
 class HealthGoalResponse(BaseModel):
     chronic_disease_goal: ChronicDiseaseGoalResponse
     lifestyle_goal: LifestyleGoalResponse
+
+
+class ExerciseLogResponse(BaseModel):
+    exercise_log_id: int
+    exercise_date: date
+    exercise_type: ExerciseType
+    duration_minutes: int
+    calories_burned: int | None = None
+    memo: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ExerciseLogSummaryResponse(BaseModel):
+    total_duration_minutes: int
+    total_calories_burned: int
+    logged_count: int
+
+
+class ExerciseLogListResponse(BaseModel):
+    summary: ExerciseLogSummaryResponse
+    total: int
+    items: list[ExerciseLogResponse]
 
 
 class MetricAssessmentItemResponse(BaseModel):

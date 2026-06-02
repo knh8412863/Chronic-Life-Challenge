@@ -189,6 +189,21 @@ class ActivityLog(models.Model):
         unique_together = (("user", "record_date"),)
 
 
+class ExerciseLog(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="exercise_logs", on_delete=fields.CASCADE)
+    exercise_date = fields.DateField()
+    exercise_type = fields.CharField(max_length=50)
+    duration_minutes = fields.IntField()
+    calories_burned = fields.IntField(null=True)
+    memo = fields.CharField(max_length=255, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "exercise_logs"
+
+
 class PredictionInputSnapshot(models.Model):
     id = fields.BigIntField(primary_key=True)
     user = fields.ForeignKeyField("models.User", related_name="prediction_input_snapshots", on_delete=fields.CASCADE)

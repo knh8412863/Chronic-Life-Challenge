@@ -12,6 +12,11 @@ from app.dtos.predictions import (
     ActivityLogResponse,
     ActivityLogUpdateRequest,
     DataResponse,
+    ExerciseLogCreateRequest,
+    ExerciseLogListResponse,
+    ExerciseLogResponse,
+    ExerciseLogUpdateRequest,
+    ExerciseType,
     HealthGoalResponse,
     HealthGoalUpdateRequest,
     HealthSurveyCreateRequest,
@@ -331,6 +336,79 @@ async def update_health_goal(
 ) -> Response:
     result = await service.update_health_goal(user, request)
     return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@health_router.post(
+    "/health/exercise-logs",
+    response_model=DataResponse[OptionalRecordCreateResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_exercise_log(
+    request: ExerciseLogCreateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+) -> Response:
+    result = await service.create_exercise_log(user, request)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_201_CREATED)
+
+
+@health_router.get(
+    "/health/exercise-logs",
+    response_model=DataResponse[ExerciseLogListResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_exercise_logs(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+    from_date: Annotated[date | None, Query(alias="from")] = None,
+    to_date: Annotated[date | None, Query(alias="to")] = None,
+    exercise_type: ExerciseType | None = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> Response:
+    result = await service.get_exercise_logs(user, from_date, to_date, exercise_type, limit)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@health_router.get(
+    "/health/exercise-logs/{exercise_log_id}",
+    response_model=DataResponse[ExerciseLogResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_exercise_log(
+    exercise_log_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+) -> Response:
+    result = await service.get_exercise_log(user, exercise_log_id)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@health_router.patch(
+    "/health/exercise-logs/{exercise_log_id}",
+    response_model=DataResponse[ExerciseLogResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def update_exercise_log(
+    exercise_log_id: int,
+    request: ExerciseLogUpdateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+) -> Response:
+    result = await service.update_exercise_log(user, exercise_log_id, request)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@health_router.delete(
+    "/health/exercise-logs/{exercise_log_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_exercise_log(
+    exercise_log_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+) -> EmptyResponse:
+    await service.delete_exercise_log(user, exercise_log_id)
+    return EmptyResponse(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @health_router.get(
