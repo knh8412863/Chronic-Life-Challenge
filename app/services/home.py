@@ -19,6 +19,7 @@ from app.models.predictions import (
     RenalRecord,
 )
 from app.models.users import User
+from app.services.notifications import NotificationService
 from app.services.predictions import HealthInputService
 
 DISEASE_LABELS = {
@@ -40,6 +41,7 @@ class HomeService:
         active_challenges = await ChallengeParticipation.filter(user_id=user.id, status="JOINED").prefetch_related(
             "challenge"
         )
+        unread_notification_count = await NotificationService.count_unread(user.id)
         metric_assessment = await HealthInputService().get_metric_assessments(user)
 
         return HomeSummaryResponse(
@@ -59,7 +61,7 @@ class HomeService:
                 latest_lipid_obesity_record_at=latest_lipid.created_at if latest_lipid else None,
                 latest_renal_record_at=latest_renal.created_at if latest_renal else None,
             ),
-            unread_notification_count=0,
+            unread_notification_count=unread_notification_count,
         )
 
     @staticmethod
