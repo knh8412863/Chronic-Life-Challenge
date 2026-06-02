@@ -19,6 +19,7 @@ from app.dtos.predictions import (
     ExerciseType,
     HealthGoalResponse,
     HealthGoalUpdateRequest,
+    HealthStatisticsResponse,
     HealthSurveyCreateRequest,
     HealthSurveyCreateResponse,
     HealthSurveyRecordResponse,
@@ -409,6 +410,21 @@ async def delete_exercise_log(
 ) -> EmptyResponse:
     await service.delete_exercise_log(user, exercise_log_id)
     return EmptyResponse(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@health_router.get(
+    "/health/statistics",
+    response_model=DataResponse[HealthStatisticsResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_health_statistics(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+    from_date: Annotated[date | None, Query(alias="from")] = None,
+    to_date: Annotated[date | None, Query(alias="to")] = None,
+) -> Response:
+    result = await service.get_health_statistics(user, from_date, to_date)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
 
 
 @health_router.get(
