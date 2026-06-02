@@ -457,6 +457,27 @@ class ExerciseLogListResponse(BaseModel):
     items: list[ExerciseLogResponse]
 
 
+class HealthGoalProgressResponse(BaseModel):
+    metric: Literal["EXERCISE_MINUTES", "SLEEP_HOURS", "DIET_SCORE"]
+    current_value: float | None = None
+    target_value: float | None = None
+    unit: str
+    progress_rate: float | None = None
+    status: Literal["ACHIEVED", "IN_PROGRESS", "UNAVAILABLE"]
+
+
+class HealthStatisticsResponse(BaseModel):
+    period_start: date
+    period_end: date
+    vital_summary: VitalRecordSummaryResponse
+    latest_vital_record: VitalRecordResponse | None = None
+    activity_summary: ActivityLogSummaryResponse
+    latest_activity_log: ActivityLogResponse | None = None
+    exercise_summary: ExerciseLogSummaryResponse
+    latest_exercise_log: ExerciseLogResponse | None = None
+    goal_progress: list[HealthGoalProgressResponse]
+
+
 class MetricAssessmentItemResponse(BaseModel):
     status: Literal["NORMAL", "CAUTION", "HIGH", "UNAVAILABLE"]
     reasons: list[str] = Field(default_factory=list)

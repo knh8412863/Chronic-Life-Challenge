@@ -23,8 +23,10 @@ from app.dtos.predictions import (
     ExerciseLogSummaryResponse,
     ExerciseLogUpdateRequest,
     ExerciseType,
+    HealthGoalProgressResponse,
     HealthGoalResponse,
     HealthGoalUpdateRequest,
+    HealthStatisticsResponse,
     HealthSurveyCreateRequest,
     HealthSurveyCreateResponse,
     HealthSurveyRecordResponse,
@@ -546,6 +548,55 @@ class HealthInputService:
         self._ensure_today_record(record.exercise_date)
         await record.delete()
 
+    async def get_health_statistics(
+        self,
+        user: User,
+        from_date: date | None = None,
+        to_date: date | None = None,
+    ) -> HealthStatisticsResponse:
+        period_end = to_date or self._today()
+        period_start = from_date or (period_end - timedelta(days=6))
+        if period_start > period_end:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="조회 시작일은 종료일보다 늦을 수 없습니다."
+            )
+
+        vital_records = (
+            await VitalRecord.filter(user_id=user.id, record_date__gte=period_start, record_date__lte=period_end)
+            .order_by("-measured_at", "-id")
+            .limit(200)
+        )
+        activity_logs = (
+            await ActivityLog.filter(user_id=user.id, record_date__gte=period_start, record_date__lte=period_end)
+            .order_by("-record_date", "-id")
+            .limit(200)
+        )
+        exercise_logs = (
+            await ExerciseLog.filter(user_id=user.id, exercise_date__gte=period_start, exercise_date__lte=period_end)
+            .order_by("-exercise_date", "-id")
+            .limit(200)
+        )
+        _, lifestyle_goal = await self._get_or_create_health_goals(user)
+
+        activity_summary = self._build_activity_summary(activity_logs)
+        exercise_summary = self._build_exercise_summary(exercise_logs)
+        return HealthStatisticsResponse(
+            period_start=period_start,
+            period_end=period_end,
+            vital_summary=self._build_vital_summary(vital_records),
+            latest_vital_record=self._to_vital_record(vital_records[0]) if vital_records else None,
+            activity_summary=activity_summary,
+            latest_activity_log=self._to_activity_log(activity_logs[0]) if activity_logs else None,
+            exercise_summary=exercise_summary,
+            latest_exercise_log=self._to_exercise_log(exercise_logs[0]) if exercise_logs else None,
+            goal_progress=self._build_goal_progress(
+                lifestyle_goal=lifestyle_goal,
+                activity_summary=activity_summary,
+                exercise_summary=exercise_summary,
+                period_days=(period_end - period_start).days + 1,
+            ),
+        )
+
     @staticmethod
     def _assess_dyslipidemia(user: User, lipid: LipidObesityRecord | None) -> MetricAssessmentItemResponse:
         if lipid is None:
@@ -848,6 +899,65 @@ class HealthInputService:
             total_calories_burned=sum(record.calories_burned or 0 for record in records),
             logged_count=len(records),
         )
+
+    @staticmethod
+    def _build_goal_progress(
+        lifestyle_goal: UserLifestyleGoal,
+        activity_summary: ActivityLogSummaryResponse,
+        exercise_summary: ExerciseLogSummaryResponse,
+        period_days: int,
+    ) -> list[HealthGoalProgressResponse]:
+        return [
+            HealthInputService._build_progress_item(
+                metric="EXERCISE_MINUTES",
+                current_value=float(exercise_summary.total_duration_minutes),
+                target_value=float(lifestyle_goal.target_exercise_minutes * period_days),
+                unit="minutes",
+            ),
+            HealthInputService._build_progress_item(
+                metric="SLEEP_HOURS",
+                current_value=activity_summary.avg_sleep_hours,
+                target_value=HealthInputService._optional_float(lifestyle_goal.target_sleep_hours),
+                unit="hours",
+            ),
+            HealthInputService._build_progress_item(
+                metric="DIET_SCORE",
+                current_value=activity_summary.avg_diet_score,
+                target_value=HealthInputService._optional_float(lifestyle_goal.target_diet_score),
+                unit="score",
+            ),
+        ]
+
+    @staticmethod
+    def _build_progress_item(
+        metric: str,
+        current_value: float | None,
+        target_value: float | None,
+        unit: str,
+    ) -> HealthGoalProgressResponse:
+        progress_rate = HealthInputService._progress_rate(current_value, target_value)
+        return HealthGoalProgressResponse(
+            metric=metric,
+            current_value=current_value,
+            target_value=target_value,
+            unit=unit,
+            progress_rate=progress_rate,
+            status=HealthInputService._progress_status(progress_rate),
+        )
+
+    @staticmethod
+    def _progress_rate(current_value: float | None, target_value: float | None) -> float | None:
+        if current_value is None or target_value is None or target_value <= 0:
+            return None
+        return round(min(current_value / target_value, 1.0) * 100, 1)
+
+    @staticmethod
+    def _progress_status(progress_rate: float | None) -> str:
+        if progress_rate is None:
+            return "UNAVAILABLE"
+        if progress_rate >= 100:
+            return "ACHIEVED"
+        return "IN_PROGRESS"
 
     @staticmethod
     def _average(values: list[int]) -> float | None:
