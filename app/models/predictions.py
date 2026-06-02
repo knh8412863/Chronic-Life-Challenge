@@ -30,6 +30,44 @@ class UserProfile(models.Model):
         table = "user_profiles"
 
 
+class UserChronicDiseaseGoal(models.Model):
+    user = fields.OneToOneField(
+        "models.User", related_name="chronic_disease_goal", primary_key=True, on_delete=fields.CASCADE
+    )
+    target_systolic_bp = fields.IntField(null=True)
+    target_diastolic_bp = fields.IntField(null=True)
+    target_fasting_glucose = fields.IntField(null=True)
+    target_postprandial_glucose = fields.IntField(null=True)
+    target_hba1c = fields.DecimalField(max_digits=4, decimal_places=2, null=True)
+    target_ldl_cholesterol = fields.IntField(null=True)
+    target_hdl_cholesterol = fields.IntField(null=True)
+    target_triglycerides = fields.IntField(null=True)
+    target_bmi = fields.DecimalField(max_digits=5, decimal_places=2, null=True)
+    target_weight_kg = fields.DecimalField(max_digits=5, decimal_places=2, null=True)
+    target_egfr = fields.DecimalField(max_digits=6, decimal_places=2, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "user_chronic_disease_goals"
+
+
+class UserLifestyleGoal(models.Model):
+    user = fields.OneToOneField(
+        "models.User", related_name="lifestyle_goal", primary_key=True, on_delete=fields.CASCADE
+    )
+    target_steps = fields.IntField(default=10000)
+    target_water_ml = fields.IntField(default=2000)
+    target_exercise_minutes = fields.IntField(default=30)
+    target_sleep_hours = fields.DecimalField(max_digits=3, decimal_places=1, null=True)
+    target_diet_score = fields.DecimalField(max_digits=3, decimal_places=1, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "user_lifestyle_goals"
+
+
 class ChronicHealthInput(models.Model):
     id = fields.BigIntField(primary_key=True)
     user = fields.ForeignKeyField("models.User", related_name="chronic_health_inputs", on_delete=fields.CASCADE)

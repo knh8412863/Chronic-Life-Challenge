@@ -16,10 +16,14 @@ from app.dtos.predictions import (
     ActivityLogResponse,
     ActivityLogSummaryResponse,
     ActivityLogUpdateRequest,
+    ChronicDiseaseGoalResponse,
+    HealthGoalResponse,
+    HealthGoalUpdateRequest,
     HealthSurveyCreateRequest,
     HealthSurveyCreateResponse,
     HealthSurveyRecordResponse,
     InputCompletenessResponse,
+    LifestyleGoalResponse,
     LipidObesityRecordCreateRequest,
     LipidObesityRecordResponse,
     MetricAssessmentItemResponse,
@@ -55,6 +59,8 @@ from app.models.predictions import (
     PredictionStatus,
     PredictionTask,
     RenalRecord,
+    UserChronicDiseaseGoal,
+    UserLifestyleGoal,
     UserProfile,
     VitalRecord,
 )
@@ -80,6 +86,13 @@ PREDICTION_PROGRESS = {
     PredictionStatus.RUNNING: (60, "AI 모델 실행 중"),
     PredictionStatus.SUCCESS: (100, "예측 완료"),
     PredictionStatus.FAILED: (100, "예측 실패"),
+}
+DEFAULT_LIFESTYLE_GOAL = {
+    "target_steps": 10000,
+    "target_water_ml": 2000,
+    "target_exercise_minutes": 30,
+    "target_sleep_hours": None,
+    "target_diet_score": None,
 }
 
 
@@ -421,6 +434,39 @@ class HealthInputService:
         self._ensure_today_record(record.record_date)
         await record.delete()
 
+    async def get_health_goal(self, user: User) -> HealthGoalResponse:
+        chronic_goal, lifestyle_goal = await self._get_or_create_health_goals(user)
+        return HealthGoalResponse(
+            chronic_disease_goal=self._to_chronic_disease_goal(chronic_goal),
+            lifestyle_goal=self._to_lifestyle_goal(lifestyle_goal),
+        )
+
+    async def update_health_goal(self, user: User, data: HealthGoalUpdateRequest) -> HealthGoalResponse:
+        chronic_goal, lifestyle_goal = await self._get_or_create_health_goals(user)
+
+        if data.chronic_disease_goal is not None:
+            for field, value in data.chronic_disease_goal.model_dump(exclude_unset=True).items():
+                setattr(
+                    chronic_goal,
+                    field,
+                    self._optional_decimal(value) if field in self._decimal_goal_fields() else value,
+                )
+            await chronic_goal.save()
+
+        if data.lifestyle_goal is not None:
+            for field, value in data.lifestyle_goal.model_dump(exclude_unset=True).items():
+                setattr(
+                    lifestyle_goal,
+                    field,
+                    self._optional_decimal(value) if field in self._decimal_goal_fields() else value,
+                )
+            await lifestyle_goal.save()
+
+        return HealthGoalResponse(
+            chronic_disease_goal=self._to_chronic_disease_goal(chronic_goal),
+            lifestyle_goal=self._to_lifestyle_goal(lifestyle_goal),
+        )
+
     @staticmethod
     def _assess_dyslipidemia(user: User, lipid: LipidObesityRecord | None) -> MetricAssessmentItemResponse:
         if lipid is None:
@@ -642,6 +688,40 @@ class HealthInputService:
         )
 
     @staticmethod
+    async def _get_or_create_health_goals(user: User) -> tuple[UserChronicDiseaseGoal, UserLifestyleGoal]:
+        chronic_goal, _ = await UserChronicDiseaseGoal.get_or_create(user_id=user.id)
+        lifestyle_goal, _ = await UserLifestyleGoal.get_or_create(user_id=user.id, defaults=DEFAULT_LIFESTYLE_GOAL)
+        return chronic_goal, lifestyle_goal
+
+    @staticmethod
+    def _to_chronic_disease_goal(goal: UserChronicDiseaseGoal) -> ChronicDiseaseGoalResponse:
+        return ChronicDiseaseGoalResponse(
+            target_systolic_bp=goal.target_systolic_bp,
+            target_diastolic_bp=goal.target_diastolic_bp,
+            target_fasting_glucose=goal.target_fasting_glucose,
+            target_postprandial_glucose=goal.target_postprandial_glucose,
+            target_hba1c=HealthInputService._optional_float(goal.target_hba1c),
+            target_ldl_cholesterol=goal.target_ldl_cholesterol,
+            target_hdl_cholesterol=goal.target_hdl_cholesterol,
+            target_triglycerides=goal.target_triglycerides,
+            target_bmi=HealthInputService._optional_float(goal.target_bmi),
+            target_weight_kg=HealthInputService._optional_float(goal.target_weight_kg),
+            target_egfr=HealthInputService._optional_float(goal.target_egfr),
+            updated_at=goal.updated_at,
+        )
+
+    @staticmethod
+    def _to_lifestyle_goal(goal: UserLifestyleGoal) -> LifestyleGoalResponse:
+        return LifestyleGoalResponse(
+            target_steps=goal.target_steps,
+            target_water_ml=goal.target_water_ml,
+            target_exercise_minutes=goal.target_exercise_minutes,
+            target_sleep_hours=HealthInputService._optional_float(goal.target_sleep_hours),
+            target_diet_score=HealthInputService._optional_float(goal.target_diet_score),
+            updated_at=goal.updated_at,
+        )
+
+    @staticmethod
     def _build_vital_summary(records: list[VitalRecord]) -> VitalRecordSummaryResponse:
         sbp_values = [record.sbp for record in records if record.sbp is not None]
         dbp_values = [record.dbp for record in records if record.dbp is not None]
@@ -676,6 +756,17 @@ class HealthInputService:
     @staticmethod
     def _average_float(values: list[int | float]) -> float | None:
         return round(sum(values) / len(values), 1) if values else None
+
+    @staticmethod
+    def _decimal_goal_fields() -> set[str]:
+        return {
+            "target_hba1c",
+            "target_bmi",
+            "target_weight_kg",
+            "target_egfr",
+            "target_sleep_hours",
+            "target_diet_score",
+        }
 
     @staticmethod
     def _validate_activity_alcohol(alcohol_frequency: int | None, alcohol_amount: int | None) -> None:

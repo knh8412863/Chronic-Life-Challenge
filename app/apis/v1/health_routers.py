@@ -12,6 +12,8 @@ from app.dtos.predictions import (
     ActivityLogResponse,
     ActivityLogUpdateRequest,
     DataResponse,
+    HealthGoalResponse,
+    HealthGoalUpdateRequest,
     HealthSurveyCreateRequest,
     HealthSurveyCreateResponse,
     HealthSurveyRecordResponse,
@@ -302,6 +304,33 @@ async def delete_activity_log(
 ) -> EmptyResponse:
     await service.delete_activity_log(user, activity_log_id)
     return EmptyResponse(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@health_router.get(
+    "/health/goals",
+    response_model=DataResponse[HealthGoalResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_health_goal(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+) -> Response:
+    result = await service.get_health_goal(user)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@health_router.patch(
+    "/health/goals",
+    response_model=DataResponse[HealthGoalResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def update_health_goal(
+    request: HealthGoalUpdateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+) -> Response:
+    result = await service.update_health_goal(user, request)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
 
 
 @health_router.get(
