@@ -16,6 +16,7 @@ class User(models.Model):
     gender = fields.CharEnumField(enum_type=Gender)
     birthday = fields.DateField()
     phone_number = fields.CharField(max_length=11)
+    profile_image_url = fields.CharField(max_length=500, null=True)
     is_active = fields.BooleanField(default=True)
     is_email_verified = fields.BooleanField(default=False)
     is_admin = fields.BooleanField(default=False)

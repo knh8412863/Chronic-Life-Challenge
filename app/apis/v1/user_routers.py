@@ -14,8 +14,10 @@ user_router = APIRouter(prefix="/users", tags=["users"])
 @user_router.get("/me", response_model=UserInfoResponse, status_code=status.HTTP_200_OK)
 async def user_me_info(
     user: Annotated[User, Depends(get_request_user)],
+    user_manage_service: Annotated[UserManageService, Depends(UserManageService)],
 ) -> Response:
-    return Response(UserInfoResponse.model_validate(user).model_dump(), status_code=status.HTTP_200_OK)
+    result = await user_manage_service.get_user_info(user)
+    return Response(result.model_dump(mode="json"), status_code=status.HTTP_200_OK)
 
 
 @user_router.patch("/me", response_model=UserInfoResponse, status_code=status.HTTP_200_OK)
@@ -24,5 +26,5 @@ async def update_user_me_info(
     user: Annotated[User, Depends(get_request_user)],
     user_manage_service: Annotated[UserManageService, Depends(UserManageService)],
 ) -> Response:
-    updated_user = await user_manage_service.update_user(user=user, data=update_data)
-    return Response(UserInfoResponse.model_validate(updated_user).model_dump(), status_code=status.HTTP_200_OK)
+    result = await user_manage_service.update_user_info(user=user, data=update_data)
+    return Response(result.model_dump(mode="json"), status_code=status.HTTP_200_OK)
