@@ -6,6 +6,8 @@ from fastapi.responses import ORJSONResponse as Response
 from app.dependencies.security import get_request_user
 from app.dtos.predictions import (
     DataResponse,
+    PredictionFeedbackCreateRequest,
+    PredictionFeedbackCreateResponse,
     PredictionResultResponse,
     PredictionTaskCreateRequest,
     PredictionTaskCreateResponse,
@@ -59,3 +61,18 @@ async def get_prediction_result(
 ) -> Response:
     result = await service.get_result(user, result_id)
     return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@prediction_router.post(
+    "/prediction-results/{result_id}/feedbacks",
+    response_model=DataResponse[PredictionFeedbackCreateResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_prediction_feedback(
+    result_id: int,
+    request: PredictionFeedbackCreateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[PredictionService, Depends(PredictionService)],
+) -> Response:
+    result = await service.create_feedback(user, result_id, request)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_201_CREATED)

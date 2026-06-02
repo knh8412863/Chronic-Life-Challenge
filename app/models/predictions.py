@@ -178,3 +178,20 @@ class PredictionResultItem(models.Model):
     class Meta:
         table = "prediction_result_items"
         unique_together = (("result", "disease_code"),)
+
+
+class PredictionFeedback(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    prediction_result = fields.OneToOneField(
+        "models.PredictionResult",
+        related_name="feedback",
+        on_delete=fields.CASCADE,
+    )
+    user = fields.ForeignKeyField("models.User", related_name="prediction_feedbacks", on_delete=fields.CASCADE)
+    feedback_type = fields.CharField(max_length=15)
+    actual_diagnosis = fields.JSONField(null=True)
+    comment = fields.CharField(max_length=500, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "prediction_feedback"

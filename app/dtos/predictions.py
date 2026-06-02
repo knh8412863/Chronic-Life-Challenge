@@ -36,6 +36,12 @@ class LastCheckupPeriod(StrEnum):
     NEVER = "NEVER"
 
 
+class PredictionFeedbackType(StrEnum):
+    CORRECT = "CORRECT"
+    INCORRECT = "INCORRECT"
+    UNSURE = "UNSURE"
+
+
 class HealthSurveyCreateRequest(BaseModel):
     input_mode: InputMode = InputMode.DEEP
     birth_date: date
@@ -187,3 +193,16 @@ class PredictionResultResponse(BaseModel):
     disease_risks: dict[str, DiseaseRiskResponse]
     input_completeness: InputCompletenessResponse
     disclaimer: str
+
+
+class PredictionFeedbackCreateRequest(BaseModel):
+    feedback_type: PredictionFeedbackType
+    actual_diagnosis: dict[str, bool] | None = None
+    comment: Annotated[str | None, Field(default=None, max_length=500)]
+
+
+class PredictionFeedbackCreateResponse(BaseModel):
+    feedback_id: int
+    prediction_result_id: int
+    feedback_type: PredictionFeedbackType
+    created_at: datetime

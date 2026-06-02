@@ -77,6 +77,20 @@ class TestPredictionFlowAPIs(TestCase):
                 f"/api/v1/prediction-results/{status_response.json()['data']['result_id']}",
                 headers=headers,
             )
+            feedback_response = await client.post(
+                f"/api/v1/prediction-results/{status_response.json()['data']['result_id']}/feedbacks",
+                json={
+                    "feedback_type": "CORRECT",
+                    "actual_diagnosis": {"diabetes": True},
+                    "comment": "결과 설명이 이해됐습니다.",
+                },
+                headers=headers,
+            )
+            duplicate_feedback_response = await client.post(
+                f"/api/v1/prediction-results/{status_response.json()['data']['result_id']}/feedbacks",
+                json={"feedback_type": "UNSURE"},
+                headers=headers,
+            )
 
         assert survey_response.status_code == status.HTTP_201_CREATED
         assert task_response.status_code == status.HTTP_202_ACCEPTED
@@ -90,6 +104,9 @@ class TestPredictionFlowAPIs(TestCase):
         assert result["input_completeness"]["used_default_values"] is True
         assert "total_cholesterol" in result["input_completeness"]["missing_fields"]
         assert "waist_circumference" not in result["input_completeness"]["missing_fields"]
+        assert feedback_response.status_code == status.HTTP_201_CREATED
+        assert feedback_response.json()["data"]["feedback_type"] == "CORRECT"
+        assert duplicate_feedback_response.status_code == status.HTTP_409_CONFLICT
 
     async def test_metric_assessment_returns_dyslipidemia_and_obesity_status(self):
         signup_data = {

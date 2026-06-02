@@ -24,11 +24,18 @@ class Config(BaseSettings):
 
     DB_HOST: str = "localhost"
     DB_PORT: int = 3306
+    DB_EXPOSE_PORT: int = 3306
     DB_USER: str = "root"
     DB_PASSWORD: str = "pw1234"
+    DB_ROOT_PASSWORD: str = "pw1234"
     DB_NAME: str = "ai_health"
     DB_CONNECT_TIMEOUT: int = 5
     DB_CONNECTION_POOL_MAXSIZE: int = 10
+    TEST_DB_HOST: str | None = None
+    TEST_DB_PORT: int | None = None
+    TEST_DB_USER: str | None = None
+    TEST_DB_PASSWORD: str | None = None
+    TEST_DB_NAME: str = "test"
 
     REDIS_URL: str | None = None
 

@@ -18,6 +18,8 @@ from app.dtos.predictions import (
     MetricAssessmentItemResponse,
     MetricAssessmentResponse,
     OptionalRecordCreateResponse,
+    PredictionFeedbackCreateRequest,
+    PredictionFeedbackCreateResponse,
     PredictionResultResponse,
     PredictionTaskCreateRequest,
     PredictionTaskCreateResponse,
@@ -28,6 +30,7 @@ from app.models.predictions import (
     ChronicHealthInput,
     LifestyleInput,
     LipidObesityRecord,
+    PredictionFeedback,
     PredictionInputSnapshot,
     PredictionMode,
     PredictionResult,
@@ -419,6 +422,34 @@ class PredictionService:
             disease_risks=disease_risks,
             input_completeness=InputCompletenessResponse(**result.input_completeness),
             disclaimer=result.disclaimer,
+        )
+
+    async def create_feedback(
+        self,
+        user: User,
+        result_id: int,
+        data: PredictionFeedbackCreateRequest,
+    ) -> PredictionFeedbackCreateResponse:
+        result = await PredictionResult.get_or_none(id=result_id, user_id=user.id)
+        if result is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="예측 결과를 찾을 수 없습니다.")
+
+        exists = await PredictionFeedback.exists(prediction_result_id=result.id)
+        if exists:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 피드백을 등록한 예측 결과입니다.")
+
+        feedback = await PredictionFeedback.create(
+            prediction_result=result,
+            user=user,
+            feedback_type=data.feedback_type.value,
+            actual_diagnosis=data.actual_diagnosis,
+            comment=data.comment,
+        )
+        return PredictionFeedbackCreateResponse(
+            feedback_id=feedback.id,
+            prediction_result_id=result.id,
+            feedback_type=data.feedback_type,
+            created_at=feedback.created_at,
         )
 
     @staticmethod
