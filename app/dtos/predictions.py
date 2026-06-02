@@ -58,6 +58,13 @@ class ExerciseType(StrEnum):
     ETC = "ETC"
 
 
+class MealType(StrEnum):
+    BREAKFAST = "BREAKFAST"
+    LUNCH = "LUNCH"
+    DINNER = "DINNER"
+    SNACK = "SNACK"
+
+
 class HealthSurveyCreateRequest(BaseModel):
     input_mode: InputMode = InputMode.DEEP
     birth_date: date
@@ -266,9 +273,47 @@ class ExerciseLogUpdateRequest(BaseModel):
     memo: Annotated[str | None, Field(default=None, max_length=255)] = None
 
 
+class MealLogCreateRequest(BaseModel):
+    food_analysis_result_id: Annotated[int | None, Field(default=None, ge=1)]
+    meal_date: date
+    meal_type: MealType
+    food_name: Annotated[str, Field(min_length=1, max_length=100)]
+    amount: Annotated[str | None, Field(default=None, max_length=50)]
+    calories: Annotated[int | None, Field(default=None, ge=0, le=10000)]
+    carbs_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
+    protein_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
+    fat_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
+    sodium_mg: Annotated[float | None, Field(default=None, ge=0, le=100000)]
+    sugar_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
+    fiber_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
+    memo: Annotated[str | None, Field(default=None, max_length=255)]
+
+
+class MealLogUpdateRequest(BaseModel):
+    food_analysis_result_id: Annotated[int | None, Field(default=None, ge=1)]
+    meal_date: date | None = None
+    meal_type: MealType | None = None
+    food_name: Annotated[str | None, Field(default=None, min_length=1, max_length=100)]
+    amount: Annotated[str | None, Field(default=None, max_length=50)]
+    calories: Annotated[int | None, Field(default=None, ge=0, le=10000)]
+    carbs_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
+    protein_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
+    fat_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
+    sodium_mg: Annotated[float | None, Field(default=None, ge=0, le=100000)]
+    sugar_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
+    fiber_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
+    memo: Annotated[str | None, Field(default=None, max_length=255)]
+
+
 class OptionalRecordCreateResponse(BaseModel):
     record_id: int
     bmi: float | None = None
+    created_at: datetime
+
+
+class MealLogCreateResponse(BaseModel):
+    meal_log_id: int
+    meal_date: date
     created_at: datetime
 
 
@@ -455,6 +500,40 @@ class ExerciseLogListResponse(BaseModel):
     summary: ExerciseLogSummaryResponse
     total: int
     items: list[ExerciseLogResponse]
+
+
+class MealLogResponse(BaseModel):
+    meal_log_id: int
+    food_analysis_result_id: int | None = None
+    meal_date: date
+    meal_type: MealType
+    food_name: str
+    amount: str | None = None
+    calories: int | None = None
+    carbs_g: float | None = None
+    protein_g: float | None = None
+    fat_g: float | None = None
+    sodium_mg: float | None = None
+    sugar_g: float | None = None
+    fiber_g: float | None = None
+    memo: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MealDailySummaryResponse(BaseModel):
+    meal_date: date
+    meal_count: int
+    total_calories: int
+    total_sodium_mg: float
+    total_sugar_g: float
+    total_fiber_g: float
+
+
+class MealLogListResponse(BaseModel):
+    daily_summary: list[MealDailySummaryResponse]
+    total: int
+    items: list[MealLogResponse]
 
 
 class HealthGoalProgressResponse(BaseModel):

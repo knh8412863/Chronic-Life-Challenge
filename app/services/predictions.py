@@ -34,6 +34,13 @@ from app.dtos.predictions import (
     LifestyleGoalResponse,
     LipidObesityRecordCreateRequest,
     LipidObesityRecordResponse,
+    MealDailySummaryResponse,
+    MealLogCreateRequest,
+    MealLogCreateResponse,
+    MealLogListResponse,
+    MealLogResponse,
+    MealLogUpdateRequest,
+    MealType,
     MetricAssessmentItemResponse,
     MetricAssessmentResponse,
     OptionalRecordCreateResponse,
@@ -60,6 +67,7 @@ from app.models.predictions import (
     ExerciseLog,
     LifestyleInput,
     LipidObesityRecord,
+    MealLog,
     PredictionFeedback,
     PredictionInputSnapshot,
     PredictionMode,
@@ -548,6 +556,77 @@ class HealthInputService:
         self._ensure_today_record(record.exercise_date)
         await record.delete()
 
+    async def create_meal_log(self, user: User, data: MealLogCreateRequest) -> MealLogCreateResponse:
+        record = await MealLog.create(
+            user=user,
+            food_analysis_result_id=data.food_analysis_result_id,
+            meal_date=data.meal_date,
+            meal_type=data.meal_type.value,
+            food_name=data.food_name,
+            amount=data.amount,
+            calories=data.calories,
+            carbs_g=self._optional_decimal(data.carbs_g),
+            protein_g=self._optional_decimal(data.protein_g),
+            fat_g=self._optional_decimal(data.fat_g),
+            sodium_mg=self._optional_decimal(data.sodium_mg),
+            sugar_g=self._optional_decimal(data.sugar_g),
+            fiber_g=self._optional_decimal(data.fiber_g),
+            memo=data.memo,
+        )
+        return MealLogCreateResponse(meal_log_id=record.id, meal_date=record.meal_date, created_at=record.created_at)
+
+    async def get_meal_logs(
+        self,
+        user: User,
+        from_date: date | None = None,
+        to_date: date | None = None,
+        meal_type: MealType | None = None,
+        limit: int = 100,
+    ) -> MealLogListResponse:
+        query = MealLog.filter(user_id=user.id)
+        if from_date is not None:
+            query = query.filter(meal_date__gte=from_date)
+        if to_date is not None:
+            query = query.filter(meal_date__lte=to_date)
+        if meal_type is not None:
+            query = query.filter(meal_type=meal_type.value)
+
+        records = await query.order_by("-meal_date", "-id").limit(limit)
+        items = [self._to_meal_log(record) for record in records]
+        return MealLogListResponse(
+            daily_summary=self._build_meal_daily_summary(records),
+            total=len(items),
+            items=items,
+        )
+
+    async def get_meal_log(self, user: User, meal_log_id: int) -> MealLogResponse:
+        record = await MealLog.get_or_none(id=meal_log_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="식단 기록을 찾을 수 없습니다.")
+        return self._to_meal_log(record)
+
+    async def update_meal_log(self, user: User, meal_log_id: int, data: MealLogUpdateRequest) -> MealLogResponse:
+        record = await MealLog.get_or_none(id=meal_log_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="식단 기록을 찾을 수 없습니다.")
+
+        update_data = data.model_dump(exclude_unset=True)
+        if "meal_type" in update_data:
+            record.meal_type = update_data.pop("meal_type").value
+        for field, value in update_data.items():
+            if field in self._meal_decimal_fields():
+                setattr(record, field, self._optional_decimal(value))
+            else:
+                setattr(record, field, value)
+        await record.save()
+        return self._to_meal_log(record)
+
+    async def delete_meal_log(self, user: User, meal_log_id: int) -> None:
+        record = await MealLog.get_or_none(id=meal_log_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="식단 기록을 찾을 수 없습니다.")
+        await record.delete()
+
     async def get_health_statistics(
         self,
         user: User,
@@ -865,6 +944,27 @@ class HealthInputService:
         )
 
     @staticmethod
+    def _to_meal_log(record: MealLog) -> MealLogResponse:
+        return MealLogResponse(
+            meal_log_id=record.id,
+            food_analysis_result_id=record.food_analysis_result_id,
+            meal_date=record.meal_date,
+            meal_type=MealType(record.meal_type),
+            food_name=record.food_name,
+            amount=record.amount,
+            calories=record.calories,
+            carbs_g=HealthInputService._optional_float(record.carbs_g),
+            protein_g=HealthInputService._optional_float(record.protein_g),
+            fat_g=HealthInputService._optional_float(record.fat_g),
+            sodium_mg=HealthInputService._optional_float(record.sodium_mg),
+            sugar_g=HealthInputService._optional_float(record.sugar_g),
+            fiber_g=HealthInputService._optional_float(record.fiber_g),
+            memo=record.memo,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
+
+    @staticmethod
     def _build_vital_summary(records: list[VitalRecord]) -> VitalRecordSummaryResponse:
         sbp_values = [record.sbp for record in records if record.sbp is not None]
         dbp_values = [record.dbp for record in records if record.dbp is not None]
@@ -899,6 +999,33 @@ class HealthInputService:
             total_calories_burned=sum(record.calories_burned or 0 for record in records),
             logged_count=len(records),
         )
+
+    @staticmethod
+    def _build_meal_daily_summary(records: list[MealLog]) -> list[MealDailySummaryResponse]:
+        grouped: dict[date, list[MealLog]] = {}
+        for record in records:
+            grouped.setdefault(record.meal_date, []).append(record)
+
+        return [
+            MealDailySummaryResponse(
+                meal_date=meal_date,
+                meal_count=len(day_records),
+                total_calories=sum(record.calories or 0 for record in day_records),
+                total_sodium_mg=round(
+                    sum(float(record.sodium_mg or 0) for record in day_records),
+                    2,
+                ),
+                total_sugar_g=round(
+                    sum(float(record.sugar_g or 0) for record in day_records),
+                    2,
+                ),
+                total_fiber_g=round(
+                    sum(float(record.fiber_g or 0) for record in day_records),
+                    2,
+                ),
+            )
+            for meal_date, day_records in sorted(grouped.items(), reverse=True)
+        ]
 
     @staticmethod
     def _build_goal_progress(
@@ -977,6 +1104,10 @@ class HealthInputService:
             "target_sleep_hours",
             "target_diet_score",
         }
+
+    @staticmethod
+    def _meal_decimal_fields() -> set[str]:
+        return {"carbs_g", "protein_g", "fat_g", "sodium_mg", "sugar_g", "fiber_g"}
 
     @staticmethod
     def _validate_activity_alcohol(alcohol_frequency: int | None, alcohol_amount: int | None) -> None:

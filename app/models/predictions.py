@@ -204,6 +204,29 @@ class ExerciseLog(models.Model):
         table = "exercise_logs"
 
 
+class MealLog(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="meal_logs", on_delete=fields.CASCADE)
+    food_analysis_result_id = fields.BigIntField(null=True)
+    meal_date = fields.DateField()
+    meal_type = fields.CharField(max_length=20)
+    food_name = fields.CharField(max_length=100)
+    amount = fields.CharField(max_length=50, null=True)
+    calories = fields.IntField(null=True)
+    carbs_g = fields.DecimalField(max_digits=6, decimal_places=2, null=True)
+    protein_g = fields.DecimalField(max_digits=6, decimal_places=2, null=True)
+    fat_g = fields.DecimalField(max_digits=6, decimal_places=2, null=True)
+    sodium_mg = fields.DecimalField(max_digits=8, decimal_places=2, null=True)
+    sugar_g = fields.DecimalField(max_digits=6, decimal_places=2, null=True)
+    fiber_g = fields.DecimalField(max_digits=6, decimal_places=2, null=True)
+    memo = fields.CharField(max_length=255, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "meal_logs"
+
+
 class PredictionInputSnapshot(models.Model):
     id = fields.BigIntField(primary_key=True)
     user = fields.ForeignKeyField("models.User", related_name="prediction_input_snapshots", on_delete=fields.CASCADE)
