@@ -61,6 +61,7 @@ from app.dtos.predictions import (
     VitalRecordUpdateRequest,
     VitalTrendResponse,
 )
+from app.models.foods import FoodAnalysisResult
 from app.models.predictions import (
     ActivityLog,
     ChronicHealthInput,
@@ -557,6 +558,7 @@ class HealthInputService:
         await record.delete()
 
     async def create_meal_log(self, user: User, data: MealLogCreateRequest) -> MealLogCreateResponse:
+        await self._ensure_owned_food_analysis_result(user, data.food_analysis_result_id)
         record = await MealLog.create(
             user=user,
             food_analysis_result_id=data.food_analysis_result_id,
@@ -611,6 +613,8 @@ class HealthInputService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="식단 기록을 찾을 수 없습니다.")
 
         update_data = data.model_dump(exclude_unset=True)
+        if "food_analysis_result_id" in update_data:
+            await self._ensure_owned_food_analysis_result(user, update_data["food_analysis_result_id"])
         if "meal_type" in update_data:
             record.meal_type = update_data.pop("meal_type").value
         for field, value in update_data.items():
@@ -1108,6 +1112,14 @@ class HealthInputService:
     @staticmethod
     def _meal_decimal_fields() -> set[str]:
         return {"carbs_g", "protein_g", "fat_g", "sodium_mg", "sugar_g", "fiber_g"}
+
+    @staticmethod
+    async def _ensure_owned_food_analysis_result(user: User, food_analysis_result_id: int | None) -> None:
+        if food_analysis_result_id is None:
+            return
+        exists = await FoodAnalysisResult.exists(id=food_analysis_result_id, user_id=user.id)
+        if not exists:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="식단 분석 결과를 찾을 수 없습니다.")
 
     @staticmethod
     def _validate_activity_alcohol(alcohol_frequency: int | None, alcohol_amount: int | None) -> None:
