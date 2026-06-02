@@ -141,6 +141,69 @@ class OptionalRecordCreateResponse(BaseModel):
     created_at: datetime
 
 
+class HealthSurveyRecordResponse(BaseModel):
+    health_input_id: int
+    input_mode: str
+    age: int
+    gender: str
+    height: float
+    weight: float
+    bmi: float
+    waist_circumference: float | None = None
+    sbp: int | None = None
+    dbp: int | None = None
+    glucose_fasting: int | None = None
+    diagnosed_diseases: list[str] = Field(default_factory=list)
+    medications: list[str] = Field(default_factory=list)
+    last_checkup_period: str | None = None
+    fh_diabetes_father: bool
+    fh_diabetes_mother: bool
+    fh_diabetes_sibling: bool
+    fh_hypertension_father: bool
+    fh_hypertension_mother: bool
+    fh_hypertension_sibling: bool
+    family_history_ckd: bool
+    smoking_status: int
+    alcohol_frequency: int
+    alcohol_amount: int | None = None
+    walking_days: int | None = None
+    sedentary_hours: float | None = None
+    exercise_frequency: int
+    physical_activity_min: int | None = None
+    sleep_hours: float | None = None
+    stress_level: int | None = None
+    diet_score: float | None = None
+    created_at: datetime
+
+
+class LipidObesityRecordResponse(BaseModel):
+    record_id: int
+    record_date: date
+    total_cholesterol: int | None = None
+    hdl_cholesterol: int | None = None
+    ldl_cholesterol: int | None = None
+    triglycerides: int | None = None
+    height: float | None = None
+    weight: float | None = None
+    bmi: float | None = None
+    waist_circumference: float | None = None
+    memo: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class RenalRecordResponse(BaseModel):
+    record_id: int
+    record_date: date
+    creatinine: float | None = None
+    egfr: float | None = None
+    bun: float | None = None
+    urine_protein_pos: bool | None = None
+    memo: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class MetricAssessmentItemResponse(BaseModel):
     status: Literal["NORMAL", "CAUTION", "HIGH", "UNAVAILABLE"]
     reasons: list[str] = Field(default_factory=list)

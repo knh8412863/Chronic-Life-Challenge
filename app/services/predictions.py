@@ -13,8 +13,10 @@ from app.core import config
 from app.dtos.predictions import (
     HealthSurveyCreateRequest,
     HealthSurveyCreateResponse,
+    HealthSurveyRecordResponse,
     InputCompletenessResponse,
     LipidObesityRecordCreateRequest,
+    LipidObesityRecordResponse,
     MetricAssessmentItemResponse,
     MetricAssessmentResponse,
     OptionalRecordCreateResponse,
@@ -25,6 +27,7 @@ from app.dtos.predictions import (
     PredictionTaskCreateResponse,
     PredictionTaskStatusResponse,
     RenalRecordCreateRequest,
+    RenalRecordResponse,
 )
 from app.models.predictions import (
     ChronicHealthInput,
@@ -188,6 +191,46 @@ class HealthInputService:
             obesity=self._assess_obesity(user, profile, latest_health, latest_lipid),
         )
 
+    async def get_health_surveys(self, user: User, limit: int = 20) -> list[HealthSurveyRecordResponse]:
+        snapshots = (
+            await PredictionInputSnapshot.filter(user_id=user.id)
+            .order_by("-created_at")
+            .limit(limit)
+            .prefetch_related("chronic_health_input", "lifestyle_input")
+        )
+        return [self._to_health_survey_record(snapshot) for snapshot in snapshots]
+
+    async def get_latest_health_survey(self, user: User) -> HealthSurveyRecordResponse:
+        snapshot = (
+            await PredictionInputSnapshot.filter(user_id=user.id)
+            .order_by("-created_at")
+            .prefetch_related("chronic_health_input", "lifestyle_input")
+            .first()
+        )
+        if snapshot is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="건강 설문 입력을 찾을 수 없습니다.")
+        return self._to_health_survey_record(snapshot)
+
+    async def get_lipid_obesity_records(self, user: User, limit: int = 20) -> list[LipidObesityRecordResponse]:
+        records = await LipidObesityRecord.filter(user_id=user.id).order_by("-record_date", "-created_at").limit(limit)
+        return [self._to_lipid_obesity_record(record) for record in records]
+
+    async def get_lipid_obesity_record(self, user: User, record_id: int) -> LipidObesityRecordResponse:
+        record = await LipidObesityRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="지질·비만 기록을 찾을 수 없습니다.")
+        return self._to_lipid_obesity_record(record)
+
+    async def get_renal_records(self, user: User, limit: int = 20) -> list[RenalRecordResponse]:
+        records = await RenalRecord.filter(user_id=user.id).order_by("-record_date", "-created_at").limit(limit)
+        return [self._to_renal_record(record) for record in records]
+
+    async def get_renal_record(self, user: User, record_id: int) -> RenalRecordResponse:
+        record = await RenalRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신장 기록을 찾을 수 없습니다.")
+        return self._to_renal_record(record)
+
     @staticmethod
     def _assess_dyslipidemia(user: User, lipid: LipidObesityRecord | None) -> MetricAssessmentItemResponse:
         if lipid is None:
@@ -302,6 +345,81 @@ class HealthInputService:
     @staticmethod
     def _status_from_rank(rank: int) -> str:
         return {0: "NORMAL", 1: "CAUTION", 2: "HIGH"}[rank]
+
+    @staticmethod
+    def _to_health_survey_record(snapshot: PredictionInputSnapshot) -> HealthSurveyRecordResponse:
+        health = snapshot.chronic_health_input
+        lifestyle = snapshot.lifestyle_input
+        return HealthSurveyRecordResponse(
+            health_input_id=snapshot.id,
+            input_mode=snapshot.input_mode,
+            age=health.age,
+            gender=health.gender.value,
+            height=float(health.height),
+            weight=float(health.weight),
+            bmi=float(health.bmi),
+            waist_circumference=HealthInputService._optional_float(health.waist_circumference),
+            sbp=health.sbp,
+            dbp=health.dbp,
+            glucose_fasting=health.glucose_fasting,
+            diagnosed_diseases=health.diagnosed_diseases or [],
+            medications=health.medications or [],
+            last_checkup_period=health.last_checkup_period,
+            fh_diabetes_father=health.fh_diabetes_father,
+            fh_diabetes_mother=health.fh_diabetes_mother,
+            fh_diabetes_sibling=health.fh_diabetes_sibling,
+            fh_hypertension_father=health.fh_hypertension_father,
+            fh_hypertension_mother=health.fh_hypertension_mother,
+            fh_hypertension_sibling=health.fh_hypertension_sibling,
+            family_history_ckd=health.family_history_ckd,
+            smoking_status=lifestyle.smoking_status,
+            alcohol_frequency=lifestyle.alcohol_frequency,
+            alcohol_amount=lifestyle.alcohol_amount,
+            walking_days=lifestyle.walking_days,
+            sedentary_hours=HealthInputService._optional_float(lifestyle.sedentary_hours),
+            exercise_frequency=lifestyle.exercise_frequency,
+            physical_activity_min=lifestyle.physical_activity_min,
+            sleep_hours=HealthInputService._optional_float(lifestyle.sleep_hours),
+            stress_level=lifestyle.stress_level,
+            diet_score=HealthInputService._optional_float(lifestyle.diet_score),
+            created_at=snapshot.created_at,
+        )
+
+    @staticmethod
+    def _to_lipid_obesity_record(record: LipidObesityRecord) -> LipidObesityRecordResponse:
+        return LipidObesityRecordResponse(
+            record_id=record.id,
+            record_date=record.record_date,
+            total_cholesterol=record.total_cholesterol,
+            hdl_cholesterol=record.hdl_cholesterol,
+            ldl_cholesterol=record.ldl_cholesterol,
+            triglycerides=record.triglycerides,
+            height=HealthInputService._optional_float(record.height_cm),
+            weight=HealthInputService._optional_float(record.weight_kg),
+            bmi=HealthInputService._optional_float(record.bmi),
+            waist_circumference=HealthInputService._optional_float(record.waist_circumference),
+            memo=record.memo,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
+
+    @staticmethod
+    def _to_renal_record(record: RenalRecord) -> RenalRecordResponse:
+        return RenalRecordResponse(
+            record_id=record.id,
+            record_date=record.record_date,
+            creatinine=HealthInputService._optional_float(record.creatinine),
+            egfr=HealthInputService._optional_float(record.egfr),
+            bun=HealthInputService._optional_float(record.bun),
+            urine_protein_pos=record.urine_protein_pos,
+            memo=record.memo,
+            created_at=record.created_at,
+            updated_at=record.updated_at,
+        )
+
+    @staticmethod
+    def _optional_float(value: Any) -> float | None:
+        return float(value) if value is not None else None
 
 
 class PredictionService:
