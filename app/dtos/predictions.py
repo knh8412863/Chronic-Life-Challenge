@@ -174,6 +174,47 @@ class VitalRecordUpdateRequest(BaseModel):
     memo: Annotated[str | None, Field(default=None, max_length=255)] = None
 
 
+class ActivityLogCreateRequest(BaseModel):
+    record_date: date
+    alcohol_frequency: Literal[0, 1, 3] | None = None
+    alcohol_amount: Annotated[int | None, Field(default=None, ge=1, le=5)]
+    walking_days: Annotated[int | None, Field(default=None, ge=0, le=7)]
+    sedentary_hours: Annotated[float | None, Field(default=None, ge=0, le=24)]
+    sleep_hours: Annotated[float | None, Field(default=None, ge=0, le=14)]
+    stress_level: Annotated[int | None, Field(default=None, ge=1, le=5)]
+    diet_score: Annotated[float | None, Field(default=None, ge=0, le=10)]
+    memo: Annotated[str | None, Field(default=None, max_length=255)]
+
+    @model_validator(mode="after")
+    def validate_activity_values(self) -> "ActivityLogCreateRequest":
+        fields = [
+            self.alcohol_frequency,
+            self.walking_days,
+            self.sedentary_hours,
+            self.sleep_hours,
+            self.stress_level,
+            self.diet_score,
+        ]
+        if all(value is None for value in fields) and self.memo is None:
+            raise ValueError("At least one activity value is required.")
+        if self.alcohol_frequency == 0 and self.alcohol_amount is not None:
+            raise ValueError("alcohol_amount must be empty when alcohol_frequency is 0.")
+        if self.alcohol_frequency in {1, 3} and self.alcohol_amount is None:
+            raise ValueError("alcohol_amount is required when alcohol_frequency is not 0.")
+        return self
+
+
+class ActivityLogUpdateRequest(BaseModel):
+    alcohol_frequency: Literal[0, 1, 3] | None = None
+    alcohol_amount: Annotated[int | None, Field(default=None, ge=1, le=5)]
+    walking_days: Annotated[int | None, Field(default=None, ge=0, le=7)]
+    sedentary_hours: Annotated[float | None, Field(default=None, ge=0, le=24)]
+    sleep_hours: Annotated[float | None, Field(default=None, ge=0, le=14)]
+    stress_level: Annotated[int | None, Field(default=None, ge=1, le=5)]
+    diet_score: Annotated[float | None, Field(default=None, ge=0, le=10)]
+    memo: Annotated[str | None, Field(default=None, max_length=255)] = None
+
+
 class OptionalRecordCreateResponse(BaseModel):
     record_id: int
     bmi: float | None = None
@@ -281,6 +322,36 @@ class VitalTrendResponse(BaseModel):
 class VitalRecordDetailResponse(BaseModel):
     record: VitalRecordResponse
     trend: VitalTrendResponse
+
+
+class ActivityLogResponse(BaseModel):
+    activity_log_id: int
+    record_date: date
+    alcohol_frequency: int | None = None
+    alcohol_amount: int | None = None
+    walking_days: int | None = None
+    sedentary_hours: float | None = None
+    sleep_hours: float | None = None
+    stress_level: int | None = None
+    diet_score: float | None = None
+    memo: str | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class ActivityLogSummaryResponse(BaseModel):
+    avg_walking_days: float | None = None
+    avg_sedentary_hours: float | None = None
+    avg_sleep_hours: float | None = None
+    avg_stress_level: float | None = None
+    avg_diet_score: float | None = None
+    logged_days: int
+
+
+class ActivityLogListResponse(BaseModel):
+    summary: ActivityLogSummaryResponse
+    total: int
+    items: list[ActivityLogResponse]
 
 
 class MetricAssessmentItemResponse(BaseModel):

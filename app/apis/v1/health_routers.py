@@ -7,6 +7,10 @@ from starlette.responses import Response as EmptyResponse
 
 from app.dependencies.security import get_request_user
 from app.dtos.predictions import (
+    ActivityLogCreateRequest,
+    ActivityLogListResponse,
+    ActivityLogResponse,
+    ActivityLogUpdateRequest,
     DataResponse,
     HealthSurveyCreateRequest,
     HealthSurveyCreateResponse,
@@ -225,6 +229,78 @@ async def delete_vital_record(
     service: Annotated[HealthInputService, Depends(HealthInputService)],
 ) -> EmptyResponse:
     await service.delete_vital_record(user, record_id)
+    return EmptyResponse(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@health_router.post(
+    "/health/activity-logs",
+    response_model=DataResponse[OptionalRecordCreateResponse],
+    status_code=status.HTTP_201_CREATED,
+)
+async def create_activity_log(
+    request: ActivityLogCreateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+) -> Response:
+    result = await service.create_activity_log(user, request)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_201_CREATED)
+
+
+@health_router.get(
+    "/health/activity-logs",
+    response_model=DataResponse[ActivityLogListResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_activity_logs(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+    from_date: Annotated[date | None, Query(alias="from")] = None,
+    to_date: Annotated[date | None, Query(alias="to")] = None,
+    limit: Annotated[int, Query(ge=1, le=200)] = 100,
+) -> Response:
+    result = await service.get_activity_logs(user, from_date, to_date, limit)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@health_router.get(
+    "/health/activity-logs/{activity_log_id}",
+    response_model=DataResponse[ActivityLogResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_activity_log(
+    activity_log_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+) -> Response:
+    result = await service.get_activity_log(user, activity_log_id)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@health_router.patch(
+    "/health/activity-logs/{activity_log_id}",
+    response_model=DataResponse[ActivityLogResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def update_activity_log(
+    activity_log_id: int,
+    request: ActivityLogUpdateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+) -> Response:
+    result = await service.update_activity_log(user, activity_log_id, request)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@health_router.delete(
+    "/health/activity-logs/{activity_log_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+)
+async def delete_activity_log(
+    activity_log_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[HealthInputService, Depends(HealthInputService)],
+) -> EmptyResponse:
+    await service.delete_activity_log(user, activity_log_id)
     return EmptyResponse(status_code=status.HTTP_204_NO_CONTENT)
 
 

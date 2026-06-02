@@ -131,6 +131,26 @@ class VitalRecord(models.Model):
         table = "vital_records"
 
 
+class ActivityLog(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="activity_logs", on_delete=fields.CASCADE)
+    record_date = fields.DateField()
+    alcohol_frequency = fields.IntField(null=True)
+    alcohol_amount = fields.IntField(null=True)
+    walking_days = fields.IntField(null=True)
+    sedentary_hours = fields.DecimalField(max_digits=4, decimal_places=1, null=True)
+    sleep_hours = fields.DecimalField(max_digits=3, decimal_places=1, null=True)
+    stress_level = fields.IntField(null=True)
+    diet_score = fields.DecimalField(max_digits=3, decimal_places=1, null=True)
+    memo = fields.CharField(max_length=255, null=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "activity_logs"
+        unique_together = (("user", "record_date"),)
+
+
 class PredictionInputSnapshot(models.Model):
     id = fields.BigIntField(primary_key=True)
     user = fields.ForeignKeyField("models.User", related_name="prediction_input_snapshots", on_delete=fields.CASCADE)
