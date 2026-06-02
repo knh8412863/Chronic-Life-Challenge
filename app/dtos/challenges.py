@@ -19,10 +19,17 @@ class ChallengeSummaryResponse(BaseModel):
     target_metric: str
     goal_value: int
     duration_days: int
+    difficulty: str = "NORMAL"
+    reward_points: int = 0
+    participant_count: int = 0
     is_joined: bool = False
+    today_checked: bool = False
 
 
 class ChallengeDetailResponse(ChallengeSummaryResponse):
+    average_completion_rate: float = 0.0
+    how_to_join: list[str] = Field(default_factory=list)
+    daily_mission_examples: list[str] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 

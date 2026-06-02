@@ -28,6 +28,65 @@ def test_challenge_summary_marks_joined_state():
     assert result.challenge_id == 1
     assert result.is_joined is True
     assert result.duration_days == 7
+    assert result.difficulty == "EASY"
+    assert result.reward_points == 5
+
+
+def test_challenge_summary_includes_card_status_fields():
+    challenge = SimpleNamespace(
+        id=2,
+        title="걷기 챌린지",
+        description="매일 걷기 목표를 달성합니다.",
+        category="EXERCISE",
+        target_metric="STEPS",
+        goal_value=5000,
+        duration_days=14,
+    )
+
+    result = ChallengeService._to_summary(
+        challenge,
+        is_joined=True,
+        today_checked=True,
+        participant_count=12,
+    )
+
+    assert result.participant_count == 12
+    assert result.today_checked is True
+    assert result.difficulty == "NORMAL"
+    assert result.reward_points == 10
+
+
+def test_challenge_summaries_can_be_sorted_by_popularity_and_duration():
+    summaries = [
+        SimpleNamespace(challenge_id=1, participant_count=2, duration_days=14),
+        SimpleNamespace(challenge_id=2, participant_count=5, duration_days=30),
+        SimpleNamespace(challenge_id=3, participant_count=5, duration_days=7),
+    ]
+
+    popular = ChallengeService._sort_challenge_summaries(summaries, "POPULAR")
+    duration = ChallengeService._sort_challenge_summaries(summaries, "DURATION")
+
+    assert [item.challenge_id for item in popular] == [2, 3, 1]
+    assert [item.challenge_id for item in duration] == [3, 1, 2]
+
+
+def test_challenge_detail_calculates_average_completion_and_guides():
+    challenge = SimpleNamespace(
+        target_metric="WATER",
+        goal_value=8,
+        duration_days=10,
+    )
+    participations = [
+        SimpleNamespace(progress_count=5, challenge=SimpleNamespace(duration_days=10)),
+        SimpleNamespace(progress_count=7, challenge=SimpleNamespace(duration_days=10)),
+    ]
+
+    assert ChallengeService._average_completion_rate(participations) == 60.0
+    assert ChallengeService._difficulty(30) == "HARD"
+    assert ChallengeService._reward_points(30) == 15
+    assert ChallengeService._mission_text(challenge) == "물 섭취 8 달성하기"
+    assert len(ChallengeService._how_to_join_steps(challenge)) == 3
+    assert ChallengeService._daily_mission_examples(challenge)[0] == "물 섭취 8 달성하기"
 
 
 def test_my_challenge_response_detects_today_checkin():

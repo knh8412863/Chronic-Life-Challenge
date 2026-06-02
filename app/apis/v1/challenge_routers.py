@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import ORJSONResponse as Response
 
 from app.dependencies.security import get_request_user
@@ -28,8 +28,11 @@ challenge_router = APIRouter(tags=["challenges"])
 async def get_challenges(
     user: Annotated[User, Depends(get_request_user)],
     service: Annotated[ChallengeService, Depends(ChallengeService)],
+    category: Annotated[str | None, Query(max_length=30)] = None,
+    target_metric: Annotated[str | None, Query(max_length=30)] = None,
+    sort: Annotated[str, Query(pattern="^(LATEST|POPULAR|DURATION)$")] = "LATEST",
 ) -> Response:
-    result = await service.get_challenges(user)
+    result = await service.get_challenges(user, category=category, target_metric=target_metric, sort=sort)
     return Response({"data": [item.model_dump(mode="json") for item in result]}, status_code=status.HTTP_200_OK)
 
 

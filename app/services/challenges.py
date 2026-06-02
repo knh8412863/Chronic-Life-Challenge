@@ -20,24 +20,73 @@ from app.models.users import User
 
 
 class ChallengeService:
-    async def get_challenges(self, user: User) -> list[ChallengeSummaryResponse]:
-        challenges = await Challenge.filter(is_active=True).order_by("id")
-        active_participations = await ChallengeParticipation.filter(
-            user_id=user.id,
-            status=ChallengeParticipationStatus.JOINED.value,
-        ).values_list("challenge_id", flat=True)
-        joined_ids = set(active_participations)
-        return [self._to_summary(challenge, challenge.id in joined_ids) for challenge in challenges]
+    async def get_challenges(
+        self,
+        user: User,
+        category: str | None = None,
+        target_metric: str | None = None,
+        sort: str = "LATEST",
+    ) -> list[ChallengeSummaryResponse]:
+        query = Challenge.filter(is_active=True)
+        if category:
+            query = query.filter(category=category)
+        if target_metric:
+            query = query.filter(target_metric=target_metric)
+
+        challenges = await query.order_by("id")
+        challenge_ids = [challenge.id for challenge in challenges]
+        today = date.today()
+        active_participations = (
+            await ChallengeParticipation.filter(
+                user_id=user.id,
+                status=ChallengeParticipationStatus.JOINED.value,
+            )
+            .prefetch_related("checkins")
+            .all()
+        )
+        participation_counts = await self._participant_counts(challenge_ids)
+        joined_ids = {participation.challenge_id for participation in active_participations}
+        today_checked_ids = {
+            participation.challenge_id
+            for participation in active_participations
+            if any(checkin.checkin_date == today for checkin in participation.checkins)
+        }
+        summaries = [
+            self._to_summary(
+                challenge,
+                is_joined=challenge.id in joined_ids,
+                today_checked=challenge.id in today_checked_ids,
+                participant_count=participation_counts.get(challenge.id, 0),
+            )
+            for challenge in challenges
+        ]
+        return self._sort_challenge_summaries(summaries, sort)
 
     async def get_challenge(self, user: User, challenge_id: int) -> ChallengeDetailResponse:
         challenge = await self._get_active_challenge(challenge_id)
-        is_joined = await ChallengeParticipation.exists(
+        participation = await ChallengeParticipation.get_or_none(
             user_id=user.id,
             challenge_id=challenge.id,
             status=ChallengeParticipationStatus.JOINED.value,
+        ).prefetch_related("checkins")
+        participations = (
+            await ChallengeParticipation.filter(challenge_id=challenge.id)
+            .prefetch_related("challenge", "checkins")
+            .all()
         )
+        today = date.today()
+        participant_count = len(participations)
+        today_checked = bool(participation and any(checkin.checkin_date == today for checkin in participation.checkins))
         return ChallengeDetailResponse(
-            **self._to_summary(challenge, is_joined).model_dump(),
+            **self._to_summary(
+                challenge,
+                is_joined=participation is not None,
+                today_checked=today_checked,
+                participant_count=participant_count,
+            ).model_dump(),
+            average_completion_rate=self._average_completion_rate(participations),
+            how_to_join=self._how_to_join_steps(challenge),
+            daily_mission_examples=self._daily_mission_examples(challenge),
             created_at=challenge.created_at,
             updated_at=challenge.updated_at,
         )
@@ -129,7 +178,12 @@ class ChallengeService:
         return challenge
 
     @staticmethod
-    def _to_summary(challenge: Challenge, is_joined: bool) -> ChallengeSummaryResponse:
+    def _to_summary(
+        challenge: Challenge,
+        is_joined: bool,
+        today_checked: bool = False,
+        participant_count: int = 0,
+    ) -> ChallengeSummaryResponse:
         return ChallengeSummaryResponse(
             challenge_id=challenge.id,
             title=challenge.title,
@@ -138,7 +192,11 @@ class ChallengeService:
             target_metric=challenge.target_metric,
             goal_value=challenge.goal_value,
             duration_days=challenge.duration_days,
+            difficulty=ChallengeService._difficulty(challenge.duration_days),
+            reward_points=ChallengeService._reward_points(challenge.duration_days),
+            participant_count=participant_count,
             is_joined=is_joined,
+            today_checked=today_checked,
         )
 
     @staticmethod
@@ -280,6 +338,69 @@ class ChallengeService:
         }
         metric = metric_labels.get(challenge.target_metric, challenge.target_metric)
         return f"{metric} {challenge.goal_value} 달성하기"
+
+    @staticmethod
+    async def _participant_counts(challenge_ids: list[int]) -> dict[int, int]:
+        if not challenge_ids:
+            return {}
+        participations = await ChallengeParticipation.filter(challenge_id__in=challenge_ids).values("challenge_id")
+        counts = {challenge_id: 0 for challenge_id in challenge_ids}
+        for participation in participations:
+            counts[participation["challenge_id"]] += 1
+        return counts
+
+    @staticmethod
+    def _sort_challenge_summaries(
+        summaries: list[ChallengeSummaryResponse],
+        sort: str,
+    ) -> list[ChallengeSummaryResponse]:
+        sort_key = sort.upper()
+        if sort_key == "POPULAR":
+            return sorted(summaries, key=lambda item: (-item.participant_count, item.challenge_id))
+        if sort_key == "DURATION":
+            return sorted(summaries, key=lambda item: (item.duration_days, item.challenge_id))
+        return sorted(summaries, key=lambda item: item.challenge_id)
+
+    @staticmethod
+    def _average_completion_rate(participations: list[ChallengeParticipation]) -> float:
+        if not participations:
+            return 0.0
+        rates = [
+            ChallengeService._completion_rate(participation.progress_count, participation.challenge.duration_days)
+            for participation in participations
+        ]
+        return round(sum(rates) / len(rates), 1)
+
+    @staticmethod
+    def _difficulty(duration_days: int) -> str:
+        if duration_days <= 7:
+            return "EASY"
+        if duration_days <= 14:
+            return "NORMAL"
+        return "HARD"
+
+    @staticmethod
+    def _reward_points(duration_days: int) -> int:
+        if duration_days <= 7:
+            return 5
+        if duration_days <= 14:
+            return 10
+        return 15
+
+    @staticmethod
+    def _how_to_join_steps(challenge: Challenge) -> list[str]:
+        return [
+            "챌린지 참여 버튼을 눌러 시작합니다.",
+            f"{challenge.duration_days}일 동안 매일 미션을 완료합니다.",
+            "오늘의 미션을 완료하면 체크인으로 기록합니다.",
+        ]
+
+    @staticmethod
+    def _daily_mission_examples(challenge: Challenge) -> list[str]:
+        return [
+            ChallengeService._mission_text(challenge),
+            "완료 후 오늘 미션 체크인을 진행합니다.",
+        ]
 
     @staticmethod
     def _to_checkin_response(
