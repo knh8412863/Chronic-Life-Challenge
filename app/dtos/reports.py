@@ -74,3 +74,12 @@ class CurrentWeeklyReportResponse(BaseModel):
     week_end_date: date
     report: WeeklyReportResponse | None = None
     empty_message: str | None = None
+
+
+class WeeklyReportListItemResponse(BaseModel):
+    report_id: int
+    week_start_date: date
+    week_end_date: date
+    summary_text: str
+    overall_status: Literal["NORMAL", "CAUTION", "HIGH", "UNAVAILABLE"]
+    created_at: datetime

@@ -159,3 +159,39 @@ def test_weekly_report_source_data_detection():
 
     assert WeeklyReportService._has_report_source_data(empty) is False
     assert WeeklyReportService._has_report_source_data(available) is True
+
+
+def test_weekly_report_list_item_is_lightweight_summary():
+    report = SimpleNamespace(
+        id=9,
+        week_start_date=date(2026, 6, 1),
+        week_end_date=date(2026, 6, 7),
+        report_text="이번 주 건강 기록은 총 4건 입력되었습니다. AI 예측 중 위험 신호가 포함된 결과가 1건 있습니다.",
+        summary_cards=[
+            {"label": "건강 기록", "value": "4건", "status": "NORMAL", "description": "기록 수"},
+            {"label": "AI 위험 신호", "value": "1건", "status": "HIGH", "description": "위험 신호"},
+        ],
+        created_at=datetime(2026, 6, 2, 17, 0),
+    )
+
+    response = WeeklyReportService._to_list_item(report)
+
+    assert response.report_id == 9
+    assert response.overall_status == "HIGH"
+    assert response.summary_text.startswith("이번 주 건강 기록")
+    assert not hasattr(response, "source_summary")
+
+
+def test_weekly_report_summary_text_is_trimmed():
+    text = "가" * 100
+
+    result = WeeklyReportService._summary_text(text, max_length=10)
+
+    assert len(result) == 10
+    assert result.endswith("…")
+
+
+def test_weekly_report_overall_status_priority():
+    assert WeeklyReportService._overall_status([{"status": "NORMAL"}, {"status": "CAUTION"}]) == "CAUTION"
+    assert WeeklyReportService._overall_status([{"status": "HIGH"}, {"status": "CAUTION"}]) == "HIGH"
+    assert WeeklyReportService._overall_status([]) == "UNAVAILABLE"
