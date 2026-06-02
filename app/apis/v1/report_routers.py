@@ -5,7 +5,12 @@ from fastapi.responses import ORJSONResponse as Response
 
 from app.dependencies.security import get_request_user
 from app.dtos.predictions import DataResponse
-from app.dtos.reports import CurrentWeeklyReportResponse, WeeklyReportGenerateRequest, WeeklyReportResponse
+from app.dtos.reports import (
+    CurrentWeeklyReportResponse,
+    WeeklyReportGenerateRequest,
+    WeeklyReportListItemResponse,
+    WeeklyReportResponse,
+)
 from app.models.users import User
 from app.services.reports import WeeklyReportService
 
@@ -41,7 +46,7 @@ async def get_current_weekly_report(
 
 @report_router.get(
     "/weekly-reports",
-    response_model=DataResponse[list[WeeklyReportResponse]],
+    response_model=DataResponse[list[WeeklyReportListItemResponse]],
     status_code=status.HTTP_200_OK,
 )
 async def get_weekly_reports(

@@ -6,6 +6,7 @@ from app.dtos.reports import (
     CurrentWeeklyReportResponse,
     WeeklyReportChallengeSummaryResponse,
     WeeklyReportGenerateRequest,
+    WeeklyReportListItemResponse,
     WeeklyReportMetricSummaryResponse,
     WeeklyReportResponse,
     WeeklyReportSourceSummaryResponse,
@@ -92,9 +93,9 @@ class WeeklyReportService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="주간 리포트를 찾을 수 없습니다.")
         return self._to_response(report, generated=False)
 
-    async def get_reports(self, user: User, limit: int = 20) -> list[WeeklyReportResponse]:
+    async def get_reports(self, user: User, limit: int = 20) -> list[WeeklyReportListItemResponse]:
         reports = await WeeklyReport.filter(user_id=user.id).order_by("-week_start_date").limit(limit)
-        return [self._to_response(report, generated=False) for report in reports]
+        return [self._to_list_item(report) for report in reports]
 
     @staticmethod
     async def _build_source_summary(user_id: int, week_start: date, week_end: date) -> dict[str, int]:
@@ -370,3 +371,31 @@ class WeeklyReportService:
             created_at=report.created_at,
             source_type="RULE_BASED",
         )
+
+    @staticmethod
+    def _to_list_item(report: WeeklyReport) -> WeeklyReportListItemResponse:
+        return WeeklyReportListItemResponse(
+            report_id=report.id,
+            week_start_date=report.week_start_date,
+            week_end_date=report.week_end_date,
+            summary_text=WeeklyReportService._summary_text(report.report_text),
+            overall_status=WeeklyReportService._overall_status(report.summary_cards),
+            created_at=report.created_at,
+        )
+
+    @staticmethod
+    def _summary_text(report_text: str, max_length: int = 80) -> str:
+        if len(report_text) <= max_length:
+            return report_text
+        return report_text[: max_length - 1].rstrip() + "…"
+
+    @staticmethod
+    def _overall_status(summary_cards: list[dict[str, str]]) -> str:
+        statuses = [card.get("status", "UNAVAILABLE") for card in summary_cards]
+        if "HIGH" in statuses:
+            return "HIGH"
+        if "CAUTION" in statuses:
+            return "CAUTION"
+        if "NORMAL" in statuses:
+            return "NORMAL"
+        return "UNAVAILABLE"
