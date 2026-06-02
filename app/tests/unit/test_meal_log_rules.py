@@ -3,6 +3,7 @@ from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 from pydantic import ValidationError
 
 from app.dtos.predictions import MealLogCreateRequest, MealType
@@ -38,6 +39,69 @@ def test_meal_log_create_request_rejects_negative_nutrition_values():
             food_name="저녁",
             calories=-1,
         )
+
+
+def test_meal_log_create_request_accepts_analysis_result_id_only():
+    request = MealLogCreateRequest(food_analysis_result_id=12)
+
+    assert request.food_analysis_result_id == 12
+    assert request.meal_date is None
+    assert request.food_name is None
+
+
+def test_meal_create_values_copy_analysis_result_and_prefer_request_overrides():
+    request = MealLogCreateRequest(
+        food_analysis_result_id=12,
+        calories=580,
+        sodium_mg=900,
+        memo="나트륨 추정치 수정",
+    )
+    analysis_result = SimpleNamespace(
+        meal_date=date(2026, 6, 2),
+        meal_type="LUNCH",
+        food_name="비빔밥",
+        amount="1인분",
+        calories=620,
+        carbs_g=Decimal("82.00"),
+        protein_g=Decimal("22.00"),
+        fat_g=Decimal("18.00"),
+        sodium_mg=Decimal("1100.00"),
+        sugar_g=Decimal("8.00"),
+        fiber_g=Decimal("5.00"),
+    )
+
+    result = HealthInputService._build_meal_create_values(request, analysis_result)
+
+    assert result["food_analysis_result_id"] == 12
+    assert result["meal_date"] == date(2026, 6, 2)
+    assert result["meal_type"] == "LUNCH"
+    assert result["food_name"] == "비빔밥"
+    assert result["calories"] == 580
+    assert result["sodium_mg"] == Decimal("900")
+    assert result["carbs_g"] == Decimal("82.00")
+    assert result["memo"] == "나트륨 추정치 수정"
+
+
+def test_meal_create_values_requires_required_fields_after_analysis_merge():
+    request = MealLogCreateRequest(food_analysis_result_id=12)
+    analysis_result = SimpleNamespace(
+        meal_date=None,
+        meal_type=None,
+        food_name="비빔밥",
+        amount=None,
+        calories=None,
+        carbs_g=None,
+        protein_g=None,
+        fat_g=None,
+        sodium_mg=None,
+        sugar_g=None,
+        fiber_g=None,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        HealthInputService._build_meal_create_values(request, analysis_result)
+
+    assert exc_info.value.status_code == 422
 
 
 def test_meal_log_response_converts_decimal_nutrition_to_float():

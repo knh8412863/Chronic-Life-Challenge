@@ -275,9 +275,9 @@ class ExerciseLogUpdateRequest(BaseModel):
 
 class MealLogCreateRequest(BaseModel):
     food_analysis_result_id: Annotated[int | None, Field(default=None, ge=1)]
-    meal_date: date
-    meal_type: MealType
-    food_name: Annotated[str, Field(min_length=1, max_length=100)]
+    meal_date: date | None = None
+    meal_type: MealType | None = None
+    food_name: Annotated[str | None, Field(default=None, min_length=1, max_length=100)]
     amount: Annotated[str | None, Field(default=None, max_length=50)]
     calories: Annotated[int | None, Field(default=None, ge=0, le=10000)]
     carbs_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
@@ -287,6 +287,14 @@ class MealLogCreateRequest(BaseModel):
     sugar_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
     fiber_g: Annotated[float | None, Field(default=None, ge=0, le=1000)]
     memo: Annotated[str | None, Field(default=None, max_length=255)]
+
+    @model_validator(mode="after")
+    def validate_manual_required_fields(self) -> "MealLogCreateRequest":
+        if self.food_analysis_result_id is not None:
+            return self
+        if self.meal_date is None or self.meal_type is None or self.food_name is None:
+            raise ValueError("meal_date, meal_type, and food_name are required for manual meal logs.")
+        return self
 
 
 class MealLogUpdateRequest(BaseModel):
