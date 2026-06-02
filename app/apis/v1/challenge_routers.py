@@ -7,6 +7,7 @@ from app.dependencies.security import get_request_user
 from app.dtos.challenges import (
     ChallengeCheckinCreateRequest,
     ChallengeCheckinResponse,
+    ChallengeDashboardSummaryResponse,
     ChallengeDetailResponse,
     ChallengeJoinResponse,
     ChallengeSummaryResponse,
@@ -30,6 +31,19 @@ async def get_challenges(
 ) -> Response:
     result = await service.get_challenges(user)
     return Response({"data": [item.model_dump(mode="json") for item in result]}, status_code=status.HTTP_200_OK)
+
+
+@challenge_router.get(
+    "/challenges/summary",
+    response_model=DataResponse[ChallengeDashboardSummaryResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_challenge_summary(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[ChallengeService, Depends(ChallengeService)],
+) -> Response:
+    result = await service.get_dashboard_summary(user)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
 
 
 @challenge_router.get(

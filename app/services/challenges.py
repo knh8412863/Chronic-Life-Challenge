@@ -6,10 +6,13 @@ from tortoise.transactions import in_transaction
 from app.dtos.challenges import (
     ChallengeCheckinCreateRequest,
     ChallengeCheckinResponse,
+    ChallengeDashboardSummaryResponse,
     ChallengeDetailResponse,
     ChallengeJoinResponse,
     ChallengeParticipationStatus,
     ChallengeSummaryResponse,
+    ChallengeTodayMissionResponse,
+    ChallengeWeeklyActivityResponse,
     MyChallengeResponse,
 )
 from app.models.challenges import Challenge, ChallengeCheckin, ChallengeParticipation
@@ -67,6 +70,18 @@ class ChallengeService:
         )
         today = date.today()
         return [self._to_my_challenge(participation, today) for participation in participations]
+
+    async def get_dashboard_summary(self, user: User) -> ChallengeDashboardSummaryResponse:
+        today = date.today()
+        week_start = today - timedelta(days=today.weekday())
+        week_end = week_start + timedelta(days=6)
+        participations = (
+            await ChallengeParticipation.filter(user_id=user.id)
+            .order_by("-created_at")
+            .prefetch_related("challenge", "checkins")
+        )
+
+        return self._build_dashboard_summary(participations, today, week_start, week_end)
 
     async def checkin_today(
         self,
@@ -160,6 +175,111 @@ class ChallengeService:
             ),
             today_checked=today_checked,
         )
+
+    @staticmethod
+    def _build_dashboard_summary(
+        participations: list[ChallengeParticipation],
+        today: date,
+        week_start: date,
+        week_end: date,
+    ) -> ChallengeDashboardSummaryResponse:
+        active_participations = [
+            item for item in participations if item.status == ChallengeParticipationStatus.JOINED.value
+        ]
+        completed_count = sum(
+            1 for item in participations if item.status == ChallengeParticipationStatus.COMPLETED.value
+        )
+        weekly_activity = ChallengeService._build_weekly_activity(participations, week_start)
+        completed_mission_count = sum(item.completed_count for item in weekly_activity)
+        weekly_completion_rate = ChallengeService._weekly_completion_rate(
+            completed_mission_count,
+            len(active_participations),
+            today,
+            week_start,
+            week_end,
+        )
+        checkin_dates = {checkin.checkin_date for participation in participations for checkin in participation.checkins}
+
+        return ChallengeDashboardSummaryResponse(
+            active_count=len(active_participations),
+            completed_count=completed_count,
+            weekly_completion_rate=weekly_completion_rate,
+            current_streak_days=ChallengeService._current_streak_days(checkin_dates, today),
+            completed_mission_count=completed_mission_count,
+            today_missions=ChallengeService._build_today_missions(active_participations, today),
+            weekly_activity=weekly_activity,
+        )
+
+    @staticmethod
+    def _build_today_missions(
+        participations: list[ChallengeParticipation],
+        today: date,
+    ) -> list[ChallengeTodayMissionResponse]:
+        missions = []
+        for participation in participations:
+            today_checked = any(checkin.checkin_date == today for checkin in participation.checkins)
+            missions.append(
+                ChallengeTodayMissionResponse(
+                    participation_id=participation.id,
+                    challenge_id=participation.challenge.id,
+                    title=participation.challenge.title,
+                    mission_text=ChallengeService._mission_text(participation.challenge),
+                    today_checked=today_checked,
+                )
+            )
+        return missions
+
+    @staticmethod
+    def _build_weekly_activity(
+        participations: list[ChallengeParticipation],
+        week_start: date,
+    ) -> list[ChallengeWeeklyActivityResponse]:
+        counts = {week_start + timedelta(days=offset): 0 for offset in range(7)}
+        for participation in participations:
+            for checkin in participation.checkins:
+                if checkin.checkin_date in counts:
+                    counts[checkin.checkin_date] += 1
+
+        return [
+            ChallengeWeeklyActivityResponse(activity_date=activity_date, completed_count=completed_count)
+            for activity_date, completed_count in counts.items()
+        ]
+
+    @staticmethod
+    def _weekly_completion_rate(
+        completed_mission_count: int,
+        active_count: int,
+        today: date,
+        week_start: date,
+        week_end: date,
+    ) -> float:
+        if active_count <= 0:
+            return 0.0
+        elapsed_days = (min(today, week_end) - week_start).days + 1
+        possible_count = max(elapsed_days * active_count, 1)
+        return round(min(completed_mission_count / possible_count, 1.0) * 100, 1)
+
+    @staticmethod
+    def _current_streak_days(checkin_dates: set[date], today: date) -> int:
+        streak = 0
+        current = today
+        while current in checkin_dates:
+            streak += 1
+            current -= timedelta(days=1)
+        return streak
+
+    @staticmethod
+    def _mission_text(challenge: Challenge) -> str:
+        metric_labels = {
+            "STEPS": "걸음 수",
+            "WATER": "물 섭취",
+            "EXERCISE": "운동",
+            "SLEEP": "수면",
+            "DIET": "식단",
+            "DAILY_CHECKIN": "건강 기록",
+        }
+        metric = metric_labels.get(challenge.target_metric, challenge.target_metric)
+        return f"{metric} {challenge.goal_value} 달성하기"
 
     @staticmethod
     def _to_checkin_response(

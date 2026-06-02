@@ -66,6 +66,64 @@ def test_challenge_checkin_response_can_mark_completed():
     assert response.completion_rate == 100.0
 
 
+def test_challenge_dashboard_summary_counts_active_completed_and_today_missions():
+    today = date(2026, 6, 3)
+    week_start = date(2026, 6, 1)
+    week_end = date(2026, 6, 7)
+    participations = [
+        SimpleNamespace(
+            id=1,
+            status="JOINED",
+            challenge=SimpleNamespace(id=10, title="걷기 챌린지", target_metric="STEPS", goal_value=5000),
+            checkins=[
+                SimpleNamespace(checkin_date=date(2026, 6, 1)),
+                SimpleNamespace(checkin_date=date(2026, 6, 2)),
+                SimpleNamespace(checkin_date=today),
+            ],
+        ),
+        SimpleNamespace(
+            id=2,
+            status="JOINED",
+            challenge=SimpleNamespace(id=11, title="물 마시기", target_metric="WATER", goal_value=8),
+            checkins=[],
+        ),
+        SimpleNamespace(
+            id=3,
+            status="COMPLETED",
+            challenge=SimpleNamespace(id=12, title="수면 챌린지", target_metric="SLEEP", goal_value=7),
+            checkins=[SimpleNamespace(checkin_date=date(2026, 6, 1))],
+        ),
+    ]
+
+    result = ChallengeService._build_dashboard_summary(participations, today, week_start, week_end)
+
+    assert result.active_count == 2
+    assert result.completed_count == 1
+    assert result.completed_mission_count == 4
+    assert result.weekly_completion_rate == 66.7
+    assert result.current_streak_days == 3
+    assert result.earned_badge_count == 0
+    assert len(result.today_missions) == 2
+    assert result.today_missions[0].today_checked is True
+    assert result.today_missions[0].mission_text == "걸음 수 5000 달성하기"
+
+
+def test_challenge_dashboard_summary_returns_empty_state():
+    today = date(2026, 6, 3)
+    week_start = date(2026, 6, 1)
+    week_end = date(2026, 6, 7)
+
+    result = ChallengeService._build_dashboard_summary([], today, week_start, week_end)
+
+    assert result.active_count == 0
+    assert result.completed_count == 0
+    assert result.weekly_completion_rate == 0.0
+    assert result.current_streak_days == 0
+    assert result.completed_mission_count == 0
+    assert result.today_missions == []
+    assert len(result.weekly_activity) == 7
+
+
 def test_home_challenge_summary_uses_average_completion_rate():
     participations = [
         SimpleNamespace(progress_count=3, challenge=SimpleNamespace(duration_days=10)),

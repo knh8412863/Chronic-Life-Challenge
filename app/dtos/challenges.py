@@ -51,6 +51,30 @@ class MyChallengeResponse(BaseModel):
     today_checked: bool
 
 
+class ChallengeTodayMissionResponse(BaseModel):
+    participation_id: int
+    challenge_id: int
+    title: str
+    mission_text: str
+    today_checked: bool
+
+
+class ChallengeWeeklyActivityResponse(BaseModel):
+    activity_date: date
+    completed_count: int
+
+
+class ChallengeDashboardSummaryResponse(BaseModel):
+    active_count: int
+    completed_count: int
+    weekly_completion_rate: float
+    current_streak_days: int
+    completed_mission_count: int
+    earned_badge_count: int = 0
+    today_missions: list[ChallengeTodayMissionResponse]
+    weekly_activity: list[ChallengeWeeklyActivityResponse]
+
+
 class ChallengeCheckinCreateRequest(BaseModel):
     note: Annotated[str | None, Field(default=None, max_length=255)]
 
