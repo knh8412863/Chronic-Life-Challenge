@@ -4,16 +4,21 @@ from fastapi import HTTPException, status
 from tortoise.transactions import in_transaction
 
 from app.dtos.challenges import (
+    ChallengeBadgeItemResponse,
+    ChallengeBadgeListResponse,
     ChallengeCancelResponse,
     ChallengeCheckinCreateRequest,
     ChallengeCheckinResponse,
     ChallengeDashboardSummaryResponse,
     ChallengeDetailResponse,
     ChallengeJoinResponse,
+    ChallengeLeaderboardItemResponse,
+    ChallengeLeaderboardMyRankResponse,
     ChallengeParticipationStatus,
     ChallengeSummaryResponse,
     ChallengeTodayMissionResponse,
     ChallengeWeeklyActivityResponse,
+    ChallengeWeeklyLeaderboardResponse,
     MyChallengeResponse,
 )
 from app.models.challenges import Challenge, ChallengeCheckin, ChallengeParticipation
@@ -132,6 +137,31 @@ class ChallengeService:
         )
 
         return self._build_dashboard_summary(participations, today, week_start, week_end)
+
+    async def get_badges(self, user: User, badge_filter: str = "ALL") -> ChallengeBadgeListResponse:
+        checkins = await ChallengeCheckin.filter(user_id=user.id).order_by("-checkin_date", "-created_at")
+        return self._build_badge_list(checkins, date.today(), badge_filter)
+
+    async def get_weekly_leaderboard(
+        self,
+        user: User,
+        week_start: date | None = None,
+        limit: int = 10,
+    ) -> ChallengeWeeklyLeaderboardResponse:
+        target_week_start = week_start or self._current_week_start(date.today())
+        week_end = target_week_start + timedelta(days=6)
+        checkins = (
+            await ChallengeCheckin.filter(checkin_date__gte=target_week_start, checkin_date__lte=week_end)
+            .prefetch_related("user")
+            .all()
+        )
+        return self._build_weekly_leaderboard(
+            checkins=checkins,
+            current_user_id=user.id,
+            week_start=target_week_start,
+            week_end=week_end,
+            limit=limit,
+        )
 
     async def checkin_today(
         self,
@@ -443,6 +473,144 @@ class ChallengeService:
             status=ChallengeParticipationStatus(participation.status),
             canceled_at=participation.updated_at,
         )
+
+    @staticmethod
+    def _build_badge_list(
+        checkins: list[ChallengeCheckin],
+        today: date,
+        badge_filter: str,
+    ) -> ChallengeBadgeListResponse:
+        checkin_dates = {checkin.checkin_date for checkin in checkins}
+        current_streak = ChallengeService._current_streak_days(checkin_dates, today)
+        latest_by_date = {}
+        for checkin in checkins:
+            latest_by_date.setdefault(checkin.checkin_date, checkin.created_at)
+
+        items = [
+            ChallengeService._build_badge_item(
+                badge_type="STREAK_3",
+                badge_name="3일 연속 성공",
+                target_streak=3,
+                current_streak=current_streak,
+                earned_at=latest_by_date.get(today) if current_streak >= 3 else None,
+            ),
+            ChallengeService._build_badge_item(
+                badge_type="STREAK_7",
+                badge_name="7일 연속 성공",
+                target_streak=7,
+                current_streak=current_streak,
+                earned_at=latest_by_date.get(today) if current_streak >= 7 else None,
+            ),
+            ChallengeService._build_badge_item(
+                badge_type="STREAK_30",
+                badge_name="30일 연속 성공",
+                target_streak=30,
+                current_streak=current_streak,
+                earned_at=latest_by_date.get(today) if current_streak >= 30 else None,
+            ),
+        ]
+
+        filtered_items = ChallengeService._filter_badges(items, badge_filter)
+        earned_items = [item for item in items if item.is_earned]
+        return ChallengeBadgeListResponse(
+            earned_count=len(earned_items),
+            total_completion_rate=round(len(earned_items) / len(items) * 100, 1),
+            items=filtered_items,
+            recent_earned=earned_items[:3],
+        )
+
+    @staticmethod
+    def _build_badge_item(
+        badge_type: str,
+        badge_name: str,
+        target_streak: int,
+        current_streak: int,
+        earned_at: object | None,
+    ) -> ChallengeBadgeItemResponse:
+        return ChallengeBadgeItemResponse(
+            badge_id=badge_type.lower(),
+            badge_name=badge_name,
+            badge_type=badge_type,
+            is_earned=current_streak >= target_streak,
+            current_streak=current_streak,
+            target_streak=target_streak,
+            progress_rate=round(min(current_streak / target_streak, 1.0) * 100, 1),
+            earned_at=earned_at,
+        )
+
+    @staticmethod
+    def _filter_badges(
+        badges: list[ChallengeBadgeItemResponse],
+        badge_filter: str,
+    ) -> list[ChallengeBadgeItemResponse]:
+        if badge_filter == "ALL":
+            return badges
+        return [badge for badge in badges if badge.badge_type == badge_filter]
+
+    @staticmethod
+    def _build_weekly_leaderboard(
+        checkins: list[ChallengeCheckin],
+        current_user_id: int,
+        week_start: date,
+        week_end: date,
+        limit: int,
+    ) -> ChallengeWeeklyLeaderboardResponse:
+        stats = {}
+        for checkin in checkins:
+            user_id = checkin.user.id
+            if user_id not in stats:
+                stats[user_id] = {
+                    "user_id": user_id,
+                    "name": checkin.user.name,
+                    "completed_mission_count": 0,
+                }
+            stats[user_id]["completed_mission_count"] += 1
+
+        ranked = sorted(
+            stats.values(),
+            key=lambda item: (-item["completed_mission_count"], item["user_id"]),
+        )
+        items = [
+            ChallengeService._build_leaderboard_item(rank=rank, item=item) for rank, item in enumerate(ranked, start=1)
+        ]
+        my_item = next((item for item in items if item.user_id == current_user_id), None)
+
+        return ChallengeWeeklyLeaderboardResponse(
+            week_start=week_start,
+            week_end=week_end,
+            top_three=items[:3],
+            my_rank=ChallengeLeaderboardMyRankResponse(
+                rank=my_item.rank if my_item else None,
+                score=my_item.score if my_item else 0,
+                completed_mission_count=my_item.completed_mission_count if my_item else 0,
+            ),
+            items=items[:limit],
+        )
+
+    @staticmethod
+    def _build_leaderboard_item(rank: int, item: dict) -> ChallengeLeaderboardItemResponse:
+        completed_mission_count = item["completed_mission_count"]
+        return ChallengeLeaderboardItemResponse(
+            rank=rank,
+            user_id=item["user_id"],
+            nickname_masked=ChallengeService._mask_name(item["name"]),
+            score=completed_mission_count * 10,
+            completed_mission_count=completed_mission_count,
+        )
+
+    @staticmethod
+    def _mask_name(name: str) -> str:
+        if not name:
+            return "익명"
+        if len(name) == 1:
+            return "*"
+        if len(name) == 2:
+            return f"{name[0]}*"
+        return f"{name[0]}{'*' * (len(name) - 2)}{name[-1]}"
+
+    @staticmethod
+    def _current_week_start(today: date) -> date:
+        return today - timedelta(days=today.weekday())
 
     @staticmethod
     def _completion_rate(progress_count: int, duration_days: int) -> float:

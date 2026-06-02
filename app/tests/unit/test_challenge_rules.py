@@ -142,6 +142,62 @@ def test_challenge_cancel_response_uses_updated_at_as_canceled_at():
     assert response.canceled_at == canceled_at
 
 
+def test_challenge_badges_use_current_streak_progress():
+    today = date(2026, 6, 5)
+    checkins = [
+        SimpleNamespace(checkin_date=date(2026, 6, 5), created_at=datetime(2026, 6, 5, 9, 0)),
+        SimpleNamespace(checkin_date=date(2026, 6, 4), created_at=datetime(2026, 6, 4, 9, 0)),
+        SimpleNamespace(checkin_date=date(2026, 6, 3), created_at=datetime(2026, 6, 3, 9, 0)),
+    ]
+
+    result = ChallengeService._build_badge_list(checkins, today, "ALL")
+
+    assert result.earned_count == 1
+    assert result.total_completion_rate == 33.3
+    assert result.items[0].badge_type == "STREAK_3"
+    assert result.items[0].is_earned is True
+    assert result.items[1].progress_rate == 42.9
+    assert len(result.recent_earned) == 1
+
+
+def test_challenge_badges_can_be_filtered_by_badge_type():
+    today = date(2026, 6, 5)
+    checkins = [
+        SimpleNamespace(checkin_date=date(2026, 6, 5), created_at=datetime(2026, 6, 5, 9, 0)),
+        SimpleNamespace(checkin_date=date(2026, 6, 4), created_at=datetime(2026, 6, 4, 9, 0)),
+        SimpleNamespace(checkin_date=date(2026, 6, 3), created_at=datetime(2026, 6, 3, 9, 0)),
+    ]
+
+    result = ChallengeService._build_badge_list(checkins, today, "STREAK_7")
+
+    assert len(result.items) == 1
+    assert result.items[0].badge_type == "STREAK_7"
+
+
+def test_challenge_weekly_leaderboard_ranks_users_and_masks_names():
+    checkins = [
+        SimpleNamespace(user=SimpleNamespace(id=2, name="김나현")),
+        SimpleNamespace(user=SimpleNamespace(id=2, name="김나현")),
+        SimpleNamespace(user=SimpleNamespace(id=1, name="이준")),
+        SimpleNamespace(user=SimpleNamespace(id=3, name="박")),
+    ]
+
+    result = ChallengeService._build_weekly_leaderboard(
+        checkins=checkins,
+        current_user_id=1,
+        week_start=date(2026, 6, 1),
+        week_end=date(2026, 6, 7),
+        limit=10,
+    )
+
+    assert [item.user_id for item in result.items] == [2, 1, 3]
+    assert result.items[0].rank == 1
+    assert result.items[0].nickname_masked == "김*현"
+    assert result.items[0].score == 20
+    assert result.my_rank.rank == 2
+    assert result.my_rank.completed_mission_count == 1
+
+
 def test_challenge_dashboard_summary_counts_active_completed_and_today_missions():
     today = date(2026, 6, 3)
     week_start = date(2026, 6, 1)
