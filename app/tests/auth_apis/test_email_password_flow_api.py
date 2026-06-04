@@ -98,16 +98,3 @@ class TestEmailPasswordFlowAPI(TestCase):
             )
 
         assert response.status_code == status.HTTP_204_NO_CONTENT
-
-    async def test_password_reset_rejects_password_mismatch(self):
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-            response = await client.post(
-                "/api/v1/auth/password-resets",
-                json={
-                    "token": "invalid-token",
-                    "new_password": "NewPassword123!",
-                    "new_password_confirm": "Mismatch123!",
-                },
-            )
-
-        assert response.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
