@@ -14,3 +14,29 @@ class Notification(models.Model):
 
     class Meta:
         table = "notifications"
+
+
+class NotificationPreference(models.Model):
+    user = fields.OneToOneField(
+        "models.User",
+        related_name="notification_preference",
+        primary_key=True,
+        on_delete=fields.CASCADE,
+    )
+    push_enabled = fields.BooleanField(default=True)
+    health_data_reminder_enabled = fields.BooleanField(default=True)
+    challenge_mission_enabled = fields.BooleanField(default=True)
+    prediction_result_enabled = fields.BooleanField(default=True)
+    advice_update_enabled = fields.BooleanField(default=True)
+    virtual_pet_enabled = fields.BooleanField(default=True)
+    email_enabled = fields.BooleanField(default=False)
+    weekly_report_enabled = fields.BooleanField(default=True)
+    important_notice_enabled = fields.BooleanField(default=True)
+    promotion_enabled = fields.BooleanField(default=False)
+    quiet_start_time = fields.TimeField(default="09:00:00")
+    quiet_end_time = fields.TimeField(default="21:00:00")
+    updated_at = fields.DatetimeField(auto_now=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "notification_preferences"

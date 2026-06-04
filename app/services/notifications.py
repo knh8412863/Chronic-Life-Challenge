@@ -4,12 +4,22 @@ from tortoise import timezone
 from app.dtos.notifications import (
     NotificationMarkAllReadResponse,
     NotificationMarkReadResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdateRequest,
     NotificationResponse,
     NotificationType,
     NotificationUnreadCountResponse,
 )
-from app.models.notifications import Notification
+from app.models.notifications import Notification, NotificationPreference
 from app.models.users import User
+
+PUSH_DETAIL_FIELDS = {
+    "health_data_reminder_enabled",
+    "challenge_mission_enabled",
+    "prediction_result_enabled",
+    "advice_update_enabled",
+    "virtual_pet_enabled",
+}
 
 
 class NotificationService:
@@ -43,9 +53,30 @@ class NotificationService:
         updated_count = await Notification.filter(user_id=user.id, is_read=False).update(is_read=True, read_at=now)
         return NotificationMarkAllReadResponse(updated_count=updated_count)
 
+    async def get_preferences(self, user: User) -> NotificationPreferenceResponse:
+        preference = await self._get_or_create_preference(user)
+        return self._to_preference_response(preference)
+
+    async def update_preferences(
+        self,
+        user: User,
+        data: NotificationPreferenceUpdateRequest,
+    ) -> NotificationPreferenceResponse:
+        preference = await self._get_or_create_preference(user)
+        payload = self._normalize_preference_update(data.model_dump(exclude_none=True))
+        for field, value in payload.items():
+            setattr(preference, field, value)
+        await preference.save(update_fields=[*payload.keys(), "updated_at"] if payload else ["updated_at"])
+        return self._to_preference_response(preference)
+
     @staticmethod
     async def count_unread(user_id: int) -> int:
         return await Notification.filter(user_id=user_id, is_read=False).count()
+
+    @staticmethod
+    async def _get_or_create_preference(user: User) -> NotificationPreference:
+        preference, _ = await NotificationPreference.get_or_create(user_id=user.id)
+        return preference
 
     @staticmethod
     def _to_response(notification: Notification) -> NotificationResponse:
@@ -66,4 +97,28 @@ class NotificationService:
             notification_id=notification.id,
             is_read=notification.is_read,
             read_at=notification.read_at,
+        )
+
+    @staticmethod
+    def _normalize_preference_update(payload: dict) -> dict:
+        if payload.get("push_enabled") is False:
+            for field in PUSH_DETAIL_FIELDS:
+                payload[field] = False
+        return payload
+
+    @staticmethod
+    def _to_preference_response(preference: NotificationPreference) -> NotificationPreferenceResponse:
+        return NotificationPreferenceResponse(
+            push_enabled=preference.push_enabled,
+            health_data_reminder_enabled=preference.health_data_reminder_enabled,
+            challenge_mission_enabled=preference.challenge_mission_enabled,
+            prediction_result_enabled=preference.prediction_result_enabled,
+            advice_update_enabled=preference.advice_update_enabled,
+            virtual_pet_enabled=preference.virtual_pet_enabled,
+            email_enabled=preference.email_enabled,
+            weekly_report_enabled=preference.weekly_report_enabled,
+            important_notice_enabled=preference.important_notice_enabled,
+            promotion_enabled=preference.promotion_enabled,
+            quiet_start_time=preference.quiet_start_time,
+            quiet_end_time=preference.quiet_end_time,
         )

@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from types import SimpleNamespace
 
 from app.dtos.notifications import NotificationType
@@ -37,3 +37,48 @@ def test_mark_read_response_returns_read_timestamp():
     assert result.notification_id == 5
     assert result.is_read is True
     assert result.read_at == datetime(2026, 6, 2, 16, 10)
+
+
+def test_notification_preference_response_maps_all_settings():
+    preference = SimpleNamespace(
+        push_enabled=True,
+        health_data_reminder_enabled=True,
+        challenge_mission_enabled=True,
+        prediction_result_enabled=True,
+        advice_update_enabled=False,
+        virtual_pet_enabled=True,
+        email_enabled=True,
+        weekly_report_enabled=True,
+        important_notice_enabled=True,
+        promotion_enabled=False,
+        quiet_start_time=time(9, 0),
+        quiet_end_time=time(21, 0),
+    )
+
+    result = NotificationService._to_preference_response(preference)
+
+    assert result.push_enabled is True
+    assert result.advice_update_enabled is False
+    assert result.email_enabled is True
+    assert result.quiet_start_time == time(9, 0)
+    assert result.quiet_end_time == time(21, 0)
+
+
+def test_push_disabled_turns_off_push_detail_settings():
+    payload = {
+        "push_enabled": False,
+        "health_data_reminder_enabled": True,
+        "challenge_mission_enabled": True,
+        "prediction_result_enabled": True,
+        "advice_update_enabled": True,
+        "virtual_pet_enabled": True,
+    }
+
+    result = NotificationService._normalize_preference_update(payload)
+
+    assert result["push_enabled"] is False
+    assert result["health_data_reminder_enabled"] is False
+    assert result["challenge_mission_enabled"] is False
+    assert result["prediction_result_enabled"] is False
+    assert result["advice_update_enabled"] is False
+    assert result["virtual_pet_enabled"] is False
