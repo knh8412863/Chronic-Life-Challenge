@@ -5,6 +5,9 @@ from tortoise.transactions import in_transaction
 
 from app.core import config
 from app.dtos.pets import (
+    PetCatalogItemResponse,
+    PetCatalogResponse,
+    PetCatalogSummaryResponse,
     PetRecentActivityResponse,
     PetRewardClaimResponse,
     PetRewardTaskResponse,
@@ -27,6 +30,65 @@ BASE_REWARD_TASKS = [
     ("EXERCISE_30", "운동 30분 이상", 50),
     ("WATER_CHALLENGE", "물 2L 마시기", 20),
     ("DAILY_HEALTH_LOG", "건강 일지 작성", 40),
+]
+
+PET_CATALOG = [
+    {
+        "catalog_id": "DOG_POMERANIAN",
+        "pet_type": PetType.DOG,
+        "display_name": "포메라니안",
+        "required_streak_days": 0,
+        "affinity_score": 3,
+    },
+    {
+        "catalog_id": "DOG_GOLDEN_RETRIEVER",
+        "pet_type": PetType.DOG,
+        "display_name": "골든 리트리버",
+        "required_streak_days": 3,
+        "affinity_score": 2,
+    },
+    {
+        "catalog_id": "DOG_BICHON_FRISE",
+        "pet_type": PetType.DOG,
+        "display_name": "비숑 프리제",
+        "required_streak_days": 7,
+        "affinity_score": 1,
+    },
+    {
+        "catalog_id": "DOG_MIXED",
+        "pet_type": PetType.DOG,
+        "display_name": "믹스견",
+        "required_streak_days": 30,
+        "affinity_score": 5,
+    },
+    {
+        "catalog_id": "CAT_KOREAN_SHORT_HAIR",
+        "pet_type": PetType.CAT,
+        "display_name": "코리안 숏헤어",
+        "required_streak_days": 0,
+        "affinity_score": 3,
+    },
+    {
+        "catalog_id": "CAT_RUSSIAN_BLUE",
+        "pet_type": PetType.CAT,
+        "display_name": "러시안 블루",
+        "required_streak_days": 3,
+        "affinity_score": 2,
+    },
+    {
+        "catalog_id": "CAT_PERSIAN",
+        "pet_type": PetType.CAT,
+        "display_name": "페르시안",
+        "required_streak_days": 7,
+        "affinity_score": 1,
+    },
+    {
+        "catalog_id": "CAT_SIAMESE",
+        "pet_type": PetType.CAT,
+        "display_name": "샴",
+        "required_streak_days": 30,
+        "affinity_score": 5,
+    },
 ]
 
 
@@ -159,6 +221,20 @@ class VirtualPetService:
             growth_stage=pet.growth_stage,
         )
 
+    async def get_pet_catalog(self, user: User, pet_type: PetType | None = None) -> PetCatalogResponse:
+        current_streak_days = await self._current_challenge_streak_days(user.id, self._today())
+        catalog_items = [item for item in PET_CATALOG if pet_type is None or item["pet_type"] == pet_type]
+        items = [self._to_catalog_item(item, current_streak_days) for item in catalog_items]
+        unlocked_count = sum(1 for item in items if item.is_unlocked)
+        return PetCatalogResponse(
+            summary=PetCatalogSummaryResponse(
+                total_count=len(items),
+                unlocked_count=unlocked_count,
+                completion_rate=round(self._percent(unlocked_count, len(items)), 1),
+            ),
+            items=items,
+        )
+
     @staticmethod
     async def _create_activity(
         user_id: int,
@@ -230,6 +306,36 @@ class VirtualPetService:
             min(participation.progress_count, participation.challenge.duration_days) for participation in participations
         )
         return VirtualPetService._percent(completed_days, total_days)
+
+    @staticmethod
+    async def _current_challenge_streak_days(user_id: int, today: date) -> int:
+        checkins = await ChallengeCheckin.filter(user_id=user_id)
+        checkin_dates = {checkin.checkin_date for checkin in checkins}
+        streak = 0
+        current = today
+        while current in checkin_dates:
+            streak += 1
+            current -= timedelta(days=1)
+        return streak
+
+    @staticmethod
+    def _to_catalog_item(item: dict, current_streak_days: int) -> PetCatalogItemResponse:
+        required_streak_days = item["required_streak_days"]
+        is_unlocked = current_streak_days >= required_streak_days
+        return PetCatalogItemResponse(
+            catalog_id=item["catalog_id"],
+            pet_type=item["pet_type"],
+            display_name=item["display_name"] if is_unlocked else "???",
+            is_unlocked=is_unlocked,
+            unlock_condition=VirtualPetService._unlock_condition(required_streak_days),
+            affinity_score=item["affinity_score"] if is_unlocked else None,
+        )
+
+    @staticmethod
+    def _unlock_condition(required_streak_days: int) -> str:
+        if required_streak_days <= 0:
+            return "기본 제공"
+        return f"챌린지 {required_streak_days}일 연속 달성"
 
     @staticmethod
     def _reward_experience(task_type: str, base_reward: int, pet_type: PetType) -> int:

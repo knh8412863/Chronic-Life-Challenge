@@ -80,6 +80,26 @@ class PetRewardClaimResponse(BaseModel):
     growth_stage: PetGrowthStage
 
 
+class PetCatalogSummaryResponse(BaseModel):
+    total_count: int
+    unlocked_count: int
+    completion_rate: float
+
+
+class PetCatalogItemResponse(BaseModel):
+    catalog_id: str
+    pet_type: PetType
+    display_name: str
+    is_unlocked: bool
+    unlock_condition: str
+    affinity_score: int | None = None
+
+
+class PetCatalogResponse(BaseModel):
+    summary: PetCatalogSummaryResponse
+    items: list[PetCatalogItemResponse]
+
+
 class VirtualPetStatusResponse(BaseModel):
     has_pet: bool
     pet: VirtualPetResponse | None = None

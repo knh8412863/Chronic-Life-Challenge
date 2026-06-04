@@ -5,6 +5,7 @@ from fastapi.responses import ORJSONResponse as Response
 
 from app.dependencies.security import get_request_user
 from app.dtos.pets import (
+    PetCatalogResponse,
     PetRewardClaimResponse,
     VirtualPetCreateRequest,
     VirtualPetCreateResponse,
@@ -13,6 +14,7 @@ from app.dtos.pets import (
     VirtualPetStatusResponse,
 )
 from app.dtos.predictions import DataResponse
+from app.models.pets import PetType
 from app.models.users import User
 from app.services.pets import VirtualPetService
 
@@ -29,6 +31,20 @@ async def get_my_virtual_pet(
     service: Annotated[VirtualPetService, Depends(VirtualPetService)],
 ) -> Response:
     result = await service.get_my_pet(user)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@pet_router.get(
+    "/catalog",
+    response_model=DataResponse[PetCatalogResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_virtual_pet_catalog(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[VirtualPetService, Depends(VirtualPetService)],
+    pet_type: PetType | None = None,
+) -> Response:
+    result = await service.get_pet_catalog(user, pet_type)
     return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
 
 

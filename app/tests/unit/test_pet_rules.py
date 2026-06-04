@@ -95,3 +95,43 @@ def test_pet_percent_caps_at_one_hundred():
     assert VirtualPetService._percent(3, 4) == 75
     assert VirtualPetService._percent(10, 4) == 100
     assert VirtualPetService._percent(1, 0) == 0
+
+
+def test_pet_catalog_item_unlocks_by_streak_days():
+    item = {
+        "catalog_id": "DOG_GOLDEN_RETRIEVER",
+        "pet_type": PetType.DOG,
+        "display_name": "골든 리트리버",
+        "required_streak_days": 3,
+        "affinity_score": 2,
+    }
+
+    locked = VirtualPetService._to_catalog_item(item, current_streak_days=2)
+    unlocked = VirtualPetService._to_catalog_item(item, current_streak_days=3)
+
+    assert locked.is_unlocked is False
+    assert locked.display_name == "???"
+    assert locked.affinity_score is None
+    assert unlocked.is_unlocked is True
+    assert unlocked.display_name == "골든 리트리버"
+    assert unlocked.affinity_score == 2
+
+
+def test_pet_catalog_default_item_is_always_unlocked():
+    item = {
+        "catalog_id": "CAT_KOREAN_SHORT_HAIR",
+        "pet_type": PetType.CAT,
+        "display_name": "코리안 숏헤어",
+        "required_streak_days": 0,
+        "affinity_score": 3,
+    }
+
+    result = VirtualPetService._to_catalog_item(item, current_streak_days=0)
+
+    assert result.is_unlocked is True
+    assert result.unlock_condition == "기본 제공"
+
+
+def test_pet_unlock_condition_uses_challenge_streak_days():
+    assert VirtualPetService._unlock_condition(0) == "기본 제공"
+    assert VirtualPetService._unlock_condition(7) == "챌린지 7일 연속 달성"
