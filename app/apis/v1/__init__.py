@@ -7,6 +7,7 @@ from app.apis.v1.food_routers import food_router
 from app.apis.v1.health_routers import health_router
 from app.apis.v1.home_routers import home_router
 from app.apis.v1.notification_routers import notification_router
+from app.apis.v1.pet_routers import pet_router
 from app.apis.v1.prediction_routers import prediction_router
 from app.apis.v1.report_routers import report_router
 from app.apis.v1.user_routers import policy_router, user_router
@@ -23,3 +24,4 @@ v1_routers.include_router(challenge_router)
 v1_routers.include_router(notification_router)
 v1_routers.include_router(report_router)
 v1_routers.include_router(food_router)
+v1_routers.include_router(pet_router)

@@ -13,6 +13,7 @@ TORTOISE_APP_MODELS = [
     "app.models.challenges",
     "app.models.notifications",
     "app.models.reports",
+    "app.models.pets",
 ]
 
 TORTOISE_ORM = {
