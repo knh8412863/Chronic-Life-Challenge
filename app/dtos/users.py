@@ -5,7 +5,7 @@ from pydantic import BaseModel, Field
 
 from app.core.validators import optional_after_validator, validate_phone_number
 from app.dtos.base import BaseSerializerModel
-from app.models.users import Gender
+from app.models.users import Gender, WithdrawalReason
 
 
 class UserUpdateRequest(BaseModel):
@@ -73,3 +73,10 @@ class PolicyDocumentResponse(BaseModel):
     policy_version: str
     changed_at: date | None = None
     content: str
+
+
+class UserWithdrawalRequest(BaseModel):
+    password: Annotated[str, Field(min_length=8, max_length=128)]
+    withdrawal_reason: WithdrawalReason
+    withdrawal_comment: Annotated[str | None, Field(None, max_length=500)] = None
+    confirm_agreed: bool

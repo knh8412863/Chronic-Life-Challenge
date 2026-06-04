@@ -16,6 +16,14 @@ class ConsentType(StrEnum):
     LOCATION = "LOCATION"
 
 
+class WithdrawalReason(StrEnum):
+    NOT_USEFUL = "NOT_USEFUL"
+    PRIVACY_CONCERN = "PRIVACY_CONCERN"
+    HARD_TO_USE = "HARD_TO_USE"
+    FOUND_ALTERNATIVE = "FOUND_ALTERNATIVE"
+    OTHER = "OTHER"
+
+
 class User(models.Model):
     id = fields.BigIntField(primary_key=True)
     email = fields.CharField(max_length=40)
@@ -89,3 +97,15 @@ class PolicyDocument(models.Model):
     class Meta:
         table = "policy_documents"
         unique_together = (("policy_type", "policy_version"),)
+
+
+class UserWithdrawalRequest(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="withdrawal_requests", on_delete=fields.CASCADE)
+    withdrawal_reason = fields.CharEnumField(enum_type=WithdrawalReason, max_length=40)
+    withdrawal_comment = fields.CharField(max_length=500, null=True)
+    confirm_agreed = fields.BooleanField(default=False)
+    requested_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "user_withdrawal_requests"

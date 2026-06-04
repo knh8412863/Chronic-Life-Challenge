@@ -2,6 +2,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, Depends, status
 from fastapi.responses import ORJSONResponse as Response
+from starlette.responses import Response as EmptyResponse
 
 from app.dependencies.security import get_request_user
 from app.dtos.users import (
@@ -11,6 +12,7 @@ from app.dtos.users import (
     UserConsentListResponse,
     UserInfoResponse,
     UserUpdateRequest,
+    UserWithdrawalRequest,
 )
 from app.models.users import ConsentType, User
 from app.services.users import UserManageService
@@ -36,6 +38,16 @@ async def update_user_me_info(
 ) -> Response:
     result = await user_manage_service.update_user_info(user=user, data=update_data)
     return Response(result.model_dump(mode="json"), status_code=status.HTTP_200_OK)
+
+
+@user_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
+async def withdraw_user_me(
+    request: UserWithdrawalRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    user_manage_service: Annotated[UserManageService, Depends(UserManageService)],
+) -> EmptyResponse:
+    await user_manage_service.withdraw_user(user=user, data=request)
+    return EmptyResponse(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @user_router.get(
