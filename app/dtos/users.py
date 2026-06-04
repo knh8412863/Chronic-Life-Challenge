@@ -38,3 +38,38 @@ class UserInfoResponse(BaseSerializerModel):
     points: int = 0
     level: int = 1
     created_at: datetime
+
+
+class ConsentUpdateRequest(BaseModel):
+    is_agreed: bool
+    policy_version: str = "v1.0"
+
+
+class UserConsentItemResponse(BaseModel):
+    consent_type: str
+    title: str
+    is_required: bool
+    is_agreed: bool
+    agreed_at: datetime | None = None
+    withdrawn_at: datetime | None = None
+    policy_version: str
+
+
+class PolicyChangeResponse(BaseModel):
+    policy_type: str
+    title: str
+    policy_version: str
+    changed_at: date | None = None
+
+
+class UserConsentListResponse(BaseModel):
+    items: list[UserConsentItemResponse]
+    recent_policy_changes: list[PolicyChangeResponse] = Field(default_factory=list)
+
+
+class PolicyDocumentResponse(BaseModel):
+    policy_type: str
+    title: str
+    policy_version: str
+    changed_at: date | None = None
+    content: str
