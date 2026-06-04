@@ -7,6 +7,8 @@ from app.dependencies.security import get_request_user
 from app.dtos.notifications import (
     NotificationMarkAllReadResponse,
     NotificationMarkReadResponse,
+    NotificationPreferenceResponse,
+    NotificationPreferenceUpdateRequest,
     NotificationResponse,
     NotificationUnreadCountResponse,
 )
@@ -69,4 +71,31 @@ async def mark_all_notifications_read(
     service: Annotated[NotificationService, Depends(NotificationService)],
 ) -> Response:
     result = await service.mark_all_read(user)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@notification_router.get(
+    "/notification-preferences",
+    response_model=DataResponse[NotificationPreferenceResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_notification_preferences(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[NotificationService, Depends(NotificationService)],
+) -> Response:
+    result = await service.get_preferences(user)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@notification_router.patch(
+    "/notification-preferences",
+    response_model=DataResponse[NotificationPreferenceResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def update_notification_preferences(
+    request: NotificationPreferenceUpdateRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[NotificationService, Depends(NotificationService)],
+) -> Response:
+    result = await service.update_preferences(user, request)
     return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
