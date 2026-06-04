@@ -8,6 +8,14 @@ class Gender(StrEnum):
     FEMALE = "FEMALE"
 
 
+class ConsentType(StrEnum):
+    TOS = "TOS"
+    PRIVACY = "PRIVACY"
+    HEALTH_DATA = "HEALTH_DATA"
+    MARKETING = "MARKETING"
+    LOCATION = "LOCATION"
+
+
 class User(models.Model):
     id = fields.BigIntField(primary_key=True)
     email = fields.CharField(max_length=40)
@@ -50,3 +58,34 @@ class PasswordResetToken(models.Model):
 
     class Meta:
         table = "password_reset_tokens"
+
+
+class UserConsent(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="consents", on_delete=fields.CASCADE)
+    consent_type = fields.CharEnumField(enum_type=ConsentType, max_length=40)
+    is_agreed = fields.BooleanField()
+    agreed_at = fields.DatetimeField(null=True)
+    withdrawn_at = fields.DatetimeField(null=True)
+    policy_version = fields.CharField(max_length=20)
+    updated_at = fields.DatetimeField(auto_now=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "user_consents"
+        unique_together = (("user", "consent_type"),)
+
+
+class PolicyDocument(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    policy_type = fields.CharEnumField(enum_type=ConsentType, max_length=40)
+    title = fields.CharField(max_length=100)
+    policy_version = fields.CharField(max_length=20)
+    content = fields.TextField()
+    changed_at = fields.DateField(null=True)
+    is_active = fields.BooleanField(default=True)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "policy_documents"
+        unique_together = (("policy_type", "policy_version"),)

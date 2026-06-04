@@ -1,13 +1,22 @@
-from datetime import date
+from datetime import date, datetime
 from decimal import Decimal
 
 from fastapi import HTTPException, status
 from tortoise.transactions import in_transaction
 
+from app.core import config
 from app.core.utils.common import normalize_phone_number
-from app.dtos.users import UserInfoResponse, UserUpdateRequest
+from app.dtos.users import (
+    ConsentUpdateRequest,
+    PolicyChangeResponse,
+    PolicyDocumentResponse,
+    UserConsentItemResponse,
+    UserConsentListResponse,
+    UserInfoResponse,
+    UserUpdateRequest,
+)
 from app.models.predictions import ChronicHealthInput, UserProfile
-from app.models.users import User
+from app.models.users import ConsentType, PolicyDocument, User, UserConsent
 from app.repositories.user_repository import UserRepository
 
 
@@ -17,6 +26,17 @@ def _calculate_bmi(height_cm: float, weight_kg: float) -> float:
 
 def _joined_days(created_at: date, today: date) -> int:
     return max((today - created_at).days + 1, 1)
+
+
+CONSENT_LABELS = {
+    ConsentType.TOS: "서비스 이용약관",
+    ConsentType.PRIVACY: "개인정보 처리방침",
+    ConsentType.HEALTH_DATA: "건강 데이터 수집·이용 동의",
+    ConsentType.MARKETING: "마케팅 정보 수신 동의",
+    ConsentType.LOCATION: "위치 기반 서비스 이용약관",
+}
+REQUIRED_CONSENTS = {ConsentType.TOS, ConsentType.PRIVACY, ConsentType.HEALTH_DATA}
+CHANGEABLE_CONSENTS = {ConsentType.MARKETING, ConsentType.LOCATION}
 
 
 class UserManageService:
@@ -56,6 +76,62 @@ class UserManageService:
     async def update_user_info(self, user: User, data: UserUpdateRequest) -> UserInfoResponse:
         updated_user = await self.update_user(user=user, data=data)
         return await self.get_user_info(updated_user)
+
+    async def get_consents(self, user: User) -> UserConsentListResponse:
+        consent_rows = await UserConsent.filter(user_id=user.id)
+        consent_map = {ConsentType(row.consent_type): row for row in consent_rows}
+        documents = await PolicyDocument.filter(is_active=True)
+        return self._build_consent_list(consent_map, documents)
+
+    async def update_consent(
+        self,
+        user: User,
+        consent_type: ConsentType,
+        data: ConsentUpdateRequest,
+    ) -> UserConsentItemResponse:
+        if consent_type not in CHANGEABLE_CONSENTS:
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="변경할 수 없는 약관입니다.")
+
+        now = datetime.now(config.TIMEZONE)
+        consent, _ = await UserConsent.get_or_create(
+            user_id=user.id,
+            consent_type=consent_type,
+            defaults={
+                "is_agreed": data.is_agreed,
+                "agreed_at": now if data.is_agreed else None,
+                "withdrawn_at": None if data.is_agreed else now,
+                "policy_version": data.policy_version,
+            },
+        )
+        if not _:
+            consent.is_agreed = data.is_agreed
+            consent.agreed_at = now if data.is_agreed else consent.agreed_at
+            consent.withdrawn_at = None if data.is_agreed else now
+            consent.policy_version = data.policy_version
+            await consent.save(update_fields=["is_agreed", "agreed_at", "withdrawn_at", "policy_version", "updated_at"])
+
+        return self._to_consent_item(consent_type, consent)
+
+    async def get_policy_document(
+        self,
+        policy_type: ConsentType,
+        version: str | None = None,
+    ) -> PolicyDocumentResponse:
+        query = PolicyDocument.filter(policy_type=policy_type)
+        if version:
+            query = query.filter(policy_version=version)
+        else:
+            query = query.filter(is_active=True)
+        document = await query.order_by("-created_at").first()
+        if document:
+            return PolicyDocumentResponse(
+                policy_type=document.policy_type,
+                title=document.title,
+                policy_version=document.policy_version,
+                changed_at=document.changed_at,
+                content=document.content,
+            )
+        return self._default_policy_document(policy_type, version)
 
     @staticmethod
     def _build_profile_update_payload(
@@ -110,4 +186,51 @@ class UserManageService:
             managed_diseases=latest_health.diagnosed_diseases if latest_health else [],
             joined_days=_joined_days(user.created_at.date(), today),
             created_at=user.created_at,
+        )
+
+    @staticmethod
+    def _build_consent_list(
+        consent_map: dict[ConsentType, UserConsent],
+        documents: list[PolicyDocument],
+    ) -> UserConsentListResponse:
+        items = [
+            UserManageService._to_consent_item(consent_type, consent_map.get(consent_type))
+            for consent_type in ConsentType
+        ]
+        recent_changes = [
+            PolicyChangeResponse(
+                policy_type=document.policy_type,
+                title=document.title,
+                policy_version=document.policy_version,
+                changed_at=document.changed_at,
+            )
+            for document in documents
+            if document.changed_at is not None
+        ]
+        return UserConsentListResponse(items=items, recent_policy_changes=recent_changes[:5])
+
+    @staticmethod
+    def _to_consent_item(
+        consent_type: ConsentType,
+        consent: UserConsent | None,
+    ) -> UserConsentItemResponse:
+        is_required = consent_type in REQUIRED_CONSENTS
+        return UserConsentItemResponse(
+            consent_type=consent_type.value,
+            title=CONSENT_LABELS[consent_type],
+            is_required=is_required,
+            is_agreed=consent.is_agreed if consent else is_required,
+            agreed_at=consent.agreed_at if consent else None,
+            withdrawn_at=consent.withdrawn_at if consent else None,
+            policy_version=consent.policy_version if consent else "v1.0",
+        )
+
+    @staticmethod
+    def _default_policy_document(policy_type: ConsentType, version: str | None) -> PolicyDocumentResponse:
+        return PolicyDocumentResponse(
+            policy_type=policy_type.value,
+            title=CONSENT_LABELS[policy_type],
+            policy_version=version or "v1.0",
+            changed_at=None,
+            content=f"{CONSENT_LABELS[policy_type]} 전문입니다. 실제 운영 시 최신 약관 전문으로 교체합니다.",
         )

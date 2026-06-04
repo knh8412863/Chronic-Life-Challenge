@@ -12,7 +12,7 @@ from app.core.jwt.tokens import AccessToken, RefreshToken
 from app.core.utils.common import normalize_phone_number
 from app.core.utils.security import hash_password, verify_password
 from app.dtos.auth import LoginRequest, SignUpRequest
-from app.models.users import EmailVerification, PasswordResetToken, User
+from app.models.users import ConsentType, EmailVerification, PasswordResetToken, User, UserConsent
 from app.repositories.user_repository import UserRepository
 from app.services.email import EmailService
 from app.services.jwt import JwtService
@@ -46,6 +46,7 @@ class AuthService:
                 gender=data.gender,
                 birthday=data.birth_date,
             )
+            await self._create_initial_consents(user, data)
 
             return user
 
@@ -159,3 +160,40 @@ class AuthService:
 
     def _is_in_cooldown(self, created_at: datetime, cooldown_seconds: int) -> bool:
         return created_at + timedelta(seconds=cooldown_seconds) > datetime.now(config.TIMEZONE)
+
+    @staticmethod
+    async def _create_initial_consents(user: User, data: SignUpRequest) -> None:
+        now = datetime.now(config.TIMEZONE)
+        policy_version = data.consent_terms_version
+        consent_rows = [
+            UserConsent(
+                user=user,
+                consent_type=ConsentType.TOS,
+                is_agreed=True,
+                agreed_at=now,
+                policy_version=policy_version,
+            ),
+            UserConsent(
+                user=user,
+                consent_type=ConsentType.PRIVACY,
+                is_agreed=True,
+                agreed_at=now,
+                policy_version=policy_version,
+            ),
+            UserConsent(
+                user=user,
+                consent_type=ConsentType.HEALTH_DATA,
+                is_agreed=True,
+                agreed_at=now,
+                policy_version=policy_version,
+            ),
+            UserConsent(
+                user=user,
+                consent_type=ConsentType.MARKETING,
+                is_agreed=data.consent_marketing,
+                agreed_at=now if data.consent_marketing else None,
+                withdrawn_at=None if data.consent_marketing else now,
+                policy_version=policy_version,
+            ),
+        ]
+        await UserConsent.bulk_create(consent_rows)

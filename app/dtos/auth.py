@@ -17,6 +17,16 @@ class SignUpRequest(BaseModel):
     gender: Gender
     birth_date: Annotated[date, AfterValidator(validate_birthday)]
     phone_number: Annotated[str, AfterValidator(validate_phone_number)]
+    consent_terms_version: str = "v1.0"
+    consent_privacy_agreed: bool = True
+    consent_health_data: bool = True
+    consent_marketing: bool = False
+
+    @model_validator(mode="after")
+    def validate_required_consents(self):
+        if not self.consent_privacy_agreed or not self.consent_health_data:
+            raise ValueError("필수 약관 동의가 필요합니다.")
+        return self
 
 
 class LoginRequest(BaseModel):
