@@ -6,6 +6,7 @@ from tortoise.transactions import in_transaction
 
 from app.core import config
 from app.core.utils.common import normalize_phone_number
+from app.core.utils.security import verify_password
 from app.dtos.users import (
     ConsentUpdateRequest,
     PolicyChangeResponse,
@@ -14,9 +15,11 @@ from app.dtos.users import (
     UserConsentListResponse,
     UserInfoResponse,
     UserUpdateRequest,
+    UserWithdrawalRequest,
 )
 from app.models.predictions import ChronicHealthInput, UserProfile
 from app.models.users import ConsentType, PolicyDocument, User, UserConsent
+from app.models.users import UserWithdrawalRequest as UserWithdrawal
 from app.repositories.user_repository import UserRepository
 
 
@@ -133,6 +136,17 @@ class UserManageService:
             )
         return self._default_policy_document(policy_type, version)
 
+    async def withdraw_user(self, user: User, data: UserWithdrawalRequest) -> None:
+        self._validate_withdrawal_agreement(data.confirm_agreed)
+        if not verify_password(data.password, user.hashed_password):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="비밀번호가 올바르지 않습니다.")
+
+        payload = self._build_withdrawal_payload(data)
+        async with in_transaction():
+            await UserWithdrawal.create(user_id=user.id, **payload)
+            user.is_active = False
+            await user.save(update_fields=["is_active", "updated_at"])
+
     @staticmethod
     def _build_profile_update_payload(
         user: User,
@@ -155,6 +169,21 @@ class UserManageService:
             "height_cm": Decimal(str(height)),
             "weight_kg": Decimal(str(weight)),
             "bmi": Decimal(str(_calculate_bmi(height, weight))),
+        }
+
+    @staticmethod
+    def _validate_withdrawal_agreement(confirm_agreed: bool) -> None:
+        if not confirm_agreed:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="탈퇴 유의사항에 동의해주세요."
+            )
+
+    @staticmethod
+    def _build_withdrawal_payload(data: UserWithdrawalRequest) -> dict:
+        return {
+            "withdrawal_reason": data.withdrawal_reason,
+            "withdrawal_comment": data.withdrawal_comment.strip() if data.withdrawal_comment else None,
+            "confirm_agreed": data.confirm_agreed,
         }
 
     @staticmethod
