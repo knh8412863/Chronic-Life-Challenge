@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 
 import type { AppRoute } from "../App";
 import { Sidebar } from "../components/common/Sidebar";
-import { TopBar } from "../components/common/TopBar";
 
 type AppLayoutProps = PropsWithChildren<{
   currentRoute: AppRoute;
@@ -28,7 +27,6 @@ export function AppLayout({ children, currentRoute, onNavigate }: AppLayoutProps
         onToggle={() => setCollapsed((value) => !value)}
       />
       <div className="app-main">
-        <TopBar onNavigate={onNavigate} />
         <main className="page-container">{children}</main>
       </div>
     </div>

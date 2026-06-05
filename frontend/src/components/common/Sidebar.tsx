@@ -51,6 +51,21 @@ export function Sidebar({ collapsed, currentRoute, onNavigate, onToggle }: Sideb
           </button>
         ))}
       </nav>
+
+      <button
+        className="sidebar-profile"
+        type="button"
+        onClick={() => onNavigate("/mypage/profile")}
+        aria-label="내 정보 화면으로 이동"
+      >
+        <span className="sidebar-profile-avatar" aria-hidden="true" />
+        {!collapsed && (
+          <span className="sidebar-profile-text">
+            <strong>홍길동</strong>
+            <small>내 정보</small>
+          </span>
+        )}
+      </button>
     </aside>
   );
 }

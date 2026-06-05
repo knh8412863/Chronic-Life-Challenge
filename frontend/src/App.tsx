@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { AppLayout } from "./layouts/AppLayout";
+import { AdviceHistoryPage } from "./pages/AdviceHistoryPage";
+import { AdviceTodayPage } from "./pages/AdviceTodayPage";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { HomePage } from "./pages/HomePage";
 import { LandingPage } from "./pages/LandingPage";
@@ -8,6 +10,11 @@ import { LoginPage } from "./pages/LoginPage";
 import { MyProfilePage } from "./pages/MyProfilePage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { PredictionFeedbackPage } from "./pages/PredictionFeedbackPage";
+import { PredictionHistoryPage } from "./pages/PredictionHistoryPage";
+import { PredictionProgressPage } from "./pages/PredictionProgressPage";
+import { PredictionRequestPage } from "./pages/PredictionRequestPage";
+import { PredictionResultPage } from "./pages/PredictionResultPage";
 
 // ── front/auth-onboarding 브랜치에서 추가
 import { SignUpPage } from "./pages/SignUpPage";
@@ -115,18 +122,23 @@ export default function App() {
       case "/login":
         return <LoginPage onLogin={() => { setIsLoggedIn(true); navigate("/home"); }} />;
       case "/home":
-        return <HomePage />;
+        return <HomePage onNavigate={navigate} />;
       case "/notifications":
-        return <NotificationsPage />;
+        return <NotificationsPage onNavigate={navigate} />;
       case "/advices/today":
+        return <AdviceTodayPage onNavigate={navigate} />;
       case "/advices/history":
-        return <PlaceholderPage title="오늘의 조언" description="조언 화면을 연결할 영역입니다." />;
+        return <AdviceHistoryPage />;
       case "/prediction/request":
+        return <PredictionRequestPage onNavigate={navigate} />;
       case "/prediction/progress":
+        return <PredictionProgressPage onNavigate={navigate} />;
       case "/prediction/result":
+        return <PredictionResultPage onNavigate={navigate} />;
       case "/prediction/history":
+        return <PredictionHistoryPage onNavigate={navigate} />;
       case "/prediction/feedback":
-        return <PlaceholderPage title="AI 예측" description="예측 화면을 연결할 영역입니다." />;
+        return <PredictionFeedbackPage onNavigate={navigate} />;
       case "/mypage":
       case "/mypage/profile":
         return <MyProfilePage />;
