@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import type { AppRoute } from "../App";
 import { Stepper } from "../components/common/Stepper";
+import logoUrl from "../assets/all4health-logo.png";
 
 interface HealthSurveyPageProps {
   onNavigate: (route: AppRoute) => void;
@@ -80,7 +81,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
     <div style={{ minHeight: "100vh", background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center", padding: 40, overflowY: "auto" }}>
       <div style={{ width: "100%", maxWidth: surveyStep >= 2 ? 720 : 680 }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <img src="/logo.png" alt="All4Health" style={{ height: 36, margin: "0 auto 16px", display: "block" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          <img src={logoUrl} alt="All4Health" style={{ height: 36, margin: "0 auto 16px", display: "block" }} />
           <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", margin: "0 0 8px" }}>건강 설문</h2>
           <p style={{ fontSize: 12, color: "#888", margin: 0 }}>정확한 건강 관리를 위한 기본 정보를 입력해주세요</p>
         </div>

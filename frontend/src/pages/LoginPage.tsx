@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { AppRoute } from "../App";
+import logoUrl from "../assets/all4health-logo.png";
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -34,8 +35,7 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
       borderRight: "1px solid #e0e0e0"
     }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
-        <img src="/logo.png" alt="All4Health" style={{ height: 28, width: "auto" }}
-          onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+        <img src={logoUrl} alt="All4Health" style={{ height: 28, width: "auto" }} />
         <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>All4Health</span>
       </div>
       <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.35, margin: "0 0 12px" }}>

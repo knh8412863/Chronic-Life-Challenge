@@ -1,6 +1,36 @@
 import { useState } from "react";
 import type { AppRoute } from "../App";
 import { Stepper } from "../components/common/Stepper";
+import logoUrl from "../assets/all4health-logo.png";
+
+type PolicyType = "service" | "privacy" | "health" | "marketing";
+
+const policyDocuments: Record<PolicyType, { title: string; version: string; content: string }> = {
+  service: {
+    title: "서비스 이용약관",
+    version: "v1.0",
+    content:
+      "All4Health 서비스는 만성질환 생활습관 관리를 지원하기 위한 건강관리 플랫폼입니다. 본 서비스에서 제공하는 정보는 의료 진단이나 처방이 아닌 참고용 건강관리 정보이며, 사용자는 본인의 건강 상태에 대한 최종 판단을 의료 전문가와 상담해야 합니다.",
+  },
+  privacy: {
+    title: "개인정보 처리방침",
+    version: "v1.0",
+    content:
+      "서비스 제공을 위해 이메일, 이름, 성별, 생년월일 등 계정 및 프로필 정보를 수집합니다. 수집된 개인정보는 회원 식별, 서비스 제공, 보안 관리, 고객 지원 목적에 한해 사용되며 관련 법령에 따라 안전하게 관리됩니다.",
+  },
+  health: {
+    title: "건강 데이터 수집·이용 동의",
+    version: "v1.0",
+    content:
+      "혈압, 혈당, 신장, 체중, 생활습관 등 건강 데이터는 만성질환 위험 신호 예측, 건강 점수 산정, 맞춤 조언, 챌린지 추천을 위해 사용됩니다. 건강 데이터는 민감정보에 해당하므로 사용자의 동의에 기반해 수집·이용됩니다.",
+  },
+  marketing: {
+    title: "마케팅 정보 수신 동의",
+    version: "v1.0",
+    content:
+      "마케팅 정보 수신에 동의한 경우 서비스 소식, 이벤트, 건강관리 콘텐츠 안내를 받을 수 있습니다. 해당 동의는 선택 사항이며 동의하지 않아도 기본 서비스 이용에는 제한이 없습니다.",
+  },
+};
 
 // ──────────────────────────────────────────────
 // 약관 동의 페이지
@@ -16,9 +46,11 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
     health: false,
     marketing: false,
   });
+  const [activePolicy, setActivePolicy] = useState<PolicyType | null>(null);
 
   const allRequired = checked.service && checked.privacy && checked.health;
   const allChecked = allRequired && checked.marketing;
+  const activePolicyDocument = activePolicy ? policyDocuments[activePolicy] : null;
 
   const toggleAll = () => {
     const next = !allChecked;
@@ -29,7 +61,7 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
     <div style={{ minHeight: "100vh", background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}>
       <div style={{ width: "100%", maxWidth: 680 }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <img src="/logo.png" alt="All4Health" style={{ height: 40, margin: "0 auto 16px", display: "block" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          <img src={logoUrl} alt="All4Health" style={{ height: 40, margin: "0 auto 16px", display: "block" }} />
           <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", margin: "0 0 8px" }}>회원가입</h2>
           <p style={{ fontSize: 12, color: "#888", margin: 0 }}>서비스 이용을 위한 약관에 동의해주세요</p>
         </div>
@@ -59,7 +91,13 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
                     style={{ width: 14, height: 14, cursor: "pointer" }} />
                   <span style={{ fontSize: 12, color: "#333" }}>{item.label}</span>
                 </label>
-                <button style={{ background: "none", border: "none", fontSize: 10, color: "#888", cursor: "pointer" }}>보기</button>
+                <button
+                  type="button"
+                  onClick={() => setActivePolicy(item.key)}
+                  style={{ background: "none", border: "none", fontSize: 10, color: "#888", cursor: "pointer" }}
+                >
+                  보기
+                </button>
               </div>
             ))}
           </div>
@@ -71,6 +109,58 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
             다음
           </button>
         </div>
+
+        {activePolicyDocument && (
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="policy-modal-title"
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 50,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "rgba(0, 0, 0, 0.38)",
+              padding: 24,
+            }}
+          >
+            <div style={{ width: "100%", maxWidth: 520, borderRadius: 12, background: "#fff", boxShadow: "0 20px 60px rgba(0,0,0,0.18)", overflow: "hidden" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "18px 22px", borderBottom: "1px solid #e5e5e5" }}>
+                <div>
+                  <h3 id="policy-modal-title" style={{ margin: 0, fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>
+                    {activePolicyDocument.title}
+                  </h3>
+                  <p style={{ margin: "4px 0 0", fontSize: 11, color: "#888" }}>적용 약관 버전: {activePolicyDocument.version}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActivePolicy(null)}
+                  aria-label="약관 모달 닫기"
+                  style={{ width: 32, height: 32, border: "1px solid #ddd", borderRadius: 8, background: "#fff", cursor: "pointer", fontSize: 16 }}
+                >
+                  ×
+                </button>
+              </div>
+              <div style={{ maxHeight: 320, overflowY: "auto", padding: 22 }}>
+                <p style={{ margin: 0, color: "#444", fontSize: 13, lineHeight: 1.75 }}>{activePolicyDocument.content}</p>
+                <p style={{ margin: "18px 0 0", color: "#999", fontSize: 11, lineHeight: 1.6 }}>
+                  ※ 실제 약관 전문은 추후 API 연결 시 /api/v1/policy-documents/{"{policy_type}"} 응답으로 교체됩니다.
+                </p>
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, padding: "14px 22px", borderTop: "1px solid #e5e5e5", background: "#fafafa" }}>
+                <button
+                  type="button"
+                  onClick={() => setActivePolicy(null)}
+                  style={{ height: 36, padding: "0 18px", border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}
+                >
+                  확인
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <p style={{ textAlign: "center", marginTop: 16, fontSize: 11, color: "#888" }}>
           이미 계정이 있으신가요? {" "}
@@ -111,7 +201,7 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
       {/* Left */}
       <div style={{ width: "45%", background: "#f5f5f5", padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center", borderRight: "1px solid #e0e0e0" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24 }}>
-          <img src="/logo.png" alt="All4Health" style={{ height: 28 }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          <img src={logoUrl} alt="All4Health" style={{ height: 28 }} />
           <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>All4Health</span>
         </div>
         <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", margin: "0 0 12px" }}>이메일로 인증<br />링크를 보냈습니다</h2>
@@ -165,12 +255,6 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
           이전으로 돌아가기
         </button>
 
-        {/* 개발용: 인증 완료 시뮬레이션 */}
-        <button onClick={() => onNavigate("/health-survey")}
-          style={{ width: "100%", height: 36, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, cursor: "pointer", marginBottom: 16 }}>
-          [개발용] 인증 완료 → 다음 단계
-        </button>
-
         <p style={{ textAlign: "center", fontSize: 11, color: "#888", cursor: "pointer", margin: 0 }}
           onClick={() => onNavigate("/login")}>로그인으로 돌아가기</p>
       </div>
@@ -201,7 +285,7 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
         <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>All4Health</span>
       </div>
       <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", margin: "0 0 12px" }}>비밀번호를<br />재설정합니다</h2>
-      <p style={{ fontSize: 12, color: "#555", lineHeight: 1.6, margin: "0 0 8px" }}>재설정 링크는 발송 후 1시간 동안 유효합니다.</p>
+      <p style={{ fontSize: 12, color: "#555", lineHeight: 1.6, margin: "0 0 8px" }}>재설정 링크는 발송 후 30분 동안 유효합니다.</p>
       <hr style={{ border: "none", borderTop: "1px solid #ddd", margin: "20px 0" }} />
       {[
         { num: "1", title: "이메일 입력", desc: "가입 시 사용한 이메일 주소를 입력하세요" },
@@ -271,10 +355,8 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
             <p style={{ fontSize: 13, color: "#333", lineHeight: 1.6, margin: 0 }}>
               {email}으로 재설정 링크를 발송했습니다. 메일함을 확인하고 링크를 클릭해주세요.
             </p>
-            <p style={{ fontSize: 11, color: "#aaa", margin: 0 }}>링크는 발송 후 1시간 동안 유효합니다. 스팸 메일함도 확인해보세요.</p>
+            <p style={{ fontSize: 11, color: "#aaa", margin: 0 }}>링크는 발송 후 30분 동안 유효합니다. 스팸 메일함도 확인해보세요.</p>
             <button onClick={() => {}} style={{ width: "100%", height: 36, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>이메일 재발송</button>
-            {/* 개발용 */}
-            <button onClick={() => setStep(3)} style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 12, cursor: "pointer" }}>[개발용] 링크 클릭 → 다음 단계</button>
             <hr style={{ border: "none", borderTop: "1px solid #eee" }} />
             <p style={{ textAlign: "center", fontSize: 11, color: "#888", cursor: "pointer" }} onClick={() => onNavigate("/login")}>로그인으로 돌아가기</p>
           </div>
@@ -327,7 +409,7 @@ export function OnboardingCompletePage({ onNavigate }: OnboardingCompletePagePro
     <div style={{ minHeight: "100vh", background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}>
       <div style={{ width: "100%", maxWidth: 680 }}>
         <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <img src="/logo.png" alt="All4Health" style={{ height: 40, margin: "0 auto 16px", display: "block" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          <img src={logoUrl} alt="All4Health" style={{ height: 40, margin: "0 auto 16px", display: "block" }} />
         </div>
 
         <Stepper steps={["계정정보", "약관동의", "이메일인증", "건강설문", "완료"]} current={4} />

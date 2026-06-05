@@ -56,6 +56,18 @@ const publicRoutes = new Set<AppRoute>([
   "/password-reset",
 ]);
 
+const onboardingRoutes = new Set<AppRoute>(["/health-survey", "/onboarding-complete"]);
+const serviceIntroRoutes = new Set<AppRoute>(["/"]);
+const authRoutes = new Set<AppRoute>([
+  "/login",
+  "/signup",
+  "/terms",
+  "/email-verify",
+  "/password-reset",
+  "/health-survey",
+  "/onboarding-complete",
+]);
+
 function normalizePath(pathname: string): AppRoute {
   const knownRoutes: AppRoute[] = [
     "/",
@@ -105,8 +117,6 @@ export default function App() {
     setRoute(nextRoute);
   };
 
-  // 로그인 안 된 상태에서 보호된 경로 접근 시 → /login으로 이동
-  const onboardingRoutes = new Set(["/health-survey", "/onboarding-complete"]);
   const effectiveRoute = useMemo(() => {
     if (!isLoggedIn && !publicRoutes.has(route) && !onboardingRoutes.has(route)) {
       return "/login" as AppRoute;
@@ -120,7 +130,7 @@ export default function App() {
       case "/":
         return <LandingPage onNavigate={navigate} />;
       case "/login":
-        return <LoginPage onLogin={() => { setIsLoggedIn(true); navigate("/home"); }} />;
+        return <LoginPage onLogin={() => { setIsLoggedIn(true); navigate("/home"); }} onNavigate={navigate} />;
       case "/home":
         return <HomePage onNavigate={navigate} />;
       case "/notifications":
@@ -172,8 +182,12 @@ export default function App() {
     }
   }, [effectiveRoute]);
 
-  if (publicRoutes.has(effectiveRoute) || effectiveRoute === "/health-survey" || effectiveRoute === "/onboarding-complete") {
+  if (serviceIntroRoutes.has(effectiveRoute)) {
     return <PublicLayout onNavigate={navigate}>{page}</PublicLayout>;
+  }
+
+  if (authRoutes.has(effectiveRoute)) {
+    return page;
   }
 
   return (
