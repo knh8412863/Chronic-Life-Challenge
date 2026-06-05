@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 
 import { AppLayout } from "./layouts/AppLayout";
+import { AdviceHistoryPage } from "./pages/AdviceHistoryPage";
+import { AdviceTodayPage } from "./pages/AdviceTodayPage";
 import { PublicLayout } from "./layouts/PublicLayout";
 import { HomePage } from "./pages/HomePage";
 import { LandingPage } from "./pages/LandingPage";
@@ -8,12 +10,24 @@ import { LoginPage } from "./pages/LoginPage";
 import { MyProfilePage } from "./pages/MyProfilePage";
 import { NotificationsPage } from "./pages/NotificationsPage";
 import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { PredictionFeedbackPage } from "./pages/PredictionFeedbackPage";
+import { PredictionHistoryPage } from "./pages/PredictionHistoryPage";
+import { PredictionProgressPage } from "./pages/PredictionProgressPage";
+import { PredictionRequestPage } from "./pages/PredictionRequestPage";
+import { PredictionResultPage } from "./pages/PredictionResultPage";
 
 export type AppRoute =
   | "/"
   | "/login"
   | "/home"
   | "/notifications"
+  | "/advices/today"
+  | "/advices/history"
+  | "/prediction/request"
+  | "/prediction/progress"
+  | "/prediction/result"
+  | "/prediction/history"
+  | "/prediction/feedback"
   | "/mypage"
   | "/mypage/profile"
   | "/health"
@@ -30,6 +44,13 @@ function normalizePath(pathname: string): AppRoute {
     "/login",
     "/home",
     "/notifications",
+    "/advices/today",
+    "/advices/history",
+    "/prediction/request",
+    "/prediction/progress",
+    "/prediction/result",
+    "/prediction/history",
+    "/prediction/feedback",
     "/mypage",
     "/mypage/profile",
     "/health",
@@ -63,9 +84,23 @@ export default function App() {
       case "/login":
         return <LoginPage onLogin={() => navigate("/home")} />;
       case "/home":
-        return <HomePage />;
+        return <HomePage onNavigate={navigate} />;
       case "/notifications":
-        return <NotificationsPage />;
+        return <NotificationsPage onNavigate={navigate} />;
+      case "/advices/today":
+        return <AdviceTodayPage onNavigate={navigate} />;
+      case "/advices/history":
+        return <AdviceHistoryPage />;
+      case "/prediction/request":
+        return <PredictionRequestPage onNavigate={navigate} />;
+      case "/prediction/progress":
+        return <PredictionProgressPage onNavigate={navigate} />;
+      case "/prediction/result":
+        return <PredictionResultPage onNavigate={navigate} />;
+      case "/prediction/history":
+        return <PredictionHistoryPage onNavigate={navigate} />;
+      case "/prediction/feedback":
+        return <PredictionFeedbackPage onNavigate={navigate} />;
       case "/mypage":
       case "/mypage/profile":
         return <MyProfilePage />;
