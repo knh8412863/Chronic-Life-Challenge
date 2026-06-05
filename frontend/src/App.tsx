@@ -16,6 +16,10 @@ import { PredictionProgressPage } from "./pages/PredictionProgressPage";
 import { PredictionRequestPage } from "./pages/PredictionRequestPage";
 import { PredictionResultPage } from "./pages/PredictionResultPage";
 
+// ── front/food-management 브랜치에서 추가
+import { FoodPage } from "./pages/FoodPage";
+import { FoodAnalyzePage } from "./pages/FoodAnalyzePage";
+
 export type AppRoute =
   | "/"
   | "/login"
@@ -32,6 +36,7 @@ export type AppRoute =
   | "/mypage/profile"
   | "/health"
   | "/food"
+  | "/food/analyze"
   | "/reports"
   | "/challenges"
   | "/pet";
@@ -55,6 +60,7 @@ function normalizePath(pathname: string): AppRoute {
     "/mypage/profile",
     "/health",
     "/food",
+    "/food/analyze",
     "/reports",
     "/challenges",
     "/pet",
@@ -107,7 +113,9 @@ export default function App() {
       case "/health":
         return <PlaceholderPage title="건강 관리" description="건강 기록 입력/조회 화면을 연결할 영역입니다." />;
       case "/food":
-        return <PlaceholderPage title="식단 관리" description="식단 입력, 분석 결과, 기록 목록 화면을 연결할 영역입니다." />;
+        return <FoodPage onNavigate={navigate} />;
+      case "/food/analyze":
+        return <FoodAnalyzePage onNavigate={navigate} />;
       case "/reports":
         return <PlaceholderPage title="리포트" description="주간 리포트 목록과 상세 화면을 연결할 영역입니다." />;
       case "/challenges":
