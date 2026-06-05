@@ -13,6 +13,9 @@ wheels/
 *.coverage
 .coverage.*
 .DS_Store
+node_modules/
+frontend/.env*
+frontend/dist/
 
 # Training datasets remain local; final runtime model artifacts are versioned.
 ai_worker/models/V8/dataset/
