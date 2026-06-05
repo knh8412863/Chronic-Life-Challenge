@@ -27,16 +27,28 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   // 건강 상태
   const [diseases, setDiseases] = useState<string[]>([]);
   const [medications, setMedications] = useState<string[]>([]);
+  const [lastCheckup, setLastCheckup] = useState(""); // 최근 건강검진
   const [systolic, setSystolic] = useState("130");
   const [diastolic, setDiastolic] = useState("80");
   const [fastingGlucose, setFastingGlucose] = useState("100");
 
+  // 가족력
+  const [fhDiabetesFather, setFhDiabetesFather] = useState(false);
+  const [fhDiabetesMother, setFhDiabetesMother] = useState(false);
+  const [fhDiabetesSibling, setFhDiabetesSibling] = useState(false);
+  const [fhHypertensionFather, setFhHypertensionFather] = useState(false);
+  const [fhHypertensionMother, setFhHypertensionMother] = useState(false);
+  const [fhHypertensionSibling, setFhHypertensionSibling] = useState(false);
+  const [fhCkd, setFhCkd] = useState(false);
+
   // 생활습관1
   const [exerciseFreq, setExerciseFreq] = useState("");
+  const [physicalActivityMin, setPhysicalActivityMin] = useState(""); // 주간 운동 총 시간(분)
   const [walkingDays, setWalkingDays] = useState("");
   const [sleepTime, setSleepTime] = useState("");
   const [smoking, setSmoking] = useState("");
   const [drinking, setDrinking] = useState("");
+  const [drinkingAmount, setDrinkingAmount] = useState(""); // 1회 평균 음주량
 
   // 생활습관2
   const [mealPattern, setMealPattern] = useState("");
@@ -190,6 +202,74 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
                   </button>
                 ))}
               </div>
+              <p style={{ fontSize: 9, color: "#aaa", margin: "4px 0 0" }}>※ ML 동일질환 누수 방지용 — LLM 조언 배경정보로 활용</p>
+            </div>
+
+            {/* 최근 건강검진 */}
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 500, color: "#555", display: "block", marginBottom: 8 }}>최근 건강검진</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                {[
+                  { label: "6개월 미만", value: "UNDER_6_MONTHS" },
+                  { label: "6개월~1년 미만", value: "UNDER_1_YEAR" },
+                  { label: "1년 이상", value: "OVER_1_YEAR" },
+                  { label: "한 적 없음", value: "NEVER" },
+                ].map(opt => (
+                  <button key={opt.value} onClick={() => setLastCheckup(opt.value)}
+                    style={{ padding: "9px 6px", border: `1.5px solid ${lastCheckup === opt.value ? "#1a1a1a" : "#ddd"}`, borderRadius: 5, background: lastCheckup === opt.value ? "#1a1a1a" : "#fafafa", textAlign: "center", fontSize: 10, color: lastCheckup === opt.value ? "#fff" : "#555", cursor: "pointer" }}>
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p style={{ fontSize: 9, color: "#aaa", margin: "4px 0 0" }}>※ ML 피처 아님 — LLM 정기검진 권유 문구 활용 (last_checkup_period)</p>
+            </div>
+
+            {/* 가족력 */}
+            <div>
+              <label style={{ fontSize: 10, fontWeight: 500, color: "#555", display: "block", marginBottom: 8 }}>가족력</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+                {/* 당뇨 가족력 */}
+                <div style={{ background: "#fff9c4", border: "1px solid #f57f17", borderRadius: 6, padding: "8px 10px" }}>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "#f57f17", margin: "0 0 6px" }}>당뇨</p>
+                  {[
+                    { label: "아버지", state: fhDiabetesFather, setState: setFhDiabetesFather },
+                    { label: "어머니", state: fhDiabetesMother, setState: setFhDiabetesMother },
+                    { label: "형제/자매", state: fhDiabetesSibling, setState: setFhDiabetesSibling },
+                  ].map(item => (
+                    <label key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, cursor: "pointer" }}>
+                      <input type="checkbox" checked={item.state} onChange={e => item.setState(e.target.checked)} style={{ width: 12, height: 12 }} />
+                      <span style={{ fontSize: 11, color: "#333" }}>{item.label}</span>
+                    </label>
+                  ))}
+                </div>
+                {/* 고혈압 가족력 */}
+                <div style={{ background: "#fce4ec", border: "1px solid #c2185b", borderRadius: 6, padding: "8px 10px" }}>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "#c2185b", margin: "0 0 6px" }}>고혈압</p>
+                  {[
+                    { label: "아버지", state: fhHypertensionFather, setState: setFhHypertensionFather },
+                    { label: "어머니", state: fhHypertensionMother, setState: setFhHypertensionMother },
+                    { label: "형제/자매", state: fhHypertensionSibling, setState: setFhHypertensionSibling },
+                  ].map(item => (
+                    <label key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, cursor: "pointer" }}>
+                      <input type="checkbox" checked={item.state} onChange={e => item.setState(e.target.checked)} style={{ width: 12, height: 12 }} />
+                      <span style={{ fontSize: 11, color: "#333" }}>{item.label}</span>
+                    </label>
+                  ))}
+                </div>
+                {/* 신장질환 가족력 */}
+                <div style={{ background: "#e3f2fd", border: "1px solid #1565c0", borderRadius: 6, padding: "8px 10px" }}>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "#1565c0", margin: "0 0 6px" }}>신장질환</p>
+                  {[
+                    { label: "있음", state: fhCkd, setState: setFhCkd },
+                    { label: "없음", state: !fhCkd, setState: (v: boolean) => setFhCkd(!v) },
+                  ].map(item => (
+                    <label key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, cursor: "pointer" }}>
+                      <input type="checkbox" checked={item.state} onChange={e => item.setState(e.target.checked)} style={{ width: 12, height: 12 }} />
+                      <span style={{ fontSize: 11, color: "#333" }}>{item.label}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* 혈압 / 공복혈당 */}
@@ -233,6 +313,16 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
             </div>
           </div>
           <div style={{ marginBottom: 28 }}>
+            <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 8 }}>주간 운동 총 시간 (분)</label>
+            <p style={{ fontSize: 11, color: "#888", margin: "0 0 10px" }}>이번 주 총 운동 시간을 분 단위로 입력해주세요. (예: 150)</p>
+            <input
+              type="number" value={physicalActivityMin} onChange={e => setPhysicalActivityMin(e.target.value)}
+              placeholder="예: 150"
+              style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, padding: "0 12px", fontSize: 12, outline: "none", boxSizing: "border-box" }}
+            />
+            <p style={{ fontSize: 9, color: "#aaa", margin: "4px 0 0" }}>※ physical_activity_min (optional)</p>
+          </div>
+          <div style={{ marginBottom: 28 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 12 }}>평균 수면 시간</label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
               {["5시간 이하", "6~7시간", "8시간 이상"].map(d => <OptionButton key={d} label={d} selected={sleepTime === d} onClick={() => setSleepTime(d)} />)}
@@ -251,17 +341,28 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
               ))}
             </div>
           </div>
-          <div>
+          <div style={{ marginBottom: drinking !== "안 마심" ? 28 : 0 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 14 }}>현재 음주를 하시나요?</label>
             <div style={{ display: "flex", gap: 24 }}>
               {["안 마심", "월 1~2회", "주 1~2회", "주 3회 이상"].map(opt => (
                 <label key={opt} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
-                  <input type="radio" checked={drinking === opt} onChange={() => setDrinking(opt)} style={{ width: 16, height: 16 }} />
+                  <input type="radio" checked={drinking === opt} onChange={() => { setDrinking(opt); if (opt === "안 마심") setDrinkingAmount(""); }} style={{ width: 16, height: 16 }} />
                   <span style={{ fontSize: 12, color: "#333" }}>{opt}</span>
                 </label>
               ))}
             </div>
           </div>
+          {drinking !== "" && drinking !== "안 마심" && (
+            <div>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 14 }}>1회 평균 음주량</label>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
+                {["1~2잔", "3~4잔", "5~6잔", "7~9잔", "10잔 이상"].map(opt => (
+                  <OptionButton key={opt} label={opt} selected={drinkingAmount === opt} onClick={() => setDrinkingAmount(opt)} />
+                ))}
+              </div>
+              <p style={{ fontSize: 9, color: "#aaa", margin: "4px 0 0" }}>※ alcohol_amount: 1~5 (음주 없음이면 미입력)</p>
+            </div>
+          )}
         </div>
         <NavButtons onPrev={() => setSurveyStep(1)} onNext={() => setSurveyStep(3)} />
       </PageWrapper>
@@ -273,7 +374,24 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   const stressLabels = ["매우 낮음", "낮음", "보통", "높음", "매우 높음"];
 
   const handleComplete = () => {
-    // TODO: API 연결 — POST /api/v1/users/health-survey
+    // TODO: API 연결 — POST /api/v1/prediction-inputs
+    // body: {
+    //   input_mode: "DEEP",
+    //   birth_date, height, weight, waist_circumference,
+    //   diagnosed_diseases, medications,
+    //   last_checkup_period: lastCheckup,
+    //   sbp: systolic, dbp: diastolic, glucose_fasting: fastingGlucose,
+    //   fh_diabetes_father, fh_diabetes_mother, fh_diabetes_sibling,
+    //   fh_hypertension_father, fh_hypertension_mother, fh_hypertension_sibling,
+    //   family_history_ckd: fhCkd,
+    //   smoking_status: ("예"→2, "과거 흡연"→1, "아니오"→0),
+    //   alcohol_frequency: ("안 마심"→0, "월 1~2회"→0, "주 1~2회"→1, "주 3회 이상"→3),
+    //   alcohol_amount: ("1~2잔"→1, "3~4잔"→2, "5~6잔"→3, "7~9잔"→4, "10잔 이상"→5),
+    //   walking_days, sedentary_hours, exercise_frequency,
+    //   physical_activity_min: Number(physicalActivityMin),
+    //   sleep_hours, stress_level, diet_score
+    // }
+    // ※ gender는 회원가입 저장값 사용 (body에 포함하지 않음)
     onNavigate("/onboarding-complete");
   };
 

@@ -25,6 +25,13 @@ export type AppRoute =
   | "/onboarding-complete"
   | "/home"
   | "/notifications"
+  | "/advices/today"
+  | "/advices/history"
+  | "/prediction/request"
+  | "/prediction/progress"
+  | "/prediction/result"
+  | "/prediction/history"
+  | "/prediction/feedback"
   | "/mypage"
   | "/mypage/profile"
   | "/health"
@@ -33,7 +40,6 @@ export type AppRoute =
   | "/challenges"
   | "/pet";
 
-// 로그인 없이 접근 가능한 경로
 const publicRoutes = new Set<AppRoute>([
   "/",
   "/login",
@@ -55,6 +61,13 @@ function normalizePath(pathname: string): AppRoute {
     "/onboarding-complete",
     "/home",
     "/notifications",
+    "/advices/today",
+    "/advices/history",
+    "/prediction/request",
+    "/prediction/progress",
+    "/prediction/result",
+    "/prediction/history",
+    "/prediction/feedback",
     "/mypage",
     "/mypage/profile",
     "/health",
@@ -63,13 +76,14 @@ function normalizePath(pathname: string): AppRoute {
     "/challenges",
     "/pet",
   ];
+
   return knownRoutes.includes(pathname as AppRoute) ? (pathname as AppRoute) : "/home";
 }
 
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(() => normalizePath(window.location.pathname));
 
-  // TODO: API 연결 시 sessionStorage 토큰 체크로 교체
+  // TODO: API 연결 시 sessionStorage 토큰 체크로 교체 (REQ-AUTH-002, NFR-SEC-001)
   // const [isLoggedIn, setIsLoggedIn] = useState(() => !!sessionStorage.getItem("access_token"));
   const [isLoggedIn, setIsLoggedIn] = useState(false);
 
@@ -84,9 +98,10 @@ export default function App() {
     setRoute(nextRoute);
   };
 
-  // 로그인 안 된 상태에서 보호된 경로 접근 시 → /login으로
+  // 로그인 안 된 상태에서 보호된 경로 접근 시 → /login으로 이동
+  const onboardingRoutes = new Set(["/health-survey", "/onboarding-complete"]);
   const effectiveRoute = useMemo(() => {
-    if (!isLoggedIn && !publicRoutes.has(route) && route !== "/health-survey" && route !== "/onboarding-complete") {
+    if (!isLoggedIn && !publicRoutes.has(route) && !onboardingRoutes.has(route)) {
       return "/login" as AppRoute;
     }
     return route;
@@ -94,23 +109,24 @@ export default function App() {
 
   const page = useMemo(() => {
     switch (effectiveRoute) {
-      // ── 기존 코드 그대로 유지 ──
+      // ── 기존 라우트 유지 ──
       case "/":
         return <LandingPage onNavigate={navigate} />;
       case "/login":
-        return (
-          <LoginPage
-            onLogin={() => {
-              setIsLoggedIn(true);
-              navigate("/home");
-            }}
-            onNavigate={navigate}
-          />
-        );
+        return <LoginPage onLogin={() => { setIsLoggedIn(true); navigate("/home"); }} />;
       case "/home":
         return <HomePage />;
       case "/notifications":
         return <NotificationsPage />;
+      case "/advices/today":
+      case "/advices/history":
+        return <PlaceholderPage title="오늘의 조언" description="조언 화면을 연결할 영역입니다." />;
+      case "/prediction/request":
+      case "/prediction/progress":
+      case "/prediction/result":
+      case "/prediction/history":
+      case "/prediction/feedback":
+        return <PlaceholderPage title="AI 예측" description="예측 화면을 연결할 영역입니다." />;
       case "/mypage":
       case "/mypage/profile":
         return <MyProfilePage />;
@@ -125,7 +141,7 @@ export default function App() {
       case "/pet":
         return <PlaceholderPage title="마이펫" description="펫 현황, 보상 과제, 도감 화면을 연결할 영역입니다." />;
 
-      // ── front/auth-onboarding 브랜치에서 추가한 라우트 ──
+      // ── front/auth-onboarding 브랜치에서 추가 ──
       case "/signup":
         return <SignUpPage onNavigate={navigate} />;
       case "/terms":

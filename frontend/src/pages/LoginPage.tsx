@@ -15,8 +15,12 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
 
   const handleLogin = async () => {
     setIsLoading(true);
-    // TODO: API 연결 시 교체 — POST /api/v1/auth/login
-    // const res = await apiClient.post("/auth/login", { email, password });
+    // TODO: API 연결 — POST /api/v1/auth/sessions
+    // body: { email, password, remember_me: false }
+    // 응답: 200 { data: { access_token, token_type, expires_in: 900 } }
+    // Access Token은 sessionStorage에 저장 (localStorage 저장 금지, NFR-SEC-001)
+    // 실패 시: 401 INVALID_CREDENTIALS → detail.remaining_attempts로 남은 횟수 표시
+    // 5회 초과 시: 429 RATE_LIMIT_EXCEEDED → 잠금 화면 표시
     setTimeout(() => {
       setIsLoading(false);
       onLogin();

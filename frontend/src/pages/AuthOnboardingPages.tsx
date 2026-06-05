@@ -92,7 +92,11 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
   const [resendCooldown, setResendCooldown] = useState(0);
 
   const handleResend = () => {
-    // TODO: API 연결 — POST /api/v1/auth/resend-verification
+    // TODO: API 연결 — POST /api/v1/auth/email-verification-requests
+    // Header: Authorization: Bearer <access_token> (필수)
+    // 응답: 204 No Content
+    // 재발송 시 기존 미사용 토큰 무효화 후 신규 토큰 발급
+    // 429 RATE_LIMIT_EXCEEDED: 분당 1회 제한 → 60초 쿨다운 UI 표시
     setResendCooldown(60);
     const timer = setInterval(() => {
       setResendCooldown(prev => {
@@ -251,6 +255,9 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
             </div>
             <button onClick={() => setStep(2)} disabled={!email}
               style={{ width: "100%", height: 36, background: email ? "#1a1a1a" : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: email ? "pointer" : "not-allowed" }}>
+              {/* TODO: API 연결 — POST /api/v1/auth/password-reset-requests */}
+              {/* body: { email } / 응답: 204 No Content (미가입 이메일도 동일 응답, 가입 여부 비노출) */}
+              {/* 재설정 토큰 유효시간 30분 / 429 RATE_LIMIT_EXCEEDED: 분당 3회/IP 제한 */}
               인증 메일 발송
             </button>
             <hr style={{ border: "none", borderTop: "1px solid #eee" }} />
@@ -295,6 +302,10 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
             </div>
             <button onClick={() => setStep(4)} disabled={!newPassword || !confirmPassword || pwMismatch}
               style={{ width: "100%", height: 36, background: !newPassword || !confirmPassword || pwMismatch ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !newPassword || !confirmPassword || pwMismatch ? "not-allowed" : "pointer" }}>
+              {/* TODO: API 연결 — POST /api/v1/auth/password-resets */}
+              {/* body: { token (URL 파라미터), new_password, new_password_confirm } */}
+              {/* 응답: 204 No Content / 재설정 완료 시 기존 Refresh Token 세션 전체 무효화 */}
+              {/* 410 TOKEN_EXPIRED: 토큰 만료(30분) / 422 PASSWORD_MISMATCH */}
               비밀번호 변경하기
             </button>
           </div>

@@ -24,13 +24,27 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
   };
 
   const handleEmailCheck = () => {
-    // TODO: API 연결 — GET /api/v1/auth/check-email?email=...
+    // TODO: API 연결 — GET /api/v1/auth/email-availability?email={email}
+    // 응답: 200 { data: { available: bool } }
+    // available: true → "사용 가능한 이메일입니다." 표시
+    // available: false → 400 INVALID_EMAIL_FORMAT 또는 409 EMAIL_EXISTS
     setEmailChecked(true);
   };
 
   const handleNext = () => {
     setIsLoading(true);
-    // TODO: API 연결 — POST /api/v1/auth/signup (step 1: 계정 정보 저장 후 약관 동의로)
+    // TODO: API 연결 — POST /api/v1/auth/registrations
+    // body: {
+    //   email, password, name,
+    //   gender: gender === "male" ? "M" : "F",
+    //   managed_diseases: selectedDiseases.map(d => DISEASE_CODE_MAP[d]),
+    //   consent_terms_version: "v1.0",
+    //   consent_privacy_agreed: true,   // 약관동의 단계에서 처리
+    //   consent_health_data: true,
+    //   consent_marketing: false
+    // }
+    // 응답: 201 { data: { user_id, email, name, gender, managed_diseases } }
+    // 실패: 409 EMAIL_EXISTS / 422 PASSWORD_TOO_WEAK / 422 DISEASE_SELECTION_REQUIRED
     setTimeout(() => {
       setIsLoading(false);
       onNavigate("/terms");
