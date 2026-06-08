@@ -3,6 +3,9 @@ import { useEffect, useState } from "react";
 import type { AppRoute } from "../App";
 import { getStoredAccessToken } from "../api/auth";
 import { getNotifications, markAllNotificationsRead, type NotificationItem } from "../api/notifications";
+import { EmptyState } from "../components/common/EmptyState";
+import { ErrorState } from "../components/common/ErrorState";
+import { LoadingState } from "../components/common/LoadingState";
 
 type NotificationsPageProps = {
   onNavigate: (route: AppRoute) => void;
@@ -48,11 +51,11 @@ const fallbackNotifications: NotificationItem[] = [
 ];
 
 const notificationMeta = {
-  CHALLENGE: { icon: "🏆", label: "챌린지", tone: "green" },
-  PREDICTION: { icon: "⚠", label: "건강경고", tone: "pink" },
-  GENERAL: { icon: "🔔", label: "리마인더", tone: "yellow" },
-  REPORT: { icon: "📊", label: "주간리포트", tone: "blue" },
-  ADVICE: { icon: "💬", label: "조언", tone: "green" },
+  CHALLENGE:  { icon: "🏆",  label: "챌린지",    iconBg: "#dcfce7", iconBorder: "1px solid #86efac", pillBg: "#dcfce7", pillBorder: "1px solid #86efac", pillColor: "#16a34a" },
+  PREDICTION: { icon: "⚠️",  label: "건강경고",  iconBg: "#ffe4e6", iconBorder: "1px solid #fda4af", pillBg: "#ffe4e6", pillBorder: "1px solid #fda4af", pillColor: "#f43f5e" },
+  GENERAL:    { icon: "🔔",  label: "리마인더",  iconBg: "#fef9c3", iconBorder: "1px solid #fde047", pillBg: "#fef9c3", pillBorder: "1px solid #fde047", pillColor: "#ca8a04" },
+  REPORT:     { icon: "📊",  label: "주간리포트", iconBg: "#dbeafe", iconBorder: "1px solid #93c5fd", pillBg: "#dbeafe", pillBorder: "1px solid #93c5fd", pillColor: "#2563eb" },
+  ADVICE:     { icon: "💬",  label: "조언",      iconBg: "#dcfce7", iconBorder: "1px solid #86efac", pillBg: "#dcfce7", pillBorder: "1px solid #86efac", pillColor: "#16a34a" },
 };
 
 function formatNotificationTime(createdAt: string) {
@@ -68,17 +71,25 @@ function formatNotificationTime(createdAt: string) {
   return "1일 전";
 }
 
+type LoadStatus = "loading" | "loaded" | "empty" | "error";
+
 export function NotificationsPage({ onNavigate }: NotificationsPageProps) {
-  const [items, setItems] = useState(fallbackNotifications);
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [status, setStatus] = useState<LoadStatus>("loading");
 
   useEffect(() => {
     const token = getStoredAccessToken();
     if (!token) {
+      setItems(fallbackNotifications);
+      setStatus(fallbackNotifications.length === 0 ? "empty" : "loaded");
       return;
     }
     getNotifications(token)
-      .then((response) => setItems(response.data))
-      .catch(() => setItems(fallbackNotifications));
+      .then((response) => {
+        setItems(response.data);
+        setStatus(response.data.length === 0 ? "empty" : "loaded");
+      })
+      .catch(() => setStatus("error"));
   }, []);
 
   const handleMarkAllRead = () => {
@@ -103,30 +114,36 @@ export function NotificationsPage({ onNavigate }: NotificationsPageProps) {
         </div>
       </section>
 
-      <section className="notification-list">
-        {items.map((item) => {
-          const meta = notificationMeta[item.notification_type];
-          return (
-            <button
-              className={`notification-item ${item.is_read ? "" : "is-unread"}`}
-              key={item.notification_id}
-              type="button"
-              onClick={() => onNavigate((item.link_url as AppRoute | null) ?? "/home")}
-            >
-              <span className="notification-icon">{meta.icon}</span>
-              <span className="notification-content">
-                <span className="notification-meta-row">
-                  <span className={`pill pill-${meta.tone}`}>{meta.label}</span>
-                  <span className="notification-time">{formatNotificationTime(item.created_at)}</span>
-                  {!item.is_read && <span className="unread-dot" />}
+      {status === "loading" && <LoadingState message="알림을 불러오는 중입니다." />}
+      {status === "empty" && <EmptyState title="알림이 없습니다." description="새로운 알림이 오면 여기에 표시됩니다." />}
+      {status === "error" && <ErrorState title="알림을 불러오지 못했습니다." description="잠시 후 다시 시도해 주세요." />}
+
+      {status === "loaded" && (
+        <section className="notification-list">
+          {items.map((item) => {
+            const meta = notificationMeta[item.notification_type];
+            return (
+              <button
+                className={`notification-item ${item.is_read ? "" : "is-unread"}`}
+                key={item.notification_id}
+                type="button"
+                onClick={() => onNavigate((item.link_url as AppRoute | null) ?? "/home")}
+              >
+                <span className="notification-icon" style={{ background: meta.iconBg, border: meta.iconBorder }}>{meta.icon}</span>
+                <span className="notification-content">
+                  <span className="notification-meta-row">
+                    <span className="pill" style={{ background: meta.pillBg, border: meta.pillBorder, color: meta.pillColor }}>{meta.label}</span>
+                    <span className="notification-time">{formatNotificationTime(item.created_at)}</span>
+                    {!item.is_read && <span className="unread-dot" />}
+                  </span>
+                  <strong>{item.title}</strong>
+                  {item.message !== item.title && <small>{item.message}</small>}
                 </span>
-                <strong>{item.title}</strong>
-                {item.message !== item.title && <small>{item.message}</small>}
-              </span>
-            </button>
-          );
-        })}
-      </section>
+              </button>
+            );
+          })}
+        </section>
+      )}
     </div>
   );
 }
