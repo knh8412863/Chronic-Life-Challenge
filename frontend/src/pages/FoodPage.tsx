@@ -1,12 +1,23 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AppRoute } from "../App";
+import { getStoredAccessToken } from "../api/auth";
+import {
+  createMealLog,
+  deleteMealLog,
+  getMealLogs,
+  updateMealLog,
+  type MealLog,
+  type MealType,
+} from "../api/foods";
+import { EmptyState } from "../components/common/EmptyState";
+import { ErrorState } from "../components/common/ErrorState";
+import { LoadingState } from "../components/common/LoadingState";
 
 interface FoodPageProps {
   onNavigate: (route: AppRoute) => void;
 }
 
 type TabType = "list" | "input" | "detail";
-type MealType = "BREAKFAST" | "LUNCH" | "DINNER" | "SNACK";
 type PeriodType = "오늘" | "7일" | "30일" | "직접 선택";
 
 const MEAL_LABELS: Record<MealType, { icon: string; label: string }> = {
@@ -16,22 +27,59 @@ const MEAL_LABELS: Record<MealType, { icon: string; label: string }> = {
   SNACK:     { icon: "🍪", label: "간식" },
 };
 
-// 더미 데이터 — API 연결 시 교체 (GET /api/v1/health/meals)
-const DUMMY_MEALS = [
-  { meal_log_id: 1, meal_type: "BREAKFAST" as MealType, food_name: "밥, 된장찌개, 계란말이", amount: "밥 한공기, 된장찌개 1그릇", meal_date: "오늘", time: "08:00", calories: 300, sodium_mg: 800, sugar_g: 15, fiber_g: 3, carbs_g: 45, protein_g: 12, fat_g: 8, memo: "", isToday: true },
-  { meal_log_id: 2, meal_type: "LUNCH" as MealType, food_name: "돈까스, 소스, 샐러드", amount: "1인분", meal_date: "오늘", time: "12:00", calories: 650, sodium_mg: 1200, sugar_g: 20, fiber_g: 5, carbs_g: 80, protein_g: 25, fat_g: 22, memo: "", isToday: true },
-  { meal_log_id: 3, meal_type: "DINNER" as MealType, food_name: "구이 생선, 나물, 된장국", amount: "1인분", meal_date: "어제", time: "18:45", calories: 550, sodium_mg: 1200, sugar_g: 10, fiber_g: 6, carbs_g: 60, protein_g: 30, fat_g: 15, memo: "", isToday: false },
-  { meal_log_id: 4, meal_type: "SNACK" as MealType, food_name: "바나나, 우유", amount: "바나나 1개, 우유 1잔", meal_date: "2일 전", time: "15:30", calories: 200, sodium_mg: 100, sugar_g: 25, fiber_g: 2, carbs_g: 35, protein_g: 8, fat_g: 4, memo: "", isToday: false },
-];
+type FoodMeal = MealLog & {
+  time: string;
+  isToday: boolean;
+};
+
+function todayString() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function daysAgo(days: number) {
+  const date = new Date();
+  date.setDate(date.getDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
+function mealTimeLabel(createdAt: string) {
+  return new Date(createdAt).toLocaleTimeString("ko-KR", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function toFoodMeal(meal: MealLog): FoodMeal {
+  return {
+    ...meal,
+    time: mealTimeLabel(meal.created_at),
+    isToday: meal.meal_date === todayString(),
+  };
+}
+
+function periodRange(period: PeriodType) {
+  if (period === "오늘") return { from: todayString(), to: todayString() };
+  if (period === "7일") return { from: daysAgo(6), to: todayString() };
+  if (period === "30일") return { from: daysAgo(29), to: todayString() };
+  return {};
+}
+
+function numberOrNull(value: string) {
+  if (value.trim() === "") return null;
+  return Number(value);
+}
 
 export function FoodPage({ onNavigate }: FoodPageProps) {
   const [tab, setTab] = useState<TabType>("list");
-  const [selectedMeal, setSelectedMeal] = useState<typeof DUMMY_MEALS[0] | null>(null);
+  const [selectedMeal, setSelectedMeal] = useState<FoodMeal | null>(null);
   const [period, setPeriod] = useState<PeriodType>("오늘");
   const [mealTypeFilter, setMealTypeFilter] = useState("전체");
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteTargetId, setDeleteTargetId] = useState<number | null>(null);
-  const [meals, setMeals] = useState(DUMMY_MEALS);
+  const [meals, setMeals] = useState<FoodMeal[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [hasError, setHasError] = useState(false);
 
   // 식단 직접 입력 상태
   const [inputMealType, setInputMealType] = useState<MealType>("BREAKFAST");
@@ -54,59 +102,115 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
   const [editFoodName, setEditFoodName] = useState("");
   const [editAmount, setEditAmount] = useState("");
 
-  const totalCalories = meals.reduce((s, m) => s + m.calories, 0);
-  const totalSodium = meals.reduce((s, m) => s + m.sodium_mg, 0);
-  const totalSugar = meals.reduce((s, m) => s + m.sugar_g, 0);
+  const totalCalories = meals.reduce((s, m) => s + (m.calories ?? 0), 0);
+  const totalSodium = meals.reduce((s, m) => s + (m.sodium_mg ?? 0), 0);
+  const totalSugar = meals.reduce((s, m) => s + (m.sugar_g ?? 0), 0);
 
   const filteredMeals = meals.filter(m => {
     if (mealTypeFilter === "전체") return true;
     return MEAL_LABELS[m.meal_type].label === mealTypeFilter;
   });
 
-  const handleSaveInput = () => {
+  function fetchMeals() {
+    const token = getStoredAccessToken();
+    if (!token) return;
+
+    const range = periodRange(period);
+    setIsLoading(true);
+    getMealLogs(
+      {
+        ...range,
+        meal_type: mealTypeFilter === "전체" ? undefined : (Object.keys(MEAL_LABELS) as MealType[]).find(
+          (type) => MEAL_LABELS[type].label === mealTypeFilter,
+        ),
+        limit: 100,
+      },
+      token,
+    )
+      .then((response) => {
+        setMeals(response.data.items.map(toFoodMeal));
+        setHasError(false);
+      })
+      .catch(() => setHasError(true))
+      .finally(() => setIsLoading(false));
+  }
+
+  useEffect(() => {
+    fetchMeals();
+  }, [period, mealTypeFilter]);
+
+  const handleSaveInput = async () => {
     const hasFood = foodItems.some(f => f.food.trim());
     if (!hasFood) { setShowValidation(true); return; }
-    // TODO: API 연결 — POST /api/v1/health/meals
-    // body: {
-    //   food_name: foodItems.map(f => f.food).join(", "),
-    //   amount: foodItems.map(f => f.amount).join(", "),
-    //   meal_type: inputMealType,           // BREAKFAST/LUNCH/DINNER/SNACK (필수)
-    //   meal_date: inputDate,               // date (optional)
-    //   calories: Number(calories) || 0,
-    //   carbs_g: Number(carbs) || 0,
-    //   protein_g: Number(protein) || 0,
-    //   fat_g: Number(fat) || 0,
-    //   sodium_mg: Number(sodium) || 0,
-    //   sugar_g: Number(sugar) || 0,
-    //   fiber_g: Number(fiberG) || 0,
-    //   memo,
-    // }
-    setShowSaveSuccess(true);
-    setTimeout(() => { setShowSaveSuccess(false); setTab("list"); }, 1500);
+    const token = getStoredAccessToken();
+    if (!token) { setHasError(true); return; }
+
+    try {
+      await createMealLog(
+        {
+          food_name: foodItems.map(f => f.food.trim()).filter(Boolean).join(", "),
+          amount: foodItems.map(f => f.amount.trim()).filter(Boolean).join(", ") || null,
+          meal_type: inputMealType,
+          meal_date: inputDate,
+          calories: numberOrNull(calories),
+          carbs_g: numberOrNull(carbs),
+          protein_g: numberOrNull(protein),
+          fat_g: numberOrNull(fat),
+          sodium_mg: numberOrNull(sodium),
+          sugar_g: numberOrNull(sugar),
+          fiber_g: numberOrNull(fiberG),
+          memo: memo.trim() || null,
+        },
+        token,
+      );
+      setShowSaveSuccess(true);
+      fetchMeals();
+      setTimeout(() => { setShowSaveSuccess(false); setTab("list"); }, 800);
+    } catch {
+      setHasError(true);
+    }
   };
 
-  const handleDelete = (id: number) => {
-    // TODO: API 연결 — DELETE /api/v1/health/meals/{meal_log_id}
-    // 204 No Content 응답 시 목록에서 제거
-    setMeals(prev => prev.filter(m => m.meal_log_id !== id));
-    setShowDeleteConfirm(false);
+  const handleDelete = async (id: number) => {
+    const token = getStoredAccessToken();
+    if (!token) return;
+    try {
+      await deleteMealLog(id, token);
+      setMeals(prev => prev.filter(m => m.meal_log_id !== id));
+      setShowDeleteConfirm(false);
+      if (selectedMeal?.meal_log_id === id) {
+        setSelectedMeal(null);
+        setTab("list");
+      }
+    } catch {
+      setHasError(true);
+    }
   };
 
-  const openDetail = (meal: typeof DUMMY_MEALS[0]) => {
+  const openDetail = (meal: FoodMeal) => {
     setSelectedMeal(meal);
     setEditFoodName(meal.food_name);
-    setEditAmount(meal.amount);
+    setEditAmount(meal.amount ?? "");
     setIsEditMode(false);
     setTab("detail");
   };
 
-  const handleSaveEdit = () => {
-    // TODO: API 연결 — PATCH /api/v1/health/meals/{meal_log_id}
-    // body: { food_name: editFoodName, amount: editAmount }
-    // 당일 기록만 수정 가능 (과거 기록: 410 PAST_RECORD_LOCKED)
+  const handleSaveEdit = async () => {
     if (selectedMeal) {
-      setMeals(prev => prev.map(m => m.meal_log_id === selectedMeal.meal_log_id
-        ? { ...m, food_name: editFoodName, amount: editAmount } : m));
+      const token = getStoredAccessToken();
+      if (!token) return;
+      try {
+        const response = await updateMealLog(
+          selectedMeal.meal_log_id,
+          { food_name: editFoodName, amount: editAmount || null },
+          token,
+        );
+        const updated = toFoodMeal(response.data);
+        setMeals(prev => prev.map(m => m.meal_log_id === selectedMeal.meal_log_id ? updated : m));
+        setSelectedMeal(updated);
+      } catch {
+        setHasError(true);
+      }
     }
     setIsEditMode(false);
   };
@@ -117,6 +221,10 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
   return (
     <div className="page-container">
       <h1 className="page-title">식단 기록</h1>
+
+      {hasError && (
+        <ErrorState title="식단 데이터를 처리하지 못했습니다." description="로그인 상태와 입력값을 확인한 뒤 다시 시도해 주세요." />
+      )}
 
       {/* 탭 */}
       <div style={{ display: "flex", borderBottom: "2px solid #e0e0e0", marginBottom: 20 }}>
@@ -277,11 +385,12 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
               style={{ width: "100%", height: 36, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               + 새로운 식단 추가
             </button>
+            <button onClick={() => onNavigate("/food/analyze")}
+              style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", color: "#333", fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 8 }}>
+              식단 분석하기
+            </button>
           </div>
 
-          {/* API 연결 시: daily_summary 배열로 날짜별 합산 표시 필요
-              GET /api/v1/health/meals?from=...&to=...
-              응답: { daily_summary: [{ meal_date, meal_count, total_calories, total_sodium_mg, total_sugar_g, total_fiber_g }] } */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
             {[
               { label: "총 칼로리", val: totalCalories.toLocaleString(), unit: "kcal", bg: "#e3f2fd", color: "#1565c0", border: "#90caf9" },
@@ -298,13 +407,13 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
             ))}
           </div>
 
-          {/* 식단 목록 */}
-          {filteredMeals.length === 0 ? (
-            <div style={{ textAlign: "center", padding: "60px 20px" }}>
-              <div style={{ fontSize: 64, marginBottom: 16 }}>🍽️</div>
-              <p style={{ fontSize: 14, color: "#555" }}>이 날의 식단 기록이 없습니다.</p>
+          {isLoading ? (
+            <LoadingState message="식단 기록을 불러오는 중입니다." />
+          ) : filteredMeals.length === 0 ? (
+            <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10 }}>
+              <EmptyState title="식단 기록이 없습니다." description="새로운 식단을 입력하거나 식단 분석 결과를 저장해 보세요." icon="🍽️" />
               <button onClick={() => setTab("input")}
-                style={{ marginTop: 20, padding: "10px 24px", border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, cursor: "pointer" }}>
+                style={{ display: "block", margin: "0 auto 24px", padding: "10px 24px", border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, cursor: "pointer" }}>
                 + 새로운 식단 추가
               </button>
             </div>
@@ -322,7 +431,7 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
                     </div>
                   </div>
                   <p style={{ fontSize: 11, color: "#555", margin: "0 0 10px" }}>
-                    {meal.calories}kcal &nbsp; 나트륨 {meal.sodium_mg}mg &nbsp; 당류 {meal.sugar_g}g
+                    {meal.calories ?? 0}kcal &nbsp; 나트륨 {meal.sodium_mg ?? 0}mg &nbsp; 당류 {meal.sugar_g ?? 0}g
                   </p>
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => openDetail(meal)}
@@ -396,12 +505,12 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
               </thead>
               <tbody>
                 {[
-                  { label: "칼로리", val: `${selectedMeal.calories} kcal` },
-                  { label: "탄수화물", val: `${selectedMeal.carbs_g}g` },
-                  { label: "단백질", val: `${selectedMeal.protein_g}g` },
-                  { label: "지방", val: `${selectedMeal.fat_g}g` },
-                  { label: "나트륨", val: `${selectedMeal.sodium_mg}mg` },
-                  { label: "당류", val: `${selectedMeal.sugar_g}g` },
+                  { label: "칼로리", val: `${selectedMeal.calories ?? 0} kcal` },
+                  { label: "탄수화물", val: `${selectedMeal.carbs_g ?? 0}g` },
+                  { label: "단백질", val: `${selectedMeal.protein_g ?? 0}g` },
+                  { label: "지방", val: `${selectedMeal.fat_g ?? 0}g` },
+                  { label: "나트륨", val: `${selectedMeal.sodium_mg ?? 0}mg` },
+                  { label: "당류", val: `${selectedMeal.sugar_g ?? 0}g` },
                 ].map((row, i) => (
                   <tr key={i} style={{ background: i % 2 === 0 ? "#fafafa" : "#fff" }}>
                     <td style={{ padding: "8px 12px", border: "1px solid #e0e0e0" }}>{row.label}</td>
