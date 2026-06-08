@@ -78,7 +78,7 @@ export type AppRoute =
   | "/challenges"
   | "/pet"
   | "/pet/select"
-  | "/pet/encyclopedia";
+  | "/pet/encyclopedia"
   | "/reports/detail"
   | "/reports/export";
 

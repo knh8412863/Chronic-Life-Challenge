@@ -1,67 +1,130 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
 import type { AppRoute } from "../App";
+import { getStoredAccessToken } from "../api/auth";
+import {
+  claimVirtualPetRewards,
+  getMyVirtualPet,
+  updateVirtualPetName,
+  type PetRecentActivity,
+  type PetRewardTask,
+  type VirtualPet,
+} from "../api/pets";
+import { ErrorState } from "../components/common/ErrorState";
+import { LoadingState } from "../components/common/LoadingState";
 
 interface PetPageProps {
   onNavigate: (route: AppRoute) => void;
 }
 
-// 더미 데이터 — API 연결 시 교체
-// GET /api/v1/virtual-pets → has_pet, pet 정보, today_tasks, recent_activities 한 번에 조회
-const DUMMY_PET = {
-  pet_id: 1,
-  pet_name: "쿠키",
-  pet_type: "DOG" as "DOG" | "CAT",
-  level: 5,
-  experience_points: 450,
-  next_level_xp: 1000,
-  growth_stage: "STAGE_2" as "STAGE_1" | "STAGE_2" | "STAGE_3", // STAGE_1/STAGE_2/STAGE_3
-  health_score: 75,
-  happiness_score: 60,
-};
-
-const DUMMY_TASKS = [
-  { task_id: 1, title: "혈압 측정", xp: 30, completed: true },
-  { task_id: 2, title: "운동 30분 이상", xp: 50, completed: true },
-  { task_id: 3, title: "물 2L 마시기", xp: 20, completed: false },
-  { task_id: 4, title: "건강 일지 작성", xp: 40, completed: false },
-];
-
-const DUMMY_ACTIVITIES = [
-  { title: "혈압 측정 완료", xp: 30, date: "오늘 08:30" },
-  { title: "운동 기록 완료", xp: 50, date: "오늘 10:15" },
-  { title: "건강 목표 달성", xp: 100, date: "어제" },
-  { title: "출석 보너스", xp: 10, date: "어제" },
-];
-
 function ProgressBar({ value, color = "#888" }: { value: number; color?: string }) {
   return (
     <div style={{ flex: 1, height: 8, background: "#f0f0f0", borderRadius: 4, overflow: "hidden" }}>
-      <div style={{ width: `${value}%`, height: "100%", background: color, borderRadius: 4 }} />
+      <div style={{ width: `${Math.min(value, 100)}%`, height: "100%", background: color, borderRadius: 4 }} />
     </div>
   );
 }
 
+function growthStageLabel(stage: string) {
+  if (stage === "STAGE_1") return "아기";
+  if (stage === "STAGE_2") return "성장기";
+  return "성체";
+}
+
+function formatActivityTime(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleString("ko-KR", { month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
 export function PetPage({ onNavigate }: PetPageProps) {
-  const [hasPet] = useState(true); // TODO: API 연결 시 GET /api/v1/virtual-pets 응답의 has_pet으로 교체
+  const [pet, setPet] = useState<VirtualPet | null>(null);
+  const [tasks, setTasks] = useState<PetRewardTask[]>([]);
+  const [activities, setActivities] = useState<PetRecentActivity[]>([]);
+  const [hasPet, setHasPet] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [hasApiError, setHasApiError] = useState(false);
   const [isEditingName, setIsEditingName] = useState(false);
-  const [petName, setPetName] = useState(DUMMY_PET.pet_name);
-  const [editName, setEditName] = useState(DUMMY_PET.pet_name);
+  const [editName, setEditName] = useState("");
   const [nameError, setNameError] = useState("");
+  const [isSavingName, setIsSavingName] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
 
-  const handleSaveName = () => {
-    if (!editName.trim()) { setNameError("이름을 입력해주세요."); return; }
-    if (editName.length > 50) { setNameError("50자 이내로 입력해주세요."); return; }
-    // TODO: API 연결 — PATCH /api/v1/virtual-pets/me/name
-    // body: { pet_name: editName }
-    // 응답: 200 { data: { pet_id, pet_name } }
-    // 실패: 404 RESOURCE_NOT_FOUND / 422 VALIDATION_ERROR (1~50자)
-    setPetName(editName);
-    setIsEditingName(false);
-    setNameError("");
-  };
+  function loadPet() {
+    const token = getStoredAccessToken();
+    setIsLoading(true);
+    getMyVirtualPet(token)
+      .then((response) => {
+        setHasPet(response.data.has_pet);
+        setPet(response.data.pet);
+        setTasks(response.data.today_tasks);
+        setActivities(response.data.recent_activities);
+        setEditName(response.data.pet?.pet_name ?? "");
+        setHasApiError(false);
+      })
+      .catch(() => setHasApiError(true))
+      .finally(() => setIsLoading(false));
+  }
 
-  // ── 빈 상태 (펫 미보유) ──
-  if (!hasPet) {
+  useEffect(() => {
+    loadPet();
+  }, []);
+
+  async function handleSaveName() {
+    const nextName = editName.trim();
+    if (!nextName) {
+      setNameError("이름을 입력해주세요.");
+      return;
+    }
+    if (nextName.length > 50) {
+      setNameError("50자 이내로 입력해주세요.");
+      return;
+    }
+
+    const token = getStoredAccessToken();
+    setIsSavingName(true);
+    try {
+      const response = await updateVirtualPetName(nextName, token);
+      setPet((prev) => (prev ? { ...prev, pet_name: response.data.pet_name } : prev));
+      setEditName(response.data.pet_name);
+      setIsEditingName(false);
+      setNameError("");
+    } catch {
+      setNameError("이름 변경에 실패했습니다.");
+    } finally {
+      setIsSavingName(false);
+    }
+  }
+
+  async function handleClaimRewards() {
+    const token = getStoredAccessToken();
+    setIsClaiming(true);
+    try {
+      const response = await claimVirtualPetRewards(token);
+      if (response.data.claimed_task_count === 0) {
+        alert("수령할 보상이 없습니다.");
+      } else {
+        alert(`${response.data.awarded_experience} XP를 받았습니다.`);
+      }
+      loadPet();
+    } catch {
+      alert("보상 수령에 실패했습니다.");
+    } finally {
+      setIsClaiming(false);
+    }
+  }
+
+  if (isLoading) return <LoadingState message="내 펫 정보를 불러오는 중입니다." />;
+
+  if (hasApiError) {
+    return (
+      <div className="page-container">
+        <ErrorState title="펫 정보를 불러오지 못했습니다." description="로그인 상태와 서버 연결을 확인해 주세요." />
+      </div>
+    );
+  }
+
+  if (!hasPet || !pet) {
     return (
       <div className="page-container">
         <h1 className="page-title">내 펫 현황</h1>
@@ -78,7 +141,8 @@ export function PetPage({ onNavigate }: PetPageProps) {
     );
   }
 
-  // ── 내 펫 현황 ──
+  const hasClaimableTask = tasks.some((task) => task.is_completed);
+
   return (
     <div className="page-container">
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
@@ -89,14 +153,13 @@ export function PetPage({ onNavigate }: PetPageProps) {
         </button>
       </div>
 
-      {/* 통계 요약 */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
         {[
-          { label: "레벨", val: DUMMY_PET.level, unit: "Lv", bg: "#e8f5e9", color: "#2e7d32", border: "#a5d6a7" },
-          { label: "경험치", val: DUMMY_PET.experience_points, unit: "XP", bg: "#fff8e1", color: "#f57f17", border: "#ffe082" },
-          { label: "건강도", val: DUMMY_PET.health_score, unit: "%", bg: "#e3f2fd", color: "#1565c0", border: "#90caf9" },
-          { label: "행복도", val: DUMMY_PET.happiness_score, unit: "%", bg: "#fce4ec", color: "#c2185b", border: "#f48fb1" },
-        ].map(item => (
+          { label: "레벨", val: pet.level, unit: "Lv", bg: "#e8f5e9", color: "#2e7d32", border: "#a5d6a7" },
+          { label: "경험치", val: pet.experience, unit: "XP", bg: "#fff8e1", color: "#f57f17", border: "#ffe082" },
+          { label: "건강도", val: pet.health_percent, unit: "%", bg: "#e3f2fd", color: "#1565c0", border: "#90caf9" },
+          { label: "행복도", val: pet.happiness_percent, unit: "%", bg: "#fce4ec", color: "#c2185b", border: "#f48fb1" },
+        ].map((item) => (
           <div key={item.label} style={{ padding: "12px 14px", background: item.bg, border: `1.5px solid ${item.border}`, borderRadius: 8, textAlign: "center" }}>
             <div style={{ fontSize: 10, color: item.color, marginBottom: 4 }}>{item.label}</div>
             <div style={{ fontSize: 20, fontWeight: 700, color: item.color }}>
@@ -107,16 +170,14 @@ export function PetPage({ onNavigate }: PetPageProps) {
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 2fr", gap: 14 }}>
-        {/* 펫 카드 */}
         <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 20, textAlign: "center" }}>
           <div style={{ width: "100%", height: 120, background: "#f5f5f5", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14, fontSize: 64 }}>
-            {DUMMY_PET.pet_type === "DOG" ? "🐶" : "🐱"}
+            {pet.pet_type === "DOG" ? "🐶" : "🐱"}
           </div>
 
-          {/* 이름 편집 */}
           {isEditingName ? (
             <div style={{ marginBottom: 6 }}>
-              <input value={editName} onChange={e => { setEditName(e.target.value); setNameError(""); }}
+              <input value={editName} onChange={(e) => { setEditName(e.target.value); setNameError(""); }}
                 maxLength={50}
                 style={{ width: "100%", height: 34, border: "1.5px solid #1a1a1a", borderRadius: 6, padding: "0 10px", fontSize: 14, fontWeight: 600, textAlign: "center", outline: "none", boxSizing: "border-box" }} />
               <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 2 }}>
@@ -124,33 +185,32 @@ export function PetPage({ onNavigate }: PetPageProps) {
               </div>
               {nameError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0" }}>{nameError}</p>}
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                <button onClick={handleSaveName}
-                  style={{ flex: 1, height: 32, border: "none", borderRadius: 6, background: "#1a1a1a", color: "#fff", fontSize: 12, cursor: "pointer" }}>저장</button>
-                <button onClick={() => { setIsEditingName(false); setEditName(petName); setNameError(""); }}
+                <button onClick={handleSaveName} disabled={isSavingName}
+                  style={{ flex: 1, height: 32, border: "none", borderRadius: 6, background: "#1a1a1a", color: "#fff", fontSize: 12, cursor: "pointer" }}>
+                  {isSavingName ? "저장 중..." : "저장"}
+                </button>
+                <button onClick={() => { setIsEditingName(false); setEditName(pet.pet_name); setNameError(""); }}
                   style={{ flex: 1, height: 32, border: "1.5px solid #ddd", borderRadius: 6, background: "#fff", fontSize: 12, cursor: "pointer" }}>취소</button>
               </div>
             </div>
           ) : (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 6 }}>
-              <span style={{ fontSize: 16, fontWeight: 700 }}>{petName}</span>
-              <span style={{ padding: "2px 8px", background: "#f0f0f0", borderRadius: 12, fontSize: 11 }}>Lv.{DUMMY_PET.level}</span>
+              <span style={{ fontSize: 16, fontWeight: 700 }}>{pet.pet_name}</span>
+              <span style={{ padding: "2px 8px", background: "#f0f0f0", borderRadius: 12, fontSize: 11 }}>Lv.{pet.level}</span>
             </div>
           )}
 
           <p style={{ fontSize: 12, color: "#888", margin: "0 0 14px" }}>
-            {DUMMY_PET.pet_type === "DOG" ? "강아지형" : "고양이형"} · {
-              DUMMY_PET.growth_stage === "STAGE_1" ? "아기" :
-              DUMMY_PET.growth_stage === "STAGE_2" ? "성장기" : "성체"
-            }
+            {pet.pet_type === "DOG" ? "강아지형" : "고양이형"} · {growthStageLabel(pet.growth_stage)}
           </p>
 
           <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "0 0 14px" }} />
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {[
-              { label: "건강", val: DUMMY_PET.health_score, color: "#2e7d32" },
-              { label: "행복", val: DUMMY_PET.happiness_score, color: "#1565c0" },
-            ].map(item => (
+              { label: "건강", val: pet.health_percent, color: "#2e7d32" },
+              { label: "행복", val: pet.happiness_percent, color: "#1565c0" },
+            ].map((item) => (
               <div key={item.label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <span style={{ fontSize: 11, color: "#888", width: 36, textAlign: "left" }}>{item.label}</span>
                 <ProgressBar value={item.val} color={item.color} />
@@ -159,9 +219,9 @@ export function PetPage({ onNavigate }: PetPageProps) {
             ))}
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <span style={{ fontSize: 11, color: "#888", width: 36, textAlign: "left" }}>경험치</span>
-              <ProgressBar value={(DUMMY_PET.experience_points / DUMMY_PET.next_level_xp) * 100} color="#888" />
+              <ProgressBar value={(pet.experience / pet.next_level_experience) * 100} color="#888" />
               <span style={{ fontSize: 10, color: "#aaa", whiteSpace: "nowrap" }}>
-                {DUMMY_PET.experience_points}/{DUMMY_PET.next_level_xp}
+                {pet.experience}/{pet.next_level_experience}
               </span>
             </div>
           </div>
@@ -174,47 +234,56 @@ export function PetPage({ onNavigate }: PetPageProps) {
           )}
         </div>
 
-        {/* 오른쪽 패널 */}
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {/* 오늘의 보상 과제 */}
           <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 16 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 600, margin: "0 0 12px" }}>오늘의 보상 과제</h3>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+              <h3 style={{ fontSize: 13, fontWeight: 600, margin: 0 }}>오늘의 보상 과제</h3>
+              <button
+                type="button"
+                onClick={handleClaimRewards}
+                disabled={!hasClaimableTask || isClaiming}
+                style={{ padding: "6px 12px", border: "none", borderRadius: 6, background: hasClaimableTask ? "#1a1a1a" : "#ddd", color: "#fff", fontSize: 11, cursor: hasClaimableTask ? "pointer" : "not-allowed" }}
+              >
+                {isClaiming ? "수령 중..." : "보상 받기"}
+              </button>
+            </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              {DUMMY_TASKS.map(task => (
-                <div key={task.task_id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
-                  background: task.completed ? "#f0f4f0" : "#fafafa",
+              {tasks.map((task) => (
+                <div key={task.task_type} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
+                  background: task.is_completed ? "#f0f4f0" : "#fafafa",
                   border: "1.5px solid #e0e0e0", borderRadius: 8 }}>
                   <div style={{ width: 20, height: 20, borderRadius: "50%",
-                    background: task.completed ? "#2e7d32" : "#f0f0f0",
+                    background: task.is_completed ? "#2e7d32" : "#f0f0f0",
                     border: "1.5px solid #ddd",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 10, color: "#fff", flexShrink: 0 }}>
-                    {task.completed ? "✓" : ""}
+                    {task.is_completed ? "✓" : ""}
                   </div>
-                  <span style={{ fontSize: 12, color: task.completed ? "#555" : "#1a1a1a", textDecoration: task.completed ? "line-through" : "none", flex: 1 }}>
+                  <span style={{ fontSize: 12, color: task.is_completed ? "#555" : "#1a1a1a", textDecoration: task.is_completed ? "line-through" : "none", flex: 1 }}>
                     {task.title}
                   </span>
                   <span style={{ padding: "2px 8px", background: "#f0f0f0", border: "1px solid #ddd", borderRadius: 12, fontSize: 11 }}>
-                    {task.xp} XP
+                    {task.reward_experience} XP
                   </span>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* 최근 활동 기록 */}
           <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 16 }}>
             <h3 style={{ fontSize: 13, fontWeight: 600, margin: "0 0 12px" }}>최근 활동 기록</h3>
             <div style={{ display: "flex", flexDirection: "column" }}>
-              {DUMMY_ACTIVITIES.map((activity, i) => (
-                <div key={i} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
-                  borderBottom: i < DUMMY_ACTIVITIES.length - 1 ? "1px solid #f0f0f0" : "none" }}>
+              {activities.length === 0 ? (
+                <p style={{ fontSize: 12, color: "#888", margin: 0 }}>아직 활동 기록이 없습니다.</p>
+              ) : activities.map((activity, index) => (
+                <div key={`${activity.activity_type}-${activity.created_at}-${index}`} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0",
+                  borderBottom: index < activities.length - 1 ? "1px solid #f0f0f0" : "none" }}>
                   <div style={{ width: 32, height: 32, borderRadius: "50%", background: "#f5f5f5",
                     display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, flexShrink: 0 }}>⭐</div>
-                  <span style={{ fontSize: 12, flex: 1 }}>{activity.title}</span>
+                  <span style={{ fontSize: 12, flex: 1 }}>{activity.description}</span>
                   <div style={{ textAlign: "right" }}>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#2e7d32" }}>+{activity.xp} XP</div>
-                    <div style={{ fontSize: 10, color: "#aaa" }}>{activity.date}</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#2e7d32" }}>+{activity.experience_delta} XP</div>
+                    <div style={{ fontSize: 10, color: "#aaa" }}>{formatActivityTime(activity.created_at)}</div>
                   </div>
                 </div>
               ))}

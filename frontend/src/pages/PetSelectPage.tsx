@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { AppRoute } from "../App";
+import { getStoredAccessToken } from "../api/auth";
+import { createVirtualPet } from "../api/pets";
 
 interface PetSelectPageProps {
   onNavigate: (route: AppRoute) => void;
@@ -19,7 +21,7 @@ const PET_INFO = {
     emoji: "🐱",
     label: "고양이",
     desc: "독립적이고 차분한 동반자",
-    features: ["수면 관리 보너스 +20%", "스트레스 관리 점수 강화", "명상 챌린지 특화"],
+    features: ["건강 일지 보너스 +20%", "일상 기록 습관 강화", "생활습관 챌린지 특화"],
   },
 };
 
@@ -28,6 +30,7 @@ export function PetSelectPage({ onNavigate }: PetSelectPageProps) {
   const [selectedPet, setSelectedPet] = useState<PetType | null>(null);
   const [petName, setPetName] = useState("");
   const [nameError, setNameError] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
 
   const handleSelectPet = (type: PetType) => {
     setSelectedPet(type);
@@ -41,12 +44,18 @@ export function PetSelectPage({ onNavigate }: PetSelectPageProps) {
     setStep("confirm");
   };
 
-  const handleFinalConfirm = () => {
-    // TODO: API 연결 — POST /api/v1/virtual-pets
-    // body: { pet_type: selectedPet, pet_name: petName }
-    // 응답: 201 { data: { pet_id, pet_type, pet_name, level: 1, experience: 0, growth_stage: "STAGE_1" } }
-    // 실패: 409 ALREADY_EXISTS (이미 펫 보유) / 422 VALIDATION_ERROR (이름 1~50자)
-    onNavigate("/pet");
+  const handleFinalConfirm = async () => {
+    if (!selectedPet) return;
+    const token = getStoredAccessToken();
+    setIsSaving(true);
+    try {
+      await createVirtualPet({ pet_type: selectedPet, pet_name: petName.trim() }, token);
+      onNavigate("/pet");
+    } catch {
+      alert("펫 선택에 실패했습니다. 이미 선택한 펫이 있거나 입력값을 확인해 주세요.");
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -134,9 +143,9 @@ export function PetSelectPage({ onNavigate }: PetSelectPageProps) {
                 style={{ flex: 1, height: 40, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer" }}>
                 취소
               </button>
-              <button onClick={handleFinalConfirm}
+              <button onClick={handleFinalConfirm} disabled={isSaving}
                 style={{ flex: 1, height: 40, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                선택 완료
+                {isSaving ? "선택 중..." : "선택 완료"}
               </button>
             </div>
           </div>
