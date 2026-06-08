@@ -1,7 +1,11 @@
 from datetime import date, datetime
 from types import SimpleNamespace
 
-from app.services.reports import RULE_BASED_MODEL, WeeklyReportService
+import pytest
+
+from app.services.llm_advice import OPENAI_PROVIDER
+from app.services.llm_report import OpenAIReportClient, ReportLLMError, ReportLLMResult
+from app.services.reports import MAX_REPORT_TEXT_LENGTH, RULE_BASED_MODEL, WeeklyReportService
 
 
 def test_week_range_starts_on_monday_and_ends_on_sunday():
@@ -109,10 +113,101 @@ def test_weekly_report_response_marks_generated_state():
     assert response.generated is True
     assert response.source_summary.health_survey_count == 1
     assert response.model_name == RULE_BASED_MODEL
+    assert response.source_type == "RULE_BASED"
     assert response.status == "AVAILABLE"
     assert response.summary_cards[0].label == "건강 기록"
     assert response.trend_summary.status == "UNAVAILABLE"
     assert response.challenge_summary.checkin_count == 3
+
+
+def test_weekly_report_response_marks_openai_source_type():
+    source_summary = {
+        "health_survey_count": 1,
+        "lipid_obesity_record_count": 0,
+        "renal_record_count": 0,
+        "vital_record_count": 1,
+        "activity_log_count": 1,
+        "exercise_log_count": 1,
+        "meal_log_count": 2,
+        "prediction_count": 1,
+        "at_risk_prediction_count": 0,
+        "challenge_checkin_count": 3,
+    }
+    report = SimpleNamespace(
+        id=18,
+        week_start_date=date(2026, 6, 1),
+        week_end_date=date(2026, 6, 7),
+        source_summary=source_summary,
+        status="AVAILABLE",
+        summary_cards=WeeklyReportService._build_summary_cards(source_summary),
+        metric_summaries=WeeklyReportService._build_metric_summaries(source_summary),
+        trend_summary=WeeklyReportService._build_trend_summary(None),
+        challenge_summary=WeeklyReportService._build_challenge_summary(source_summary),
+        report_text="이번 주는 건강 기록과 챌린지 실천이 확인되었습니다.",
+        provider=OPENAI_PROVIDER,
+        model_name="gpt-4o-mini",
+        created_at=datetime(2026, 6, 2, 17, 0),
+    )
+
+    response = WeeklyReportService._to_response(report, generated=True)
+
+    assert response.source_type == "LLM"
+    assert response.model_name == "gpt-4o-mini"
+
+
+@pytest.mark.asyncio
+async def test_generate_llm_report_uses_openai_client_when_enabled(monkeypatch):
+    class FakeOpenAIReportClient:
+        is_configured = True
+
+        def __init__(self, api_key: str | None, model_name: str, timeout_seconds: float) -> None:
+            self.api_key = api_key
+            self.model_name = model_name
+            self.timeout_seconds = timeout_seconds
+
+        async def generate(self, source_summary: dict[str, int], max_length: int) -> ReportLLMResult:
+            return ReportLLMResult(
+                report_text="이번 주에는 건강 기록과 챌린지 실천이 확인되었습니다. 다음 주에도 꾸준히 기록해 보세요.",
+                provider=OPENAI_PROVIDER,
+                model_name=self.model_name,
+                input_tokens=30,
+                output_tokens=45,
+                cache_read_tokens=5,
+            )
+
+    monkeypatch.setattr("app.services.reports.config.REPORT_LLM_ENABLED", True)
+    monkeypatch.setattr("app.services.reports.config.OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.reports.config.OPENAI_MODEL", "gpt-4o-mini")
+    monkeypatch.setattr("app.services.reports.config.OPENAI_TIMEOUT_SECONDS", 10.0)
+    monkeypatch.setattr("app.services.reports.OpenAIReportClient", FakeOpenAIReportClient)
+
+    result = await WeeklyReportService._generate_llm_report({"meal_log_count": 2})
+
+    assert result is not None
+    assert result.provider == OPENAI_PROVIDER
+    assert result.model_name == "gpt-4o-mini"
+    assert result.input_tokens == 30
+
+
+@pytest.mark.asyncio
+async def test_generate_llm_report_returns_none_when_disabled(monkeypatch):
+    monkeypatch.setattr("app.services.reports.config.REPORT_LLM_ENABLED", False)
+
+    result = await WeeklyReportService._generate_llm_report({"meal_log_count": 2})
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_openai_report_client_rejects_non_ascii_api_key():
+    client = OpenAIReportClient(
+        api_key="sk-test—invalid",
+        model_name="gpt-4o-mini",
+        timeout_seconds=10,
+    )
+
+    with pytest.raises(ReportLLMError):
+        await client.generate(source_summary={"meal_log_count": 1}, max_length=MAX_REPORT_TEXT_LENGTH)
 
 
 def test_weekly_report_summary_cards_mark_risk_and_missing_records():
