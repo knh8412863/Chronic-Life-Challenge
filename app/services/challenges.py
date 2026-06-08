@@ -11,6 +11,7 @@ from app.dtos.challenges import (
     ChallengeCheckinResponse,
     ChallengeDashboardSummaryResponse,
     ChallengeDetailResponse,
+    ChallengeDisplayCategory,
     ChallengeJoinResponse,
     ChallengeLeaderboardItemResponse,
     ChallengeLeaderboardMyRankResponse,
@@ -233,7 +234,7 @@ class ChallengeService:
             challenge_id=challenge.id,
             title=challenge.title,
             description=challenge.description,
-            category=challenge.category,
+            category=ChallengeService._display_category(challenge),
             target_metric=challenge.target_metric,
             goal_value=challenge.goal_value,
             duration_days=challenge.duration_days,
@@ -243,6 +244,24 @@ class ChallengeService:
             is_joined=is_joined,
             today_checked=today_checked,
         )
+
+    @staticmethod
+    def _display_category(challenge: Challenge) -> ChallengeDisplayCategory:
+        category = str(challenge.category).upper()
+        target_metric = str(challenge.target_metric).upper()
+        if category in ChallengeDisplayCategory.__members__:
+            return ChallengeDisplayCategory(category)
+        if category in {"HYDRATION", "WATER"} or target_metric == "WATER":
+            return ChallengeDisplayCategory.WATER
+        if category in {"WALK", "STEPS"} or target_metric == "STEPS":
+            return ChallengeDisplayCategory.WALK
+        if category == "EXERCISE" or target_metric == "EXERCISE":
+            return ChallengeDisplayCategory.EXERCISE
+        if category == "SLEEP" or target_metric == "SLEEP":
+            return ChallengeDisplayCategory.SLEEP
+        if category == "DIET" or target_metric == "DIET":
+            return ChallengeDisplayCategory.DIET
+        return ChallengeDisplayCategory.COMPREHENSIVE
 
     @staticmethod
     def _to_join_response(participation: ChallengeParticipation) -> ChallengeJoinResponse:

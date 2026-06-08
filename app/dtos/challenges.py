@@ -11,11 +11,20 @@ class ChallengeParticipationStatus(StrEnum):
     CANCELED = "CANCELED"
 
 
+class ChallengeDisplayCategory(StrEnum):
+    WALK = "WALK"
+    WATER = "WATER"
+    EXERCISE = "EXERCISE"
+    SLEEP = "SLEEP"
+    DIET = "DIET"
+    COMPREHENSIVE = "COMPREHENSIVE"
+
+
 class ChallengeSummaryResponse(BaseModel):
     challenge_id: int
     title: str
     description: str
-    category: str
+    category: ChallengeDisplayCategory
     target_metric: str
     goal_value: int
     duration_days: int

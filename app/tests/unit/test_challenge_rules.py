@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from types import SimpleNamespace
 
-from app.dtos.challenges import ChallengeParticipationStatus
+from app.dtos.challenges import ChallengeDisplayCategory, ChallengeParticipationStatus
 from app.services.challenges import ChallengeService
 from app.services.home import HomeService
 
@@ -27,6 +27,7 @@ def test_challenge_summary_marks_joined_state():
 
     assert result.challenge_id == 1
     assert result.is_joined is True
+    assert result.category == ChallengeDisplayCategory.COMPREHENSIVE
     assert result.duration_days == 7
     assert result.difficulty == "EASY"
     assert result.reward_points == 5
@@ -51,9 +52,19 @@ def test_challenge_summary_includes_card_status_fields():
     )
 
     assert result.participant_count == 12
+    assert result.category == ChallengeDisplayCategory.EXERCISE
     assert result.today_checked is True
     assert result.difficulty == "NORMAL"
     assert result.reward_points == 10
+
+
+def test_challenge_display_category_maps_frontend_values():
+    assert ChallengeService._display_category(SimpleNamespace(category="HYDRATION", target_metric="WATER")) == "WATER"
+    assert ChallengeService._display_category(SimpleNamespace(category="ANY", target_metric="STEPS")) == "WALK"
+    assert (
+        ChallengeService._display_category(SimpleNamespace(category="BLOOD_PRESSURE", target_metric="DAILY_CHECKIN"))
+        == "COMPREHENSIVE"
+    )
 
 
 def test_challenge_summaries_can_be_sorted_by_popularity_and_duration():
