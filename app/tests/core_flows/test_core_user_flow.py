@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import datetime, time
 from decimal import Decimal
 from unittest.mock import patch
 
@@ -6,6 +6,7 @@ from httpx import ASGITransport, AsyncClient
 from starlette import status
 from tortoise.contrib.test import TestCase
 
+from app.core import config
 from app.main import app
 from app.models.challenges import Challenge
 from app.services.predictions import PredictionService
@@ -13,7 +14,7 @@ from app.services.predictions import PredictionService
 
 class TestCoreUserFlow(TestCase):
     async def test_signup_health_prediction_challenge_pet_and_home_flow(self):
-        today = date.today()
+        today = datetime.now(config.TIMEZONE).date()
         measured_at = datetime.combine(today, time(hour=8, minute=30))
         signup_data = {
             "email": "core-flow@example.com",
