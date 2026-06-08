@@ -35,11 +35,11 @@ export type UpdateHealthGoalsBody = {
 };
 
 export async function getHealthGoals(token?: string) {
-  return apiRequest<{ data: HealthGoals }>("/health-goals", { token });
+  return apiRequest<{ data: HealthGoals }>("/health/goals", { token });
 }
 
 export async function updateHealthGoals(body: UpdateHealthGoalsBody, token?: string) {
-  return apiRequest<{ data: HealthGoals }>("/health-goals", {
+  return apiRequest<{ data: HealthGoals }>("/health/goals", {
     method: "PATCH",
     body: JSON.stringify(body),
     token,

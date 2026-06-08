@@ -27,7 +27,7 @@ const FALLBACK_ALL_ITEMS: VitalRecord[] = [
   },
   {
     id: 2,
-    measure_type: "BG_FASTING",
+    measure_type: "GLUCOSE_FASTING",
     measured_at: "2026-05-12T07:00:00",
     glucose_value: 98,
     is_critical: false,
@@ -46,7 +46,7 @@ const FALLBACK_ALL_ITEMS: VitalRecord[] = [
   },
   {
     id: 4,
-    measure_type: "BG_POSTPRANDIAL",
+    measure_type: "GLUCOSE_POSTPRANDIAL",
     measured_at: "2026-05-09T13:00:00",
     glucose_value: 105,
     is_critical: false,

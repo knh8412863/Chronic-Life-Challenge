@@ -285,7 +285,7 @@ export function GoalPage({ onNavigate }: GoalPageProps) {
         <div className="goal-section-header">
           <h2>최근 30일 건강 점수 추이</h2>
         </div>
-        <p className="goal-section-note">* /dashboard/statistics API 기간 30일 평균 점수 추이</p>
+        <p className="goal-section-note">* /health/statistics API 기준 기간 건강 지표 요약</p>
         {history.points.length === 0 ? (
           <div className="goal-chart-placeholder">
             <span>30일 건강 점수 추이 차트 (110점 만점)</span>

@@ -258,7 +258,6 @@ type ExerciseInputFormProps = {
 
 function ExerciseInputForm({ onSave, onCancel }: ExerciseInputFormProps) {
   const [selectedType, setSelectedType] = useState<ExerciseTypeCode>("RUNNING");
-  const [customType, setCustomType] = useState("");
   const [date, setDate] = useState(todayStr());
   const [minutes, setMinutes] = useState(30);
   const [calories, setCalories] = useState("");
@@ -267,12 +266,8 @@ function ExerciseInputForm({ onSave, onCancel }: ExerciseInputFormProps) {
 
   async function handleSave() {
     const token = getStoredAccessToken();
-    const exerciseType = selectedType === "OTHER" && customType.trim()
-      ? customType.trim()
-      : selectedType;
-
     const body: CreateExerciseBody = {
-      exercise_type: exerciseType,
+      exercise_type: selectedType,
       duration_minutes: minutes,
       exercise_date: date,
     };
@@ -308,18 +303,10 @@ function ExerciseInputForm({ onSave, onCancel }: ExerciseInputFormProps) {
             </button>
           ))}
         </div>
-        {selectedType === "OTHER" && (
-          <>
-            <p className="goal-section-note" style={{ margin: "12px 0 4px" }}>*기타 선택 시 직접 입력 (선택)</p>
-            <input
-              type="text"
-              className="vi-date-input"
-              placeholder="예: 배드민턴, 테니스"
-              value={customType}
-              onChange={(e) => setCustomType(e.target.value)}
-            />
-            <p className="goal-section-note">* exercise_type: varchar(50) — 걷기/달리기/자전거/수영/기타</p>
-          </>
+        {selectedType === "ETC" && (
+          <p className="goal-section-note" style={{ margin: "12px 0 4px" }}>
+            * 기타 운동은 메모에 상세 내용을 입력해 주세요.
+          </p>
         )}
       </section>
 

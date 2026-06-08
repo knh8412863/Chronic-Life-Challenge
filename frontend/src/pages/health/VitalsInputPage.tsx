@@ -85,7 +85,7 @@ function BpForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
     if (category === "BP") {
       return `BP_${bpTime}` as MeasureType;
     }
-    return glucoseTime === "FASTING" ? "BG_FASTING" : "BG_POSTPRANDIAL";
+    return glucoseTime === "FASTING" ? "GLUCOSE_FASTING" : "GLUCOSE_POSTPRANDIAL";
   }
 
   async function handleSave() {
@@ -100,7 +100,7 @@ function BpForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
       body.diastolic = Number(diastolic);
     } else {
       if (!glucose) { alert("혈당 값을 입력해 주세요."); return; }
-      body.glucose_value = Number(glucose);
+      body.glucose = Number(glucose);
     }
     if (memo.trim()) body.memo = memo.trim();
 
@@ -311,8 +311,8 @@ function LipidForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
     if (hdl) body.hdl = Number(hdl);
     if (triglycerides) body.triglycerides = Number(triglycerides);
     if (waist) body.waist_cm = Number(waist);
-    if (source.trim()) body.source = source.trim();
-    if (memo.trim()) body.memo = memo.trim();
+    const memoText = [source.trim() ? `측정 출처: ${source.trim()}` : "", memo.trim()].filter(Boolean).join("\n");
+    if (memoText) body.memo = memoText;
 
     setIsSaving(true);
     try {
@@ -401,6 +401,7 @@ function KidneyForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
     const token = getStoredAccessToken();
     const body: CreateKidneyBody = {
       measured_date: date,
+      record_date: date,
       urine_protein_pos: !proteinuria,
     };
     if (creatinine) body.creatinine = Number(creatinine);
