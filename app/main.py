@@ -5,6 +5,7 @@ from fastapi.responses import ORJSONResponse
 from app.apis.v1 import v1_routers
 from app.core import config
 from app.core.db.databases import initialize_tortoise
+from app.core.exceptions import register_exception_handlers
 from app.core.middlewares import add_security_headers
 
 app = FastAPI(
@@ -19,6 +20,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "Accept"],
 )
 app.middleware("http")(add_security_headers)
+register_exception_handlers(app)
 
 initialize_tortoise(app)
 
