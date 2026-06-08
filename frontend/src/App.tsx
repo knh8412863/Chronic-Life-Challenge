@@ -20,6 +20,11 @@ import { PredictionResultPage } from "./pages/PredictionResultPage";
 import { FoodPage } from "./pages/FoodPage";
 import { FoodAnalyzePage } from "./pages/FoodAnalyzePage";
 
+// -- front/report-ㅡmanagement 브랜치에서 추가
+import ReportListPage from "./pages/report/ReportListPage";
+import ReportDetailPage from "./pages/report/ReportDetailPage";
+import ReportExportPage from "./pages/report/ReportExportPage";
+
 export type AppRoute =
   | "/"
   | "/login"
@@ -39,7 +44,9 @@ export type AppRoute =
   | "/food/analyze"
   | "/reports"
   | "/challenges"
-  | "/pet";
+  | "/pet"
+  | "/reports/detail"
+  | "/reports/export";
 
 const publicRoutes = new Set<AppRoute>(["/", "/login"]);
 
@@ -64,6 +71,8 @@ function normalizePath(pathname: string): AppRoute {
     "/reports",
     "/challenges",
     "/pet",
+    "/reports/detail",
+    "/reports/export",
   ];
 
   return knownRoutes.includes(pathname as AppRoute) ? (pathname as AppRoute) : "/home";
@@ -117,7 +126,11 @@ export default function App() {
       case "/food/analyze":
         return <FoodAnalyzePage onNavigate={navigate} />;
       case "/reports":
-        return <PlaceholderPage title="리포트" description="주간 리포트 목록과 상세 화면을 연결할 영역입니다." />;
+        return <ReportListPage onNavigate={navigate} />;
+      case "/reports/detail":
+        return <ReportDetailPage onNavigate={navigate} />;
+      case "/reports/export":
+        return <ReportExportPage onNavigate={navigate} />;
       case "/challenges":
         return <PlaceholderPage title="챌린지 관리" description="챌린지 목록, 참여, 체크인 화면을 연결할 영역입니다." />;
       case "/pet":
