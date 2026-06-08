@@ -1,9 +1,12 @@
 from datetime import date, datetime
 from types import SimpleNamespace
 
+import pytest
+
 from app.dtos.advices import AdviceFeedbackType, AdviceTriggerType
 from app.services.advices import ADVICE_TITLE, MAX_ADVICE_LENGTH, AdviceService
 from app.services.home import HomeService
+from app.services.llm_advice import OPENAI_PROVIDER, AdviceLLMError, AdviceLLMResult, OpenAIAdviceClient
 
 
 def test_rule_based_advice_uses_prediction_and_metric_context():
@@ -63,6 +66,83 @@ def test_daily_advice_response_marks_existing_generation_state():
     assert response.title == ADVICE_TITLE
     assert response.trigger_type == AdviceTriggerType.MANUAL
     assert response.generated is False
+    assert response.source_type == "RULE_BASED"
+
+
+def test_daily_advice_response_marks_openai_source_type():
+    advice = SimpleNamespace(
+        id=11,
+        advice_date=date(2026, 6, 8),
+        advice_text="오늘은 혈압 기록을 확인하고 가볍게 걸어보세요.",
+        provider=OPENAI_PROVIDER,
+        model_name="gpt-4o-mini",
+        trigger_type="MANUAL",
+        created_at=datetime(2026, 6, 8, 9, 0),
+    )
+
+    response = AdviceService._to_response(advice, generated=True)
+
+    assert response.source_type == "LLM"
+    assert response.model_name == "gpt-4o-mini"
+
+
+@pytest.mark.asyncio
+async def test_generate_llm_advice_uses_openai_client_when_enabled(monkeypatch):
+    class FakeOpenAIAdviceClient:
+        is_configured = True
+
+        def __init__(self, api_key: str | None, model_name: str, timeout_seconds: float) -> None:
+            self.api_key = api_key
+            self.model_name = model_name
+            self.timeout_seconds = timeout_seconds
+
+        async def generate(self, context: dict, prompt_summary: str, max_length: int) -> AdviceLLMResult:
+            return AdviceLLMResult(
+                advice_text="오늘은 혈당 기록을 확인하고 식후 10분 걷기를 실천해 보세요.",
+                provider=OPENAI_PROVIDER,
+                model_name=self.model_name,
+                input_tokens=12,
+                output_tokens=20,
+                cache_read_tokens=3,
+            )
+
+    monkeypatch.setattr("app.services.advices.config.ADVICE_LLM_ENABLED", True)
+    monkeypatch.setattr("app.services.advices.config.OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.advices.config.OPENAI_MODEL", "gpt-4o-mini")
+    monkeypatch.setattr("app.services.advices.config.OPENAI_TIMEOUT_SECONDS", 10.0)
+    monkeypatch.setattr("app.services.advices.OpenAIAdviceClient", FakeOpenAIAdviceClient)
+
+    result = await AdviceService._generate_llm_advice({"at_risk_diseases": ["DIABETES"]})
+
+    assert result is not None
+    assert result.provider == OPENAI_PROVIDER
+    assert result.model_name == "gpt-4o-mini"
+    assert result.input_tokens == 12
+
+
+@pytest.mark.asyncio
+async def test_generate_llm_advice_returns_none_when_disabled(monkeypatch):
+    monkeypatch.setattr("app.services.advices.config.ADVICE_LLM_ENABLED", False)
+
+    result = await AdviceService._generate_llm_advice({"at_risk_diseases": ["DIABETES"]})
+
+    assert result is None
+
+
+@pytest.mark.asyncio
+async def test_openai_advice_client_rejects_non_ascii_api_key():
+    client = OpenAIAdviceClient(
+        api_key="sk-test—invalid",
+        model_name="gpt-4o-mini",
+        timeout_seconds=10,
+    )
+
+    with pytest.raises(AdviceLLMError):
+        await client.generate(
+            context={"at_risk_diseases": []},
+            prompt_summary="위험 신호 없음",
+            max_length=MAX_ADVICE_LENGTH,
+        )
 
 
 def test_home_today_advice_uses_generated_advice_before_placeholder():

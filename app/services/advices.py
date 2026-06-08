@@ -15,6 +15,7 @@ from app.dtos.advices import (
 from app.models.advices import AdviceFeedback, LLMAdvice
 from app.models.predictions import ChronicHealthInput, PredictionResult
 from app.models.users import User
+from app.services.llm_advice import OPENAI_PROVIDER, AdviceLLMError, AdviceLLMResult, OpenAIAdviceClient
 from app.services.predictions import HealthInputService
 
 RULE_BASED_PROVIDER = "RULE_BASED"
@@ -42,18 +43,19 @@ class AdviceService:
             return self._to_response(existing, generated=False)
 
         context = await self._build_context(user)
-        advice_text = self._build_rule_based_advice(context)
+        llm_result = await self._generate_llm_advice(context)
+        advice_text = llm_result.advice_text if llm_result else self._build_rule_based_advice(context)
         advice = await LLMAdvice.create(
             user=user,
             advice_date=today,
             context_snapshot=context,
             prompt_summary=self._prompt_summary(context),
             advice_text=advice_text,
-            provider=RULE_BASED_PROVIDER,
-            model_name=RULE_BASED_MODEL,
-            input_tokens=0,
-            output_tokens=0,
-            cache_read_tokens=0,
+            provider=llm_result.provider if llm_result else RULE_BASED_PROVIDER,
+            model_name=llm_result.model_name if llm_result else RULE_BASED_MODEL,
+            input_tokens=llm_result.input_tokens if llm_result else 0,
+            output_tokens=llm_result.output_tokens if llm_result else 0,
+            cache_read_tokens=llm_result.cache_read_tokens if llm_result else 0,
             trigger_type=data.trigger_type.value,
         )
         return self._to_response(advice, generated=True)
@@ -157,6 +159,37 @@ class AdviceService:
         return "위험 신호 없음 또는 예측 결과 없음"
 
     @staticmethod
+    async def _generate_llm_advice(context: dict[str, Any]) -> AdviceLLMResult | None:
+        if not config.ADVICE_LLM_ENABLED:
+            return None
+
+        client = OpenAIAdviceClient(
+            api_key=config.OPENAI_API_KEY,
+            model_name=config.OPENAI_MODEL,
+            timeout_seconds=config.OPENAI_TIMEOUT_SECONDS,
+        )
+        if not client.is_configured:
+            return None
+
+        try:
+            result = await client.generate(
+                context=context,
+                prompt_summary=AdviceService._prompt_summary(context),
+                max_length=MAX_ADVICE_LENGTH,
+            )
+        except AdviceLLMError:
+            return None
+
+        return AdviceLLMResult(
+            advice_text=AdviceService._limit_text(result.advice_text, MAX_ADVICE_LENGTH),
+            provider=result.provider,
+            model_name=result.model_name,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            cache_read_tokens=result.cache_read_tokens,
+        )
+
+    @staticmethod
     def _disease_names(disease_codes: list[str]) -> list[str]:
         labels = {
             "DIABETES": "당뇨",
@@ -183,7 +216,7 @@ class AdviceService:
             trigger_type=AdviceTriggerType(advice.trigger_type),
             generated=generated,
             created_at=advice.created_at,
-            source_type="RULE_BASED",
+            source_type="LLM" if advice.provider == OPENAI_PROVIDER else "RULE_BASED",
         )
 
     @staticmethod
