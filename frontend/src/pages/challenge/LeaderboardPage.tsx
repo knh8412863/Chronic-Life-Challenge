@@ -21,13 +21,12 @@ const FALLBACK: LeaderboardData = {
     { rank: 9, user_id: 9, nickname: "사용자***", score: 1720, completed_missions: 68, is_me: false },
     { rank: 10, user_id: 10, nickname: "사용자***", score: 1650, completed_missions: 64, is_me: false },
   ],
+  top_three: [
+    { rank: 1, user_id: 1, nickname: "사용자***", score: 2850, completed_missions: 128 },
+    { rank: 2, user_id: 2, nickname: "사용자***", score: 2640, completed_missions: 115 },
+    { rank: 3, user_id: 3, nickname: "사용자***", score: 2420, completed_missions: 102 },
+  ],
 };
-
-const TOP3_FALLBACK = [
-  { rank: 1, nickname: "사용자***", score: 2850, completed_missions: 128 },
-  { rank: 2, nickname: "사용자***", score: 2640, completed_missions: 115 },
-  { rank: 3, nickname: "사용자***", score: 2420, completed_missions: 102 },
-];
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -51,6 +50,7 @@ export function LeaderboardPage({ onNavigate }: Props) {
   if (isLoading) return <LoadingState message="리더보드를 불러오는 중입니다." />;
 
   const d = data ?? FALLBACK;
+  const topThree = d.top_three ?? [];
 
   return (
     <div className="challenge-page">
@@ -69,7 +69,7 @@ export function LeaderboardPage({ onNavigate }: Props) {
 
       {/* Top 3 */}
       <div className="leaderboard-top3">
-        {TOP3_FALLBACK.map((entry, i) => (
+        {topThree.map((entry, i) => (
           <div key={i} className="leaderboard-top-card">
             <div className="leaderboard-avatar">
               <span>👤</span>

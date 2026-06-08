@@ -64,7 +64,7 @@ export function BadgePage({ onNavigate }: Props) {
   const displayBadges = filter === "ALL" ? d.badges : d.badges.filter((b) => b.badge_type === filter);
   const earnedBadges = d.badges.filter((b) => b.is_earned).sort((a, b) => (b.earned_at ?? "").localeCompare(a.earned_at ?? "")).slice(0, 3);
 
-  const earnedPct = Math.round((d.earned_count / d.total_count) * 100);
+  const earnedPct = d.total_count > 0 ? Math.round((d.earned_count / d.total_count) * 100) : 0;
 
   return (
     <div className="challenge-page">

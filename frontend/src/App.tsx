@@ -87,7 +87,6 @@ export type AppRoute =
   | "/challenges/my"
   | "/challenges/leaderboard"
   | "/challenges/badges"
-  | "/pet";
   | "/pet"
   | "/pet/select"
   | "/pet/encyclopedia"

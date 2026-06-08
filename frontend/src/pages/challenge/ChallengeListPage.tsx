@@ -4,6 +4,7 @@ import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
 import {
   getChallengeList,
+  joinChallenge,
   CATEGORY_LABELS,
   DIFFICULTY_LABELS,
   type Challenge,
@@ -26,7 +27,7 @@ const FALLBACK_CHALLENGES: Challenge[] = [
 const JOINED_IDS = new Set([1, 3]);
 
 type CategoryFilter = "ALL" | ChallengeCategory;
-type SortOption = "POPULAR" | "NEWEST" | "COMPLETION_RATE";
+type SortOption = "POPULAR" | "LATEST" | "DURATION";
 
 const CATEGORY_TABS: Array<{ key: CategoryFilter; label: string }> = [
   { key: "ALL", label: "전체" },
@@ -81,12 +82,18 @@ export function ChallengeListPage({ onNavigate }: Props) {
       .filter((c) => diff === "ALL" || c.difficulty === diff);
   }
 
-  function handleJoin(challengeId: number) {
-    const next = new Set(joinedIds);
-    next.add(challengeId);
-    setJoinedIds(next);
-    sessionStorage.setItem("selectedChallengeId", String(challengeId));
-    onNavigate?.("/challenges/detail");
+  async function handleJoin(challengeId: number) {
+    const token = getStoredAccessToken();
+    try {
+      if (token) await joinChallenge(challengeId, token);
+      const next = new Set(joinedIds);
+      next.add(challengeId);
+      setJoinedIds(next);
+      sessionStorage.setItem("selectedChallengeId", String(challengeId));
+      onNavigate?.("/challenges/detail");
+    } catch {
+      alert("챌린지 참여에 실패했습니다.");
+    }
   }
 
   function handleDetail(challengeId: number) {
@@ -143,8 +150,8 @@ export function ChallengeListPage({ onNavigate }: Props) {
             onChange={(e) => setSort(e.target.value as SortOption)}
           >
             <option value="POPULAR">인기순</option>
-            <option value="NEWEST">최신순</option>
-            <option value="COMPLETION_RATE">달성률순</option>
+            <option value="LATEST">최신순</option>
+            <option value="DURATION">기간순</option>
           </select>
         </div>
       </div>
