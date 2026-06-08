@@ -453,11 +453,36 @@ async def _seed_weekly_report(user: User) -> None:
                 "challenge_checkin_count": 4,
             },
             "summary_cards": [
-                {"label": "건강 기록", "value": "5건", "status": "NORMAL", "description": "이번 주 입력된 건강 데이터 수입니다."},
-                {"label": "AI 위험 신호", "value": "1건", "status": "HIGH", "description": "위험 신호가 포함된 예측 결과 수입니다."},
-                {"label": "식단 기록", "value": "3건", "status": "NORMAL", "description": "이번 주 저장한 식단 기록 수입니다."},
-                {"label": "운동 기록", "value": "1건", "status": "NORMAL", "description": "이번 주 저장한 운동 기록 수입니다."},
-                {"label": "챌린지", "value": "4회", "status": "NORMAL", "description": "이번 주 챌린지 체크인 횟수입니다."},
+                {
+                    "label": "건강 기록",
+                    "value": "5건",
+                    "status": "NORMAL",
+                    "description": "이번 주 입력된 건강 데이터 수입니다.",
+                },
+                {
+                    "label": "AI 위험 신호",
+                    "value": "1건",
+                    "status": "HIGH",
+                    "description": "위험 신호가 포함된 예측 결과 수입니다.",
+                },
+                {
+                    "label": "식단 기록",
+                    "value": "3건",
+                    "status": "NORMAL",
+                    "description": "이번 주 저장한 식단 기록 수입니다.",
+                },
+                {
+                    "label": "운동 기록",
+                    "value": "1건",
+                    "status": "NORMAL",
+                    "description": "이번 주 저장한 운동 기록 수입니다.",
+                },
+                {
+                    "label": "챌린지",
+                    "value": "4회",
+                    "status": "NORMAL",
+                    "description": "이번 주 챌린지 체크인 횟수입니다.",
+                },
             ],
             "metric_summaries": [],
             "trend_summary": {
