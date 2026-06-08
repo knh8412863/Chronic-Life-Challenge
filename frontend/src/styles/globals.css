@@ -3491,3 +3491,1081 @@ button {
   font-size: 13px;
   line-height: 1.5;
 }
+
+/* ── 챌린지 공통 ── */
+.challenge-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.challenge-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.challenge-stat-card {
+  background: var(--card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 20px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.challenge-stat-card .stat-label {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+.challenge-stat-card .stat-value {
+  font-size: 32px;
+  font-weight: 800;
+  text-align: center;
+  color: var(--foreground);
+}
+
+.challenge-stat-card .stat-value .stat-unit {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.challenge-stat-card.blue { background: var(--soft-blue); border-color: #b8d0ef; }
+.challenge-stat-card.blue .stat-value { color: var(--brand-blue); }
+.challenge-stat-card.yellow { background: var(--soft-yellow); border-color: #e8d070; }
+.challenge-stat-card.yellow .stat-value { color: var(--brand-yellow); }
+.challenge-stat-card.pink { background: var(--soft-pink); border-color: #f0b8c8; }
+.challenge-stat-card.pink .stat-value { color: #c4335a; }
+
+/* 진행률 바 */
+.challenge-progress-bar {
+  width: 100%;
+  height: 8px;
+  background: #e5e7ea;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.challenge-progress-fill {
+  height: 100%;
+  background: var(--brand-green);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+/* 카테고리 태그 */
+.challenge-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.challenge-tag.walk   { background: #dff4e5; color: #2d7a46; }
+.challenge-tag.water  { background: #e7effc; color: #2756a8; }
+.challenge-tag.exercise { background: #fff3c4; color: #8c6900; }
+.challenge-tag.sleep  { background: #eee9ff; color: #5b3fa6; }
+.challenge-tag.diet   { background: #ffe8df; color: #a04020; }
+.challenge-tag.comprehensive { background: var(--soft-pink); color: #8c2040; }
+.challenge-tag.status-in-progress { background: #dff4e5; color: #2d7a46; }
+
+.challenge-diff-tag {
+  display: inline-block;
+  padding: 2px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 600;
+  background: var(--muted);
+  color: var(--muted-foreground);
+}
+
+.challenge-diff-tag.easy   { background: #dff4e5; color: #2d7a46; }
+.challenge-diff-tag.normal { background: #fff3c4; color: #8c6900; }
+.challenge-diff-tag.hard   { background: #ffe8df; color: #a04020; }
+
+/* ── 챌린지 대시보드 ── */
+.challenge-dashboard-grid {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 20px;
+  align-items: start;
+}
+
+.challenge-in-progress-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.challenge-in-progress-item {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.challenge-in-progress-item:last-child {
+  border-bottom: none;
+}
+
+.challenge-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.challenge-item-name {
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.challenge-item-pct {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+/* 오늘의 미션 */
+.challenge-mission-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 0 20px 16px;
+}
+
+.challenge-mission-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.challenge-mission-check {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid #c5c9d0;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.challenge-mission-check.done {
+  background: var(--brand-green);
+  border-color: var(--brand-green);
+  color: white;
+}
+
+.challenge-mission-note {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  padding: 0 20px 16px;
+  margin: 0;
+}
+
+/* 빠른 이동 */
+.challenge-quick-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 0 20px 20px;
+}
+
+.challenge-quick-btn {
+  width: 100%;
+  padding: 12px 16px;
+  background: var(--background);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.challenge-quick-btn:hover {
+  background: var(--muted);
+}
+
+/* 주간 활동 */
+.challenge-weekly-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+  padding: 0 20px 20px;
+  text-align: center;
+}
+
+.challenge-weekly-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-bottom: 6px;
+}
+
+.challenge-weekly-dot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.challenge-weekly-dot.done {
+  background: var(--brand-green);
+  border-color: var(--brand-green);
+  color: white;
+}
+
+.challenge-weekly-legend {
+  display: flex;
+  gap: 16px;
+  padding: 0 20px 16px;
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.challenge-weekly-legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  margin-right: 4px;
+}
+
+/* ── 챌린지 목록 ── */
+.challenge-filter-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 12px;
+}
+
+.challenge-filter-select {
+  width: 100%;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card);
+  font-size: 14px;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.challenge-filter-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-bottom: 4px;
+}
+
+.challenge-category-tabs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.challenge-category-tab {
+  padding: 6px 16px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.challenge-category-tab.active {
+  background: var(--brand-green);
+  border-color: var(--brand-green);
+  color: white;
+}
+
+.challenge-card-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.challenge-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  position: relative;
+  transition: box-shadow 0.15s;
+}
+
+.challenge-card:hover {
+  box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+}
+
+.challenge-card-icon {
+  font-size: 28px;
+}
+
+.challenge-card-name {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.challenge-card-desc {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+.challenge-card-tags {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+.challenge-card-participants {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.challenge-join-btn {
+  width: 100%;
+  padding: 10px;
+  background: var(--brand-green);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: auto;
+}
+
+.challenge-joined-btn {
+  width: 100%;
+  padding: 10px;
+  background: transparent;
+  color: var(--muted-foreground);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: default;
+}
+
+.challenge-dot-new {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--brand-red);
+}
+
+.challenge-load-more {
+  width: 100%;
+  padding: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* ── 챌린지 상세 ── */
+.challenge-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 24px;
+  align-items: start;
+}
+
+.challenge-detail-image {
+  width: 100%;
+  aspect-ratio: 16/5;
+  background: var(--muted);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.challenge-detail-title {
+  font-size: 22px;
+  font-weight: 800;
+  margin: 0 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.challenge-detail-subtitle {
+  font-size: 14px;
+  color: var(--muted-foreground);
+  margin: 0 0 20px;
+}
+
+.challenge-detail-section {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.challenge-detail-section h3 {
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+}
+
+.challenge-detail-section h4 {
+  font-size: 13px;
+  font-weight: 700;
+  margin: 0 0 6px;
+  color: var(--muted-foreground);
+}
+
+.challenge-how-list {
+  padding-left: 0;
+  margin: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.challenge-how-list li {
+  font-size: 14px;
+  padding-left: 16px;
+  position: relative;
+}
+
+.challenge-how-list li::before {
+  content: "•";
+  position: absolute;
+  left: 0;
+  color: var(--brand-green);
+}
+
+.challenge-reward-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.challenge-reward-item {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.challenge-reward-item .reward-icon {
+  font-size: 24px;
+}
+
+.challenge-reward-item .reward-label {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.challenge-sidebar-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.challenge-sidebar-section {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.challenge-sidebar-section:last-child {
+  border-bottom: none;
+}
+
+.challenge-sidebar-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-bottom: 4px;
+}
+
+.challenge-sidebar-value {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.challenge-start-btn {
+  width: 100%;
+  padding: 14px;
+  background: var(--brand-green);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.challenge-participants-bar {
+  width: 100%;
+  height: 8px;
+  background: #e5e7ea;
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+.challenge-participants-fill {
+  height: 100%;
+  background: var(--brand-green);
+  border-radius: 4px;
+}
+
+/* ── 내 챌린지 현황 ── */
+.my-challenge-item {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.my-challenge-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.my-challenge-name {
+  font-size: 16px;
+  font-weight: 800;
+  flex: 1;
+}
+
+.my-challenge-body {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 20px;
+  align-items: center;
+}
+
+.my-challenge-progress-col {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.my-challenge-progress-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.my-challenge-mission-col {
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.my-challenge-action-col {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.my-challenge-detail-btn {
+  padding: 8px 14px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.my-challenge-abandon-btn {
+  padding: 8px 14px;
+  border: 1px solid #e5c5c5;
+  border-radius: 6px;
+  background: white;
+  color: #c44040;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.my-challenge-divider {
+  height: 1px;
+  background: var(--border);
+  margin: 0 -20px;
+}
+
+.completed-challenge-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.completed-challenge-item:last-child {
+  border-bottom: none;
+}
+
+.completed-check-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--brand-green);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.completed-challenge-name {
+  font-size: 14px;
+  font-weight: 700;
+  flex: 1;
+}
+
+.completed-challenge-date {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.my-challenge-detail-link {
+  font-size: 13px;
+  color: var(--brand-blue);
+  font-weight: 600;
+  border: none;
+  background: none;
+  cursor: pointer;
+  margin-left: auto;
+}
+
+/* ── 리더보드 ── */
+.leaderboard-period {
+  font-size: 13px;
+  color: var(--muted-foreground);
+  margin: 0;
+}
+
+.leaderboard-top3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.leaderboard-top-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.leaderboard-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  position: relative;
+}
+
+.leaderboard-medal {
+  position: absolute;
+  bottom: -4px;
+  right: -4px;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.leaderboard-nickname {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.leaderboard-rank-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.leaderboard-score {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--brand-green);
+}
+
+.leaderboard-score-unit {
+  font-size: 14px;
+  color: var(--muted-foreground);
+}
+
+.leaderboard-completed {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.leaderboard-my-rank {
+  background: var(--soft-green);
+  border: 1px solid #b0dfc0;
+  border-radius: 8px;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.leaderboard-my-rank .rank-highlight {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--brand-green);
+}
+
+.leaderboard-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.leaderboard-table th {
+  text-align: left;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--muted-foreground);
+  font-weight: 600;
+  border-bottom: 1px solid var(--border);
+}
+
+.leaderboard-table td {
+  padding: 14px 16px;
+  font-size: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.leaderboard-table tr:last-child td {
+  border-bottom: none;
+}
+
+.leaderboard-table-avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--muted);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+}
+
+/* ── 뱃지 목록 ── */
+.badge-summary-row {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px 24px;
+}
+
+.badge-earned-count {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.badge-earned-num {
+  font-size: 32px;
+  font-weight: 800;
+}
+
+.badge-total-bar-wrap {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.badge-total-label {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.badge-total-bar {
+  height: 10px;
+  background: #e5e7ea;
+  border-radius: 5px;
+  overflow: hidden;
+}
+
+.badge-total-fill {
+  height: 100%;
+  background: var(--brand-green);
+  border-radius: 5px;
+}
+
+.badge-view-all-btn {
+  padding: 8px 16px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.badge-filter-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.badge-filter-tab {
+  padding: 6px 16px;
+  border-radius: 99px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.badge-filter-tab.active {
+  background: var(--brand-green);
+  border-color: var(--brand-green);
+  color: white;
+}
+
+.badge-card-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.badge-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  text-align: center;
+}
+
+.badge-card.earned {
+  border-color: #b0dfc0;
+}
+
+.badge-card.not-earned {
+  opacity: 0.7;
+}
+
+.badge-icon-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--soft-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 30px;
+}
+
+.badge-icon-wrap.not-earned {
+  background: var(--muted);
+  filter: grayscale(1);
+}
+
+.badge-card-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.badge-card-streak {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+.badge-card-points {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--brand-green);
+}
+
+.badge-card-status {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.badge-card-status.earned-status {
+  background: var(--soft-green);
+  color: #2d7a46;
+}
+
+.badge-card-progress-wrap {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.badge-card-progress-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  text-align: left;
+}
+
+.badge-card-target-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  text-align: center;
+}
+
+.recent-badge-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.recent-badge-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--border);
+}
+
+.recent-badge-item:last-child {
+  border-bottom: none;
+}
+
+.recent-badge-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--soft-green);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+}
+
+.recent-badge-info {
+  flex: 1;
+}
+
+.recent-badge-name {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.recent-badge-streak {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+.recent-badge-date {
+  font-size: 12px;
+  color: var(--muted-foreground);
+}
+
+/* 성과 요약 카드 */
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.achievement-card {
+  background: var(--background);
+  border-radius: 8px;
+  padding: 16px;
+  text-align: center;
+}
+
+.achievement-card .ach-label {
+  font-size: 12px;
+  color: var(--muted-foreground);
+  margin-bottom: 4px;
+}
+
+.achievement-card .ach-value {
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.achievement-card .ach-unit {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--muted-foreground);
+}
+
+.streak-record-box {
+  background: var(--background);
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+}
+
+.streak-record-box .streak-text {
+  font-weight: 600;
+}
+
+.streak-record-box .streak-sub {
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
