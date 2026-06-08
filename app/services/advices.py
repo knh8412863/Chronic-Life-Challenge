@@ -22,6 +22,7 @@ RULE_BASED_PROVIDER = "RULE_BASED"
 RULE_BASED_MODEL = "daily-advice-rules-v1"
 ADVICE_TITLE = "오늘의 건강 조언"
 MAX_ADVICE_LENGTH = 200
+ADVICE_DISCLAIMER = "본 조언은 진단이 아니며, 증상이나 우려가 있으면 전문의와 상담하세요."
 
 
 class AdviceService:
@@ -181,7 +182,7 @@ class AdviceService:
             return None
 
         return AdviceLLMResult(
-            advice_text=AdviceService._limit_text(result.advice_text, MAX_ADVICE_LENGTH),
+            advice_text=AdviceService._finalize_llm_advice(result.advice_text),
             provider=result.provider,
             model_name=result.model_name,
             input_tokens=result.input_tokens,
@@ -203,6 +204,14 @@ class AdviceService:
         if len(text) <= max_length:
             return text
         return text[: max_length - 1].rstrip() + "…"
+
+    @staticmethod
+    def _finalize_llm_advice(text: str) -> str:
+        normalized = " ".join(text.split())
+        has_disclaimer = "진단" in normalized or "전문의" in normalized or "의료" in normalized
+        if not has_disclaimer:
+            normalized = f"{normalized} {ADVICE_DISCLAIMER}"
+        return AdviceService._limit_text(normalized, MAX_ADVICE_LENGTH)
 
     @staticmethod
     def _to_response(advice: LLMAdvice, generated: bool) -> DailyAdviceResponse:

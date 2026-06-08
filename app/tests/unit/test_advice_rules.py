@@ -4,7 +4,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.dtos.advices import AdviceFeedbackType, AdviceTriggerType
-from app.services.advices import ADVICE_TITLE, MAX_ADVICE_LENGTH, AdviceService
+from app.services.advices import ADVICE_DISCLAIMER, ADVICE_TITLE, MAX_ADVICE_LENGTH, AdviceService
 from app.services.home import HomeService
 from app.services.llm_advice import OPENAI_PROVIDER, AdviceLLMError, AdviceLLMResult, OpenAIAdviceClient
 
@@ -118,6 +118,8 @@ async def test_generate_llm_advice_uses_openai_client_when_enabled(monkeypatch):
     assert result.provider == OPENAI_PROVIDER
     assert result.model_name == "gpt-4o-mini"
     assert result.input_tokens == 12
+    assert "진단" in result.advice_text
+    assert len(result.advice_text) <= MAX_ADVICE_LENGTH
 
 
 @pytest.mark.asyncio
@@ -127,6 +129,34 @@ async def test_generate_llm_advice_returns_none_when_disabled(monkeypatch):
     result = await AdviceService._generate_llm_advice({"at_risk_diseases": ["DIABETES"]})
 
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_generate_llm_advice_returns_none_when_client_fails(monkeypatch):
+    class FailingOpenAIAdviceClient:
+        is_configured = True
+
+        def __init__(self, api_key: str | None, model_name: str, timeout_seconds: float) -> None:
+            pass
+
+        async def generate(self, context: dict, prompt_summary: str, max_length: int) -> AdviceLLMResult:
+            raise AdviceLLMError("OpenAI advice generation failed.")
+
+    monkeypatch.setattr("app.services.advices.config.ADVICE_LLM_ENABLED", True)
+    monkeypatch.setattr("app.services.advices.config.OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.advices.config.OPENAI_MODEL", "gpt-4o-mini")
+    monkeypatch.setattr("app.services.advices.config.OPENAI_TIMEOUT_SECONDS", 10.0)
+    monkeypatch.setattr("app.services.advices.OpenAIAdviceClient", FailingOpenAIAdviceClient)
+
+    result = await AdviceService._generate_llm_advice({"at_risk_diseases": ["DIABETES"]})
+
+    assert result is None
+
+
+def test_finalize_llm_advice_adds_disclaimer_when_missing():
+    advice = AdviceService._finalize_llm_advice("오늘은 식후 10분 걷기를 실천해 보세요.")
+
+    assert ADVICE_DISCLAIMER in advice
 
 
 @pytest.mark.asyncio

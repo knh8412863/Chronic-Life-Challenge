@@ -33,6 +33,7 @@ from app.services.llm_report import OpenAIReportClient, ReportLLMError, ReportLL
 RULE_BASED_PROVIDER = "RULE_BASED"
 RULE_BASED_MODEL = "weekly-report-rules-v1"
 MAX_REPORT_TEXT_LENGTH = 600
+REPORT_DISCLAIMER = "본 리포트는 의료 진단이 아닌 생활습관 점검용 참고 자료입니다."
 
 
 class WeeklyReportService:
@@ -239,7 +240,7 @@ class WeeklyReportService:
             return None
 
         return ReportLLMResult(
-            report_text=WeeklyReportService._limit_text(result.report_text, MAX_REPORT_TEXT_LENGTH),
+            report_text=WeeklyReportService._finalize_llm_report(result.report_text),
             provider=result.provider,
             model_name=result.model_name,
             input_tokens=result.input_tokens,
@@ -430,6 +431,14 @@ class WeeklyReportService:
         if len(text) <= max_length:
             return text
         return text[: max_length - 1].rstrip() + "…"
+
+    @staticmethod
+    def _finalize_llm_report(text: str) -> str:
+        normalized = " ".join(text.split())
+        has_disclaimer = "의료 진단" in normalized or "참고 자료" in normalized or "생활습관 점검" in normalized
+        if not has_disclaimer:
+            normalized = f"{normalized} {REPORT_DISCLAIMER}"
+        return WeeklyReportService._limit_text(normalized, MAX_REPORT_TEXT_LENGTH)
 
     @staticmethod
     def _overall_status(summary_cards: list[dict[str, str]]) -> str:

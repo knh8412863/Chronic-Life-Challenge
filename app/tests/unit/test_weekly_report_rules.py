@@ -5,7 +5,7 @@ import pytest
 
 from app.services.llm_advice import OPENAI_PROVIDER
 from app.services.llm_report import OpenAIReportClient, ReportLLMError, ReportLLMResult
-from app.services.reports import MAX_REPORT_TEXT_LENGTH, RULE_BASED_MODEL, WeeklyReportService
+from app.services.reports import MAX_REPORT_TEXT_LENGTH, REPORT_DISCLAIMER, RULE_BASED_MODEL, WeeklyReportService
 
 
 def test_week_range_starts_on_monday_and_ends_on_sunday():
@@ -187,6 +187,8 @@ async def test_generate_llm_report_uses_openai_client_when_enabled(monkeypatch):
     assert result.provider == OPENAI_PROVIDER
     assert result.model_name == "gpt-4o-mini"
     assert result.input_tokens == 30
+    assert "의료 진단" in result.report_text
+    assert len(result.report_text) <= MAX_REPORT_TEXT_LENGTH
 
 
 @pytest.mark.asyncio
@@ -196,6 +198,34 @@ async def test_generate_llm_report_returns_none_when_disabled(monkeypatch):
     result = await WeeklyReportService._generate_llm_report({"meal_log_count": 2})
 
     assert result is None
+
+
+@pytest.mark.asyncio
+async def test_generate_llm_report_returns_none_when_client_fails(monkeypatch):
+    class FailingOpenAIReportClient:
+        is_configured = True
+
+        def __init__(self, api_key: str | None, model_name: str, timeout_seconds: float) -> None:
+            pass
+
+        async def generate(self, source_summary: dict[str, int], max_length: int) -> ReportLLMResult:
+            raise ReportLLMError("OpenAI weekly report generation failed.")
+
+    monkeypatch.setattr("app.services.reports.config.REPORT_LLM_ENABLED", True)
+    monkeypatch.setattr("app.services.reports.config.OPENAI_API_KEY", "test-key")
+    monkeypatch.setattr("app.services.reports.config.OPENAI_MODEL", "gpt-4o-mini")
+    monkeypatch.setattr("app.services.reports.config.OPENAI_TIMEOUT_SECONDS", 10.0)
+    monkeypatch.setattr("app.services.reports.OpenAIReportClient", FailingOpenAIReportClient)
+
+    result = await WeeklyReportService._generate_llm_report({"meal_log_count": 2})
+
+    assert result is None
+
+
+def test_finalize_llm_report_adds_disclaimer_when_missing():
+    report = WeeklyReportService._finalize_llm_report("이번 주에는 식단 기록과 챌린지 실천이 확인되었습니다.")
+
+    assert REPORT_DISCLAIMER in report
 
 
 @pytest.mark.asyncio

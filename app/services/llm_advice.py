@@ -59,7 +59,10 @@ class OpenAIAdviceClient:
         except (httpx.HTTPError, UnicodeEncodeError) as exc:
             raise AdviceLLMError("OpenAI advice generation failed.") from exc
 
-        data = response.json()
+        try:
+            data = response.json()
+        except ValueError as exc:
+            raise AdviceLLMError("OpenAI response is not valid JSON.") from exc
         advice_text = self._extract_advice_text(data)
         usage = data.get("usage") or {}
         prompt_details = usage.get("prompt_tokens_details") or {}
