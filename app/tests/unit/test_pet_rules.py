@@ -2,6 +2,7 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
+from fastapi import HTTPException
 from pydantic import ValidationError
 
 from app.dtos.pets import VirtualPetCreateRequest, VirtualPetNameUpdateRequest
@@ -67,6 +68,14 @@ def test_pet_reward_experience_applies_type_bonus():
     assert VirtualPetService._reward_experience("EXERCISE_30", 50, PetType.DOG) == 60
     assert VirtualPetService._reward_experience("DAILY_HEALTH_LOG", 40, PetType.CAT) == 48
     assert VirtualPetService._reward_experience("VITAL_BP", 30, PetType.DOG) == 30
+
+
+def test_pet_reward_claim_rejects_when_no_claimable_tasks():
+    with pytest.raises(HTTPException) as exc_info:
+        VirtualPetService._ensure_claimable_tasks([])
+
+    assert exc_info.value.status_code == 409
+    assert exc_info.value.detail == "수령 가능한 오늘의 펫 보상이 없습니다."
 
 
 def test_pet_experience_can_level_up_and_update_growth_stage():

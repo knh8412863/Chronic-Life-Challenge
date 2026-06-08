@@ -182,10 +182,10 @@ class VirtualPetService:
         )
         claimed_types = {item.source_type for item in claimed}
         claimable_tasks = [task for task in tasks if task.is_completed and task.task_type not in claimed_types]
+        self._ensure_claimable_tasks(claimable_tasks)
 
         awarded_experience = sum(task.reward_experience for task in claimable_tasks)
-        if claimable_tasks:
-            self._apply_experience(pet, awarded_experience)
+        self._apply_experience(pet, awarded_experience)
 
         pet.health_percent = await self._calculate_health_percent(user.id, today)
         pet.happiness_percent = await self._calculate_happiness_percent(user.id)
@@ -220,6 +220,11 @@ class VirtualPetService:
             next_level_experience=pet.next_level_experience,
             growth_stage=pet.growth_stage,
         )
+
+    @staticmethod
+    def _ensure_claimable_tasks(claimable_tasks: list[PetRewardTaskResponse]) -> None:
+        if not claimable_tasks:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="수령 가능한 오늘의 펫 보상이 없습니다.")
 
     async def get_pet_catalog(self, user: User, pet_type: PetType | None = None) -> PetCatalogResponse:
         current_streak_days = await self._current_challenge_streak_days(user.id, self._today())
