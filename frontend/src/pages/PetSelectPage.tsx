@@ -42,9 +42,10 @@ export function PetSelectPage({ onNavigate }: PetSelectPageProps) {
   };
 
   const handleFinalConfirm = () => {
-    // TODO: API 연결 — POST /api/v1/pets
+    // TODO: API 연결 — POST /api/v1/virtual-pets
     // body: { pet_type: selectedPet, pet_name: petName }
-    // 응답: 201 { pet_id, pet_type, pet_name, level: 1, experience_points: 0 }
+    // 응답: 201 { data: { pet_id, pet_type, pet_name, level: 1, experience: 0, growth_stage: "STAGE_1" } }
+    // 실패: 409 ALREADY_EXISTS (이미 펫 보유) / 422 VALIDATION_ERROR (이름 1~50자)
     onNavigate("/pet");
   };
 

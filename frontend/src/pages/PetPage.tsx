@@ -6,9 +6,7 @@ interface PetPageProps {
 }
 
 // 더미 데이터 — API 연결 시 교체
-// GET /api/v1/pets/my → 펫 보유 여부 확인
-// GET /api/v1/pets/my/tasks → 오늘의 보상 과제
-// GET /api/v1/pets/my/activities → 최근 활동 기록
+// GET /api/v1/virtual-pets → has_pet, pet 정보, today_tasks, recent_activities 한 번에 조회
 const DUMMY_PET = {
   pet_id: 1,
   pet_name: "쿠키",
@@ -16,6 +14,7 @@ const DUMMY_PET = {
   level: 5,
   experience_points: 450,
   next_level_xp: 1000,
+  growth_stage: "STAGE_2" as "STAGE_1" | "STAGE_2" | "STAGE_3", // STAGE_1/STAGE_2/STAGE_3
   health_score: 75,
   happiness_score: 60,
 };
@@ -43,7 +42,7 @@ function ProgressBar({ value, color = "#888" }: { value: number; color?: string 
 }
 
 export function PetPage({ onNavigate }: PetPageProps) {
-  const [hasPet] = useState(true); // TODO: API 연결 시 실제 보유 여부로 교체
+  const [hasPet] = useState(true); // TODO: API 연결 시 GET /api/v1/virtual-pets 응답의 has_pet으로 교체
   const [isEditingName, setIsEditingName] = useState(false);
   const [petName, setPetName] = useState(DUMMY_PET.pet_name);
   const [editName, setEditName] = useState(DUMMY_PET.pet_name);
@@ -52,8 +51,10 @@ export function PetPage({ onNavigate }: PetPageProps) {
   const handleSaveName = () => {
     if (!editName.trim()) { setNameError("이름을 입력해주세요."); return; }
     if (editName.length > 50) { setNameError("50자 이내로 입력해주세요."); return; }
-    // TODO: API 연결 — PATCH /api/v1/pets/my/name
+    // TODO: API 연결 — PATCH /api/v1/virtual-pets/me/name
     // body: { pet_name: editName }
+    // 응답: 200 { data: { pet_id, pet_name } }
+    // 실패: 404 RESOURCE_NOT_FOUND / 422 VALIDATION_ERROR (1~50자)
     setPetName(editName);
     setIsEditingName(false);
     setNameError("");
@@ -137,7 +138,10 @@ export function PetPage({ onNavigate }: PetPageProps) {
           )}
 
           <p style={{ fontSize: 12, color: "#888", margin: "0 0 14px" }}>
-            {DUMMY_PET.pet_type === "DOG" ? "강아지형" : "고양이형"}
+            {DUMMY_PET.pet_type === "DOG" ? "강아지형" : "고양이형"} · {
+              DUMMY_PET.growth_stage === "STAGE_1" ? "아기" :
+              DUMMY_PET.growth_stage === "STAGE_2" ? "성장기" : "성체"
+            }
           </p>
 
           <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "0 0 14px" }} />

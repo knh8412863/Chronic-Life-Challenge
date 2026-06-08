@@ -8,7 +8,9 @@ interface PetEncyclopediaPageProps {
 type PetCategory = "DOG" | "CAT";
 
 // 더미 데이터 — API 연결 시 교체
-// GET /api/v1/pets/encyclopedia → 전체 펫 도감 목록
+// GET /api/v1/virtual-pets/catalog?pet_type=DOG → 강아지 탭
+// GET /api/v1/virtual-pets/catalog?pet_type=CAT → 고양이 탭
+// 응답: { summary: { total_count, unlocked_count, completion_rate }, items: [{ catalog_id, pet_type, display_name, is_unlocked, unlock_condition, affinity_score }] }
 const DUMMY_ENCYCLOPEDIA = {
   DOG: [
     { id: 1, name: "골든 리트리버", affection: 2, max_affection: 5, unlocked: true },
