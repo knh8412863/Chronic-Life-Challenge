@@ -15,7 +15,24 @@ import { PredictionHistoryPage } from "./pages/PredictionHistoryPage";
 import { PredictionProgressPage } from "./pages/PredictionProgressPage";
 import { PredictionRequestPage } from "./pages/PredictionRequestPage";
 import { PredictionResultPage } from "./pages/PredictionResultPage";
+import { ActivityPage } from "./pages/health/ActivityPage";
+import { ExercisePage } from "./pages/health/ExercisePage";
+import { GoalEditPage } from "./pages/health/GoalEditPage";
+import { GoalPage } from "./pages/health/GoalPage";
+import { HealthHubPage } from "./pages/health/HealthHubPage";
+import { HealthProfilePage } from "./pages/health/HealthProfilePage";
+import { VitalsDetailPage } from "./pages/health/VitalsDetailPage";
+import { VitalsInputPage } from "./pages/health/VitalsInputPage";
+import { VitalsListPage } from "./pages/health/VitalsListPage";
 
+// ── front/food-management 브랜치에서 추가
+import { FoodPage } from "./pages/FoodPage";
+import { FoodAnalyzePage } from "./pages/FoodAnalyzePage";
+
+// -- front/report-ㅡmanagement 브랜치에서 추가
+import ReportListPage from "./pages/report/ReportListPage";
+import ReportDetailPage from "./pages/report/ReportDetailPage";
+import ReportExportPage from "./pages/report/ReportExportPage";
 // ── front/auth-onboarding 브랜치에서 추가
 import { SignUpPage } from "./pages/SignUpPage";
 import { TermsAgreementPage, EmailVerifyPage, PasswordResetPage, OnboardingCompletePage } from "./pages/AuthOnboardingPages";
@@ -47,12 +64,23 @@ export type AppRoute =
   | "/mypage"
   | "/mypage/profile"
   | "/health"
+  | "/health/goal"
+  | "/health/goal/edit"
+  | "/health/profile"
+  | "/health/vitals"
+  | "/health/vitals/detail"
+  | "/health/vitals/input"
+  | "/health/exercise"
+  | "/health/activity"
   | "/food"
+  | "/food/analyze"
   | "/reports"
   | "/challenges"
   | "/pet"
   | "/pet/select"
   | "/pet/encyclopedia";
+  | "/reports/detail"
+  | "/reports/export";
 
 const publicRoutes = new Set<AppRoute>([
   "/",
@@ -85,12 +113,23 @@ function normalizePath(pathname: string): AppRoute {
     "/mypage",
     "/mypage/profile",
     "/health",
+    "/health/goal",
+    "/health/goal/edit",
+    "/health/profile",
+    "/health/vitals",
+    "/health/vitals/detail",
+    "/health/vitals/input",
+    "/health/exercise",
+    "/health/activity",
     "/food",
+    "/food/analyze",
     "/reports",
     "/challenges",
     "/pet",
     "/pet/select",
     "/pet/encyclopedia",
+    "/reports/detail",
+    "/reports/export",
   ];
 
   return knownRoutes.includes(pathname as AppRoute) ? (pathname as AppRoute) : "/home";
@@ -163,11 +202,33 @@ export default function App() {
       case "/mypage/profile":
         return <MyProfilePage />;
       case "/health":
-        return <PlaceholderPage title="건강 관리" description="건강 기록 입력/조회 화면을 연결할 영역입니다." />;
+        return <HealthHubPage onNavigate={navigate} />;
+      case "/health/goal":
+        return <GoalPage onNavigate={navigate} />;
+      case "/health/goal/edit":
+        return <GoalEditPage onNavigate={navigate} />;
+      case "/health/profile":
+        return <HealthProfilePage onNavigate={navigate} />;
+      case "/health/vitals":
+        return <VitalsListPage onNavigate={navigate} />;
+      case "/health/vitals/detail":
+        return <VitalsDetailPage onNavigate={navigate} />;
+      case "/health/vitals/input":
+        return <VitalsInputPage onNavigate={navigate} />;
+      case "/health/exercise":
+        return <ExercisePage onNavigate={navigate} />;
+      case "/health/activity":
+        return <ActivityPage onNavigate={navigate} />;
       case "/food":
-        return <PlaceholderPage title="식단 관리" description="식단 입력, 분석 결과, 기록 목록 화면을 연결할 영역입니다." />;
+        return <FoodPage onNavigate={navigate} />;
+      case "/food/analyze":
+        return <FoodAnalyzePage onNavigate={navigate} />;
       case "/reports":
-        return <PlaceholderPage title="리포트" description="주간 리포트 목록과 상세 화면을 연결할 영역입니다." />;
+        return <ReportListPage onNavigate={navigate} />;
+      case "/reports/detail":
+        return <ReportDetailPage onNavigate={navigate} />;
+      case "/reports/export":
+        return <ReportExportPage onNavigate={navigate} />;
       case "/challenges":
         return <PlaceholderPage title="챌린지 관리" description="챌린지 목록, 참여, 체크인 화면을 연결할 영역입니다." />;
       case "/pet":

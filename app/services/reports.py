@@ -2,6 +2,7 @@ from datetime import date, datetime, time, timedelta
 
 from fastapi import HTTPException, status
 
+from app.core import config, default_logger
 from app.dtos.reports import (
     CurrentWeeklyReportResponse,
     WeeklyReportChallengeSummaryResponse,
@@ -26,9 +27,12 @@ from app.models.predictions import (
 )
 from app.models.reports import WeeklyReport
 from app.models.users import User
+from app.services.llm_advice import OPENAI_PROVIDER
+from app.services.llm_report import OpenAIReportClient, ReportLLMError, ReportLLMResult
 
 RULE_BASED_PROVIDER = "RULE_BASED"
 RULE_BASED_MODEL = "weekly-report-rules-v1"
+MAX_REPORT_TEXT_LENGTH = 600
 
 
 class WeeklyReportService:
@@ -41,6 +45,8 @@ class WeeklyReportService:
             await existing.delete()
 
         source_summary = await self._build_source_summary(user.id, week_start, week_end)
+        llm_result = await self._generate_llm_report(source_summary)
+        report_text = llm_result.report_text if llm_result else self._build_report_text(source_summary)
         report = await WeeklyReport.create(
             user=user,
             week_start_date=week_start,
@@ -51,12 +57,12 @@ class WeeklyReportService:
             metric_summaries=self._build_metric_summaries(source_summary),
             trend_summary=self._build_trend_summary(None),
             challenge_summary=self._build_challenge_summary(source_summary),
-            report_text=self._build_report_text(source_summary),
-            provider=RULE_BASED_PROVIDER,
-            model_name=RULE_BASED_MODEL,
-            input_tokens=0,
-            output_tokens=0,
-            cache_read_tokens=0,
+            report_text=report_text,
+            provider=llm_result.provider if llm_result else RULE_BASED_PROVIDER,
+            model_name=llm_result.model_name if llm_result else RULE_BASED_MODEL,
+            input_tokens=llm_result.input_tokens if llm_result else 0,
+            output_tokens=llm_result.output_tokens if llm_result else 0,
+            cache_read_tokens=llm_result.cache_read_tokens if llm_result else 0,
         )
         return self._to_response(report, generated=True)
 
@@ -210,6 +216,36 @@ class WeeklyReportService:
 
         parts.append("본 리포트는 의료 진단이 아닌 생활습관 점검용 참고 자료입니다.")
         return " ".join(parts)
+
+    @staticmethod
+    async def _generate_llm_report(source_summary: dict[str, int]) -> ReportLLMResult | None:
+        if not config.REPORT_LLM_ENABLED:
+            default_logger.info("weekly report llm disabled; using rule-based report")
+            return None
+
+        client = OpenAIReportClient(
+            api_key=config.OPENAI_API_KEY,
+            model_name=config.OPENAI_MODEL,
+            timeout_seconds=config.OPENAI_TIMEOUT_SECONDS,
+        )
+        if not client.is_configured:
+            default_logger.warning("weekly report llm api key is not configured; using rule-based report")
+            return None
+
+        try:
+            result = await client.generate(source_summary=source_summary, max_length=MAX_REPORT_TEXT_LENGTH)
+        except ReportLLMError:
+            default_logger.exception("weekly report llm generation failed; using rule-based report")
+            return None
+
+        return ReportLLMResult(
+            report_text=WeeklyReportService._limit_text(result.report_text, MAX_REPORT_TEXT_LENGTH),
+            provider=result.provider,
+            model_name=result.model_name,
+            input_tokens=result.input_tokens,
+            output_tokens=result.output_tokens,
+            cache_read_tokens=result.cache_read_tokens,
+        )
 
     @staticmethod
     def _build_summary_cards(source_summary: dict[str, int]) -> list[dict[str, str]]:
@@ -369,7 +405,7 @@ class WeeklyReportService:
             model_name=report.model_name,
             generated=generated,
             created_at=report.created_at,
-            source_type="RULE_BASED",
+            source_type="LLM" if report.provider == OPENAI_PROVIDER else "RULE_BASED",
         )
 
     @staticmethod
@@ -388,6 +424,12 @@ class WeeklyReportService:
         if len(report_text) <= max_length:
             return report_text
         return report_text[: max_length - 1].rstrip() + "…"
+
+    @staticmethod
+    def _limit_text(text: str, max_length: int) -> str:
+        if len(text) <= max_length:
+            return text
+        return text[: max_length - 1].rstrip() + "…"
 
     @staticmethod
     def _overall_status(summary_cards: list[dict[str, str]]) -> str:

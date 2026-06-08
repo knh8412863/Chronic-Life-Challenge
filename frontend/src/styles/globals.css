@@ -1546,7 +1546,7 @@ button {
   font-weight: 800;
 }
 
-.wide-subtle-button {
+.wide-subtle-button-legacy {
   width: 100%;
   min-height: 38px;
   border: 1px solid #d5d9df;
@@ -2254,4 +2254,1240 @@ button {
   border-color: rgba(212, 24, 61, 0.28);
   background: #fff5f7;
   color: #d4183d;
+}
+
+/* ── 건강 목표 (GoalPage) ───────────────────────────── */
+
+.goal-page {
+  max-width: 1000px;
+}
+
+.page-heading-row {
+  align-items: flex-end;
+}
+
+.page-heading-row .page-heading {
+  flex: 1;
+}
+
+.goal-section {
+  display: grid;
+  gap: 22px;
+  padding: 24px;
+}
+
+.goal-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.goal-section-header h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.goal-updated-at {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.goal-group {
+  display: grid;
+  gap: 12px;
+}
+
+.goal-group-label {
+  margin: 0;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #eceff3;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.goal-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.goal-metric-grid--wide {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.goal-metric-card {
+  display: grid;
+  gap: 8px;
+  padding: 16px;
+  border: 1px solid #eceff3;
+  border-radius: 8px;
+  background: #f9fafb;
+}
+
+.goal-val {
+  font-size: 15px;
+  color: var(--foreground);
+}
+
+.goal-val-empty {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.goal-edit-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.goal-edit-input {
+  width: 0;
+  flex: 1;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid #c9d0d8;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.goal-edit-input:focus {
+  outline: 2px solid var(--brand-green);
+  outline-offset: -1px;
+}
+
+.goal-edit-unit {
+  flex: 0 0 auto;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.goal-cancel-btn {
+  width: auto;
+  padding: 0 18px;
+}
+
+/* ── GoalPage 리디자인 (진행률 표시) ─────────────── */
+
+.goal-section-note {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.goal-progress-row {
+  display: grid;
+  grid-template-columns: 1fr 2fr 52px;
+  align-items: center;
+  gap: 16px;
+  padding: 12px 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.goal-progress-row:last-child {
+  border-bottom: none;
+}
+
+.goal-progress-left {
+  display: grid;
+  gap: 4px;
+}
+
+.goal-progress-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.goal-default-badge {
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: #f0f2f5;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.goal-progress-meta {
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.goal-progress-bar-wrap {
+  height: 8px;
+  border-radius: 99px;
+  background: #eceff3;
+  overflow: hidden;
+}
+
+.goal-progress-bar {
+  height: 100%;
+  border-radius: 99px;
+  background: var(--brand-green);
+  transition: width 0.3s ease;
+}
+
+.goal-progress-pct {
+  text-align: right;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--brand-green);
+}
+
+.goal-chart-placeholder {
+  display: grid;
+  min-height: 140px;
+  place-items: center;
+  border: 1px dashed #d0d4da;
+  border-radius: 8px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  background: #f8f9fa;
+}
+
+.goal-score-chart {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  height: 140px;
+}
+
+.goal-score-col {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  height: 100%;
+}
+
+.goal-score-bar-wrap {
+  display: flex;
+  flex: 1;
+  align-items: flex-end;
+  width: 100%;
+}
+
+.goal-score-bar {
+  width: 100%;
+  border-radius: 4px 4px 2px 2px;
+  background: var(--brand-green);
+  opacity: 0.85;
+}
+
+.goal-score-date {
+  margin-top: 4px;
+  color: var(--muted-foreground);
+  font-size: 10px;
+}
+
+/* ── GoalEditPage ─────────────────────────────────── */
+
+.goal-edit-page {
+  max-width: 1000px;
+}
+
+.goal-edit-table {
+  display: grid;
+  gap: 0;
+}
+
+.goal-edit-thead {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 2fr;
+  gap: 16px;
+  padding: 8px 0 12px;
+  border-bottom: 2px solid #eceff3;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.goal-edit-row {
+  display: grid;
+  grid-template-columns: 2fr 1fr 1.5fr 2fr;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.goal-edit-row:last-child {
+  border-bottom: none;
+}
+
+.goal-edit-item-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.goal-edit-unit-col {
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.goal-edit-current {
+  color: var(--foreground);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.goal-edit-input-wrap {
+  display: flex;
+  align-items: center;
+}
+
+.goal-edit-bp-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+}
+
+.goal-bp-sep {
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+
+.goal-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding-top: 8px;
+}
+
+/* ── 공통 버튼 ──────────────────────────────────── */
+
+.wide-subtle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  padding: 0 20px;
+  border: 1px solid #cfd3d8;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #1f2328;
+  font-weight: 700;
+  font-size: 15px;
+}
+
+/* ── 기간 탭 (공통) ──────────────────────────────── */
+
+.period-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.period-tab {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid #d9dde2;
+  border-radius: 6px;
+  background: #ffffff;
+  color: #444;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.period-tab--active {
+  border-color: #111;
+  background: #111;
+  color: #ffffff;
+}
+
+/* ── 건강 프로필 ──────────────────────────────────── */
+
+.health-profile-page {
+  max-width: 900px;
+}
+
+.hp-section {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+}
+
+.hp-section h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.hp-info-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.hp-info-item {
+  display: grid;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 8px;
+  background: #f5f6f8;
+}
+
+.hp-info-val {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.hp-disease-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.pill-pink {
+  border-color: #ffb3cc;
+  background: var(--soft-pink);
+  color: #b02060;
+}
+
+.pill-violet {
+  border-color: #c9b8ff;
+  background: var(--soft-violet);
+  color: #5530a0;
+}
+
+.hp-body-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.hp-body-item {
+  display: grid;
+  gap: 6px;
+}
+
+.hp-body-val {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.hp-vitals-link {
+  text-align: right;
+}
+
+.hp-link-btn {
+  border: none;
+  background: none;
+  color: var(--brand-green);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.hp-edit-input {
+  width: 100%;
+  height: 40px;
+  padding: 0 10px;
+  border: 1px solid #c9d0d8;
+  border-radius: 6px;
+  background: #ffffff;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.hp-edit-input:focus {
+  outline: 2px solid var(--brand-green);
+  outline-offset: -1px;
+}
+
+.hp-readonly {
+  color: var(--muted-foreground);
+}
+
+.hp-body-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hp-body-input-wrap .hp-edit-input {
+  width: 0;
+  flex: 1;
+}
+
+.hp-body-unit {
+  color: var(--muted-foreground);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.hp-family-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.hp-family-item {
+  padding: 12px 16px;
+  border: 1px solid #eceff3;
+  border-radius: 8px;
+  background: #f5f6f8;
+  font-size: 14px;
+  font-weight: 600;
+  text-align: center;
+}
+
+/* ── 건강 기록 목록 ──────────────────────────────── */
+
+.vitals-list-page {
+  max-width: 1100px;
+}
+
+.vl-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vl-type-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.vl-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.vl-summary-card {
+  display: grid;
+  gap: 8px;
+  padding: 20px 24px;
+  border: 1px solid #eceff3;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+.vl-summary-val {
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.vl-summary-val small {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.vl-status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: 99px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.vl-status-normal {
+  background: #ecfdf5;
+  color: #059669;
+}
+
+.vl-status-danger {
+  background: #fff5f7;
+  color: #d4183d;
+}
+
+.vl-action-row {
+  display: flex;
+  gap: 6px;
+}
+
+.vl-action-btn {
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid #d9dde2;
+  border-radius: 6px;
+  background: #f5f6f8;
+  color: #444;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.vl-delete-btn {
+  border-color: #ffd0d8;
+  background: #fff5f7;
+  color: #d4183d;
+}
+
+.vl-memo-cell {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted-foreground);
+  font-size: 13px;
+}
+
+.vl-row-clickable {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.vl-row-clickable:hover {
+  background: #f5f7fa;
+}
+
+/* ── 건강 기록 상세 ──────────────────────────────── */
+
+.vitals-detail-page {
+  max-width: 1100px;
+}
+
+.vd-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+}
+
+.vd-stat-card {
+  display: grid;
+  gap: 8px;
+  padding: 20px 24px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  text-align: center;
+}
+
+.vd-stat-green { background: var(--soft-green); border-color: #9bd6aa; }
+.vd-stat-yellow { background: var(--soft-yellow); border-color: #ead071; }
+.vd-stat-blue { background: var(--soft-blue); border-color: #b5c6ff; }
+.vd-stat-pink { background: var(--soft-pink); border-color: #ffb3cc; }
+
+.vd-stat-val {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.vd-stat-val small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+.vd-body-row {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 16px;
+}
+
+.vd-info-card {
+  display: grid;
+  gap: 0;
+  padding: 24px;
+}
+
+.vd-info-card h2 {
+  margin: 0 0 16px;
+  font-size: 16px;
+}
+
+.vd-info-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: 12px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid #f0f2f5;
+}
+
+.vd-info-row:last-child {
+  border-bottom: none;
+}
+
+.vd-info-val {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.vd-measure-label {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.vd-measure-big {
+  margin: 4px 0 0;
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.vd-status-large {
+  font-size: 14px;
+  padding: 5px 14px;
+}
+
+.vd-memo {
+  margin: 0;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #f8f9fa;
+  line-height: 1.7;
+  font-size: 14px;
+}
+
+.vd-trend-card {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 24px;
+}
+
+.vd-trend-card h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.vd-chart-placeholder {
+  display: grid;
+  min-height: 160px;
+  place-items: center;
+  border: 1px dashed #d0d4da;
+  border-radius: 8px;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  background: #f8f9fa;
+}
+
+.vd-avg-list {
+  display: grid;
+  gap: 6px;
+}
+
+.vd-avg-list p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--muted-foreground);
+}
+
+/* ── 혈압/혈당·지질·신장 입력 폼 ────────────────── */
+
+.vitals-input-page {
+  max-width: 900px;
+}
+
+.vi-tabs {
+  display: flex;
+  border-bottom: 2px solid #e5e7eb;
+  gap: 0;
+}
+
+.vi-tab {
+  min-height: 44px;
+  padding: 0 20px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  background: none;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vi-tab--active {
+  border-bottom-color: var(--brand-green);
+  color: var(--brand-green);
+}
+
+.vi-form-body {
+  display: grid;
+  gap: 16px;
+}
+
+.vi-form-hint-row {
+  text-align: right;
+}
+
+.vi-section {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+}
+
+.vi-section h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.vi-type-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.vi-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  border: 1px solid #d9dde2;
+  border-radius: 8px;
+  background: #f8f9fa;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.vi-type-btn--active {
+  border-color: var(--brand-green);
+  background: #ffffff;
+}
+
+.vi-type-code {
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.vi-time-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+.vi-time-btn {
+  min-height: 44px;
+  border: 1px solid #d9dde2;
+  border-radius: 8px;
+  background: #f8f9fa;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.vi-time-btn--active {
+  border-color: #111;
+  background: #111;
+  color: #ffffff;
+}
+
+.vi-bp-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.vi-glucose-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  justify-content: center;
+  padding: 16px 0;
+}
+
+.vi-bp-input-wrap {
+  display: flex;
+}
+
+.vi-bp-input {
+  width: 100px;
+  height: 64px;
+  border: 2px solid #d9dde2;
+  border-radius: 10px;
+  background: #fafbfc;
+  font-size: 28px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.vi-bp-systolic { background: #fff0f3; border-color: #ffb3cc; }
+.vi-bp-diastolic { background: #eef4ff; border-color: #b5c6ff; }
+
+.vi-bp-sep {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--muted-foreground);
+}
+
+.vi-bp-unit {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--muted-foreground);
+  align-self: flex-end;
+  margin-bottom: 8px;
+}
+
+.vi-warning-banner {
+  padding: 14px 18px;
+  border: 1px solid #f0a500;
+  border-radius: 8px;
+  background: #fff8e8;
+  color: #7c5800;
+}
+
+.vi-warning-banner p {
+  margin: 0 0 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.vi-warning-banner p:last-child {
+  margin-bottom: 0;
+}
+
+.vi-datetime-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.vi-field {
+  display: grid;
+  gap: 6px;
+}
+
+.vi-date-input {
+  height: 44px;
+  padding: 0 12px;
+  border: 1px solid #d9dde2;
+  border-radius: 8px;
+  background: #f8f9fa;
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.vi-memo-input {
+  min-height: 80px;
+  padding: 12px;
+  border: 1px solid #d9dde2;
+  border-radius: 8px;
+  background: #f8f9fa;
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+/* 지질 */
+.vi-lipid-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.vi-lipid-field {
+  display: grid;
+  gap: 6px;
+}
+
+.vi-lipid-input {
+  height: 52px;
+  padding: 0 14px;
+  border: 1px solid #d9dde2;
+  border-radius: 8px;
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.vi-lipid-neutral { background: #f8f9fa; }
+.vi-lipid-pink { background: var(--soft-pink); border-color: #ffb3cc; }
+.vi-lipid-green { background: var(--soft-green); border-color: #9bd6aa; }
+.vi-lipid-yellow { background: var(--soft-yellow); border-color: #ead071; }
+
+/* 신장 */
+.vi-kidney-layout {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.vi-kidney-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid #4a7bbf;
+  border-radius: 8px;
+  background: #eef4ff;
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.vi-egfr-display {
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: #f0f2f5;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* ── 운동기록 페이지 ─────────────────────────────── */
+
+.exercise-page {
+  max-width: 1100px;
+}
+
+.ex-tabs {
+  display: flex;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.ex-tab {
+  min-height: 44px;
+  padding: 0 20px;
+  border: none;
+  border-bottom: 3px solid transparent;
+  margin-bottom: -2px;
+  background: none;
+  color: var(--muted-foreground);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ex-tab--active {
+  border-bottom-color: var(--brand-green);
+  color: var(--brand-green);
+}
+
+.ex-filter-card {
+  display: grid;
+  gap: 12px;
+  padding: 20px 24px;
+}
+
+.ex-date-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ex-date-sep {
+  color: var(--muted-foreground);
+  font-weight: 700;
+}
+
+.ex-quick-tabs {
+  display: flex;
+  gap: 4px;
+}
+
+.ex-summary-title h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.ex-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.ex-summary-card {
+  display: grid;
+  gap: 8px;
+  padding: 18px 20px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  text-align: center;
+}
+
+.ex-summary-blue { background: var(--soft-blue); border-color: #b5c6ff; }
+.ex-summary-yellow { background: var(--soft-yellow); border-color: #ead071; }
+.ex-summary-pink { background: var(--soft-pink); border-color: #ffb3cc; }
+.ex-summary-neutral { background: #f5f6f8; border-color: #e0e3e8; }
+
+.ex-summary-val {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.ex-summary-val small {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--muted-foreground);
+}
+
+/* 운동 입력 폼 */
+.ex-input-body {
+  display: grid;
+  gap: 16px;
+}
+
+.ex-type-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.ex-type-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  min-height: 80px;
+  padding: 16px;
+  border: 1px solid #d9dde2;
+  border-radius: 10px;
+  background: #f8f9fa;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.ex-type-btn--active {
+  border-color: var(--brand-green);
+  background: #ffffff;
+  box-shadow: 0 0 0 1px var(--brand-green);
+}
+
+.ex-type-icon {
+  font-size: 24px;
+}
+
+.ex-info-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 32px;
+}
+
+.ex-stepper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.ex-stepper-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #d9dde2;
+  border-radius: 50%;
+  background: #ffffff;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.ex-stepper-val {
+  min-width: 48px;
+  font-size: 20px;
+  font-weight: 800;
+  text-align: center;
+}
+
+/* ── 일일 활동 기록 ──────────────────────────────── */
+
+.activity-page {
+  max-width: 900px;
+}
+
+.act-notice {
+  padding: 14px 18px;
+  border: 1px solid #b5c6ff;
+  border-radius: 8px;
+  background: #eef4ff;
+  color: #1d3f78;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.act-two-col {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+}
+
+.act-section {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+}
+
+.act-section h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.act-input {
+  width: 100%;
+  height: 48px;
+  padding: 0 14px;
+  border: 1px solid #d9dde2;
+  border-radius: 8px;
+  background: #f8f9fa;
+  font-size: 16px;
+  font-family: inherit;
+}
+
+.act-slider-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 32px;
+}
+
+.act-slider-item {
+  display: grid;
+  gap: 10px;
+}
+
+.act-slider {
+  width: 100%;
+  accent-color: var(--brand-green);
+  height: 6px;
+  cursor: pointer;
+}
+
+/* ── 건강 관리 허브 ──────────────────────────────── */
+
+.health-hub-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.health-hub-card {
+  display: grid;
+  gap: 8px;
+  padding: 24px;
+  border: 1px solid #eceff3;
+  border-radius: 12px;
+  background: #ffffff;
+  text-align: left;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.health-hub-card:hover {
+  box-shadow: 0 4px 16px rgba(75, 163, 95, 0.15);
+  transform: translateY(-2px);
+}
+
+.health-hub-icon {
+  font-size: 28px;
+}
+
+.health-hub-title {
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.health-hub-desc {
+  margin: 0;
+  color: var(--muted-foreground);
+  font-size: 13px;
+  line-height: 1.5;
 }
