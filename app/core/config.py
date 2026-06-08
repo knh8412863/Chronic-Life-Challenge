@@ -69,5 +69,10 @@ class Config(BaseSettings):
     PASSWORD_RESET_EXPIRE_MINUTES: int = 30
     PASSWORD_RESET_COOLDOWN_SECONDS: int = 60
 
+    ADVICE_LLM_ENABLED: bool = False
+    OPENAI_API_KEY: str | None = None
+    OPENAI_MODEL: str = "gpt-4o-mini"
+    OPENAI_TIMEOUT_SECONDS: float = 10.0
+
     def get_cors_allow_origins(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ALLOW_ORIGINS.split(",") if origin.strip()]
