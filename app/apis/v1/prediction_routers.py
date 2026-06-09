@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
 from fastapi.responses import ORJSONResponse as Response
 
 from app.dependencies.security import get_request_user
@@ -8,6 +8,7 @@ from app.dtos.predictions import (
     DataResponse,
     PredictionFeedbackCreateRequest,
     PredictionFeedbackCreateResponse,
+    PredictionResultListResponse,
     PredictionResultResponse,
     PredictionTaskCreateRequest,
     PredictionTaskCreateResponse,
@@ -47,6 +48,20 @@ async def get_prediction_task_status(
 ) -> Response:
     task = await service.get_task_status(user, task_uuid)
     return Response({"data": task.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@prediction_router.get(
+    "/prediction-results",
+    response_model=DataResponse[PredictionResultListResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_prediction_results(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[PredictionService, Depends(PredictionService)],
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> Response:
+    results = await service.get_results(user, limit)
+    return Response({"data": results.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
 
 
 @prediction_router.get(

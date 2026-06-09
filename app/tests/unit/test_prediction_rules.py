@@ -1,10 +1,11 @@
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 from types import SimpleNamespace
 
 import pytest
 
 from app.dtos.predictions import MetricAssessmentItemResponse, MetricAssessmentResponse
-from app.models.predictions import PredictionStatus
+from app.models.predictions import PredictionMode, PredictionStatus
 from app.models.users import Gender
 from app.services.home import HomeService
 from app.services.predictions import HealthInputService, PredictionService, _calculate_age, _calculate_bmi
@@ -22,6 +23,44 @@ def test_calculate_age_uses_birth_month_and_day():
 def test_prediction_progress_mapping():
     assert PredictionService._task_progress(PredictionStatus.PENDING) == (0, "예측 요청 접수")
     assert PredictionService._task_progress(PredictionStatus.SUCCESS) == (100, "예측 완료")
+
+
+def test_prediction_result_list_item_uses_highest_probability_and_feedback_state():
+    result = SimpleNamespace(
+        id=3,
+        task=SimpleNamespace(prediction_mode=PredictionMode.SCREENING),
+        created_at=datetime(2026, 6, 9, 12, 0, 0),
+        overall_risk_level="HIGH",
+        input_completeness={"used_default_values": False, "missing_fields": [], "message": "입력값 반영"},
+        items=[
+            SimpleNamespace(
+                disease_code="DIABETES",
+                probability=Decimal("0.120000"),
+                threshold=Decimal("0.05500"),
+                is_at_risk=True,
+                risk_level="HIGH",
+                message="당뇨 위험 신호가 감지되었습니다.",
+                risk_factors=["공복혈당이 당뇨 의심 기준 이상입니다."],
+            ),
+            SimpleNamespace(
+                disease_code="HYPERTENSION",
+                probability=Decimal("0.050000"),
+                threshold=Decimal("0.09600"),
+                is_at_risk=False,
+                risk_level="LOW",
+                message="고혈압 위험 신호는 현재 기준에서 높지 않습니다.",
+                risk_factors=[],
+            ),
+        ],
+    )
+
+    item = PredictionService()._to_result_list_item(result, feedback_result_ids={3})
+
+    assert item.result_id == 3
+    assert item.highest_risk_disease == "diabetes"
+    assert item.highest_risk_probability == 0.12
+    assert item.feedback_submitted is True
+    assert set(item.disease_risks) == {"diabetes", "hypertension"}
 
 
 def test_dyslipidemia_assessment_detects_high_ldl_and_low_hdl():

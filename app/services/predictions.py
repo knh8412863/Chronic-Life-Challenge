@@ -46,6 +46,8 @@ from app.dtos.predictions import (
     OptionalRecordCreateResponse,
     PredictionFeedbackCreateRequest,
     PredictionFeedbackCreateResponse,
+    PredictionResultListItemResponse,
+    PredictionResultListResponse,
     PredictionResultResponse,
     PredictionTaskCreateRequest,
     PredictionTaskCreateResponse,
@@ -1331,23 +1333,28 @@ class PredictionService:
         result = await PredictionResult.get_or_none(id=result_id, user_id=user.id).prefetch_related("items", "task")
         if result is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="예측 결과를 찾을 수 없습니다.")
-        disease_risks = {}
-        response_codes = {"DIABETES": "diabetes", "HYPERTENSION": "hypertension", "CKD": "kidney"}
-        for item in result.items:
-            disease_risks[response_codes[item.disease_code]] = {
-                "probability": float(item.probability),
-                "threshold": float(item.threshold),
-                "is_at_risk": item.is_at_risk,
-                "risk_level": item.risk_level,
-                "message": item.message,
-                "risk_factors": item.risk_factors or [],
-            }
         return PredictionResultResponse(
             result_id=result.id,
             prediction_mode=result.task.prediction_mode.value,
-            disease_risks=disease_risks,
+            disease_risks=self._to_disease_risks(result.items),
             input_completeness=InputCompletenessResponse(**result.input_completeness),
             disclaimer=result.disclaimer,
+        )
+
+    async def get_results(self, user: User, limit: int = 20) -> PredictionResultListResponse:
+        query = PredictionResult.filter(user_id=user.id).order_by("-created_at", "-id")
+        total = await query.count()
+        results = await query.limit(limit).prefetch_related("items", "task")
+        result_ids = [result.id for result in results]
+        feedback_result_ids = set(
+            await PredictionFeedback.filter(prediction_result_id__in=result_ids).values_list(
+                "prediction_result_id",
+                flat=True,
+            )
+        )
+        return PredictionResultListResponse(
+            total=total,
+            items=[self._to_result_list_item(result, feedback_result_ids) for result in results],
         )
 
     async def create_feedback(
@@ -1376,6 +1383,43 @@ class PredictionService:
             prediction_result_id=result.id,
             feedback_type=data.feedback_type,
             created_at=feedback.created_at,
+        )
+
+    @staticmethod
+    def _to_disease_risks(items: list[PredictionResultItem]) -> dict[str, dict[str, Any]]:
+        response_codes = {"DIABETES": "diabetes", "HYPERTENSION": "hypertension", "CKD": "kidney"}
+        disease_risks = {}
+        for item in items:
+            response_code = response_codes.get(item.disease_code)
+            if response_code is None:
+                continue
+            disease_risks[response_code] = {
+                "probability": float(item.probability),
+                "threshold": float(item.threshold),
+                "is_at_risk": item.is_at_risk,
+                "risk_level": item.risk_level,
+                "message": item.message,
+                "risk_factors": item.risk_factors or [],
+            }
+        return disease_risks
+
+    def _to_result_list_item(
+        self,
+        result: PredictionResult,
+        feedback_result_ids: set[int],
+    ) -> PredictionResultListItemResponse:
+        disease_risks = self._to_disease_risks(result.items)
+        highest_risk = max(disease_risks.items(), key=lambda item: item[1]["probability"], default=None)
+        return PredictionResultListItemResponse(
+            result_id=result.id,
+            prediction_mode=result.task.prediction_mode.value,
+            created_at=result.created_at,
+            overall_risk_level=result.overall_risk_level,
+            highest_risk_disease=highest_risk[0] if highest_risk else None,
+            highest_risk_probability=highest_risk[1]["probability"] if highest_risk else None,
+            disease_risks=disease_risks,
+            input_completeness=InputCompletenessResponse(**result.input_completeness),
+            feedback_submitted=result.id in feedback_result_ids,
         )
 
     @staticmethod

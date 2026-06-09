@@ -91,6 +91,7 @@ class TestPredictionFlowAPIs(TestCase):
                 json={"feedback_type": "UNSURE"},
                 headers=headers,
             )
+            history_response = await client.get("/api/v1/prediction-results", headers=headers)
 
         assert survey_response.status_code == status.HTTP_201_CREATED
         assert task_response.status_code == status.HTTP_202_ACCEPTED
@@ -107,3 +108,9 @@ class TestPredictionFlowAPIs(TestCase):
         assert feedback_response.status_code == status.HTTP_201_CREATED
         assert feedback_response.json()["data"]["feedback_type"] == "CORRECT"
         assert duplicate_feedback_response.status_code == status.HTTP_409_CONFLICT
+        assert history_response.status_code == status.HTTP_200_OK
+        history = history_response.json()["data"]
+        assert history["total"] == 1
+        assert history["items"][0]["result_id"] == result["result_id"]
+        assert history["items"][0]["highest_risk_disease"] == "diabetes"
+        assert history["items"][0]["feedback_submitted"] is True
