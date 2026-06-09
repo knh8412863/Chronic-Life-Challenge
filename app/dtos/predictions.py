@@ -619,6 +619,23 @@ class PredictionResultResponse(BaseModel):
     disclaimer: str
 
 
+class PredictionResultListItemResponse(BaseModel):
+    result_id: int
+    prediction_mode: str
+    created_at: datetime
+    overall_risk_level: str
+    highest_risk_disease: str | None = None
+    highest_risk_probability: float | None = None
+    disease_risks: dict[str, DiseaseRiskResponse]
+    input_completeness: InputCompletenessResponse
+    feedback_submitted: bool
+
+
+class PredictionResultListResponse(BaseModel):
+    total: int
+    items: list[PredictionResultListItemResponse]
+
+
 class PredictionFeedbackCreateRequest(BaseModel):
     feedback_type: PredictionFeedbackType
     actual_diagnosis: dict[str, bool] | None = None
