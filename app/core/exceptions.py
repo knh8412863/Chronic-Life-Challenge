@@ -1,0 +1,63 @@
+from typing import Any
+
+from fastapi import FastAPI, Request, status
+from fastapi.exceptions import RequestValidationError
+from fastapi.responses import ORJSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+ERROR_CODE_BY_STATUS = {
+    status.HTTP_400_BAD_REQUEST: "BAD_REQUEST",
+    status.HTTP_401_UNAUTHORIZED: "UNAUTHORIZED",
+    status.HTTP_403_FORBIDDEN: "FORBIDDEN",
+    status.HTTP_404_NOT_FOUND: "NOT_FOUND",
+    status.HTTP_409_CONFLICT: "CONFLICT",
+    status.HTTP_410_GONE: "GONE",
+    status.HTTP_422_UNPROCESSABLE_CONTENT: "VALIDATION_ERROR",
+    status.HTTP_423_LOCKED: "LOCKED",
+    status.HTTP_429_TOO_MANY_REQUESTS: "RATE_LIMIT_EXCEEDED",
+}
+
+
+def build_error_response(
+    *,
+    status_code: int,
+    detail: Any,
+    code: str | None = None,
+    message: str | None = None,
+) -> dict[str, Any]:
+    if message is None:
+        message = detail if isinstance(detail, str) else "요청을 처리할 수 없습니다."
+
+    return {
+        "detail": detail,
+        "error": {
+            "code": code or ERROR_CODE_BY_STATUS.get(status_code, "HTTP_ERROR"),
+            "message": message,
+            "status_code": status_code,
+        },
+    }
+
+
+async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> ORJSONResponse:
+    return ORJSONResponse(
+        status_code=exc.status_code,
+        content=build_error_response(status_code=exc.status_code, detail=exc.detail),
+        headers=exc.headers,
+    )
+
+
+async def request_validation_exception_handler(request: Request, exc: RequestValidationError) -> ORJSONResponse:
+    return ORJSONResponse(
+        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        content=build_error_response(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            detail=exc.errors(),
+            code="VALIDATION_ERROR",
+            message="입력값 형식이 올바르지 않습니다.",
+        ),
+    )
+
+
+def register_exception_handlers(app: FastAPI) -> None:
+    app.add_exception_handler(StarletteHTTPException, http_exception_handler)
+    app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
