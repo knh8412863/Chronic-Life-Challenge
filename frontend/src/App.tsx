@@ -3,18 +3,42 @@ import { useEffect, useMemo, useState } from "react";
 import { AppLayout } from "./layouts/AppLayout";
 import { AdviceHistoryPage } from "./pages/AdviceHistoryPage";
 import { AdviceTodayPage } from "./pages/AdviceTodayPage";
+import { TermsAgreementPage, EmailVerifyPage, PasswordResetPage, OnboardingCompletePage } from "./pages/AuthOnboardingPages";
+import { BadgePage } from "./pages/challenge/BadgePage";
+import { ChallengeDashboardPage } from "./pages/challenge/ChallengeDashboardPage";
+import { ChallengeDetailPage } from "./pages/challenge/ChallengeDetailPage";
+import { ChallengeListPage } from "./pages/challenge/ChallengeListPage";
+import { LeaderboardPage } from "./pages/challenge/LeaderboardPage";
+import { MyChallengesPage } from "./pages/challenge/MyChallengesPage";
 import { PublicLayout } from "./layouts/PublicLayout";
+import { FoodAnalyzePage } from "./pages/FoodAnalyzePage";
+import { FoodPage } from "./pages/FoodPage";
 import { HomePage } from "./pages/HomePage";
+import { ActivityPage } from "./pages/health/ActivityPage";
+import { ExercisePage } from "./pages/health/ExercisePage";
+import { GoalEditPage } from "./pages/health/GoalEditPage";
+import { GoalPage } from "./pages/health/GoalPage";
+import { HealthHubPage } from "./pages/health/HealthHubPage";
+import { HealthProfilePage } from "./pages/health/HealthProfilePage";
+import { VitalsDetailPage } from "./pages/health/VitalsDetailPage";
+import { VitalsInputPage } from "./pages/health/VitalsInputPage";
+import { VitalsListPage } from "./pages/health/VitalsListPage";
+import { HealthSurveyPage } from "./pages/HealthSurveyPage";
 import { LandingPage } from "./pages/LandingPage";
 import { LoginPage } from "./pages/LoginPage";
-import { MyProfilePage } from "./pages/MyProfilePage";
 import { NotificationsPage } from "./pages/NotificationsPage";
-import { PlaceholderPage } from "./pages/PlaceholderPage";
+import { PetEncyclopediaPage } from "./pages/PetEncyclopediaPage";
+import { PetPage } from "./pages/PetPage";
+import { PetSelectPage } from "./pages/PetSelectPage";
 import { PredictionFeedbackPage } from "./pages/PredictionFeedbackPage";
 import { PredictionHistoryPage } from "./pages/PredictionHistoryPage";
 import { PredictionProgressPage } from "./pages/PredictionProgressPage";
 import { PredictionRequestPage } from "./pages/PredictionRequestPage";
 import { PredictionResultPage } from "./pages/PredictionResultPage";
+import ReportDetailPage from "./pages/report/ReportDetailPage";
+import ReportExportPage from "./pages/report/ReportExportPage";
+import ReportListPage from "./pages/report/ReportListPage";
+import { SignUpPage } from "./pages/SignUpPage";
 
 // ── front/mypage-management 브랜치에서 추가
 import { MyInfoPage } from "./pages/MyInfoPage";
@@ -70,7 +94,17 @@ export type AppRoute =
   | "/pet/select"
   | "/pet/encyclopedia";
 
-const publicRoutes = new Set<AppRoute>(["/", "/login"]);
+const publicRoutes = new Set<AppRoute>(["/"]);
+
+const standaloneRoutes = new Set<AppRoute>([
+  "/login",
+  "/signup",
+  "/terms",
+  "/email-verify",
+  "/password-reset",
+  "/health-survey",
+  "/onboarding-complete",
+]);
 
 function normalizePath(pathname: string): AppRoute {
   const knownRoutes: AppRoute[] = [
@@ -145,7 +179,19 @@ export default function App() {
       case "/":
         return <LandingPage onNavigate={navigate} />;
       case "/login":
-        return <LoginPage onLogin={() => navigate("/home")} />;
+        return <LoginPage onLogin={() => navigate("/home")} onNavigate={navigate} />;
+      case "/signup":
+        return <SignUpPage onNavigate={navigate} />;
+      case "/terms":
+        return <TermsAgreementPage onNavigate={navigate} />;
+      case "/email-verify":
+        return <EmailVerifyPage onNavigate={navigate} />;
+      case "/password-reset":
+        return <PasswordResetPage onNavigate={navigate} />;
+      case "/health-survey":
+        return <HealthSurveyPage onNavigate={navigate} />;
+      case "/onboarding-complete":
+        return <OnboardingCompletePage onNavigate={navigate} />;
       case "/home":
         return <HomePage onNavigate={navigate} />;
       case "/notifications":
@@ -178,22 +224,62 @@ export default function App() {
       case "/mypage/withdrawal":
         return <WithdrawalPage onNavigate={navigate} />;
       case "/health":
-        return <PlaceholderPage title="건강 관리" description="건강 기록 입력/조회 화면을 연결할 영역입니다." />;
+        return <HealthHubPage onNavigate={navigate} />;
+      case "/health/goal":
+        return <GoalPage onNavigate={navigate} />;
+      case "/health/goal/edit":
+        return <GoalEditPage onNavigate={navigate} />;
+      case "/health/profile":
+        return <HealthProfilePage onNavigate={navigate} />;
+      case "/health/vitals":
+        return <VitalsListPage onNavigate={navigate} />;
+      case "/health/vitals/input":
+        return <VitalsInputPage onNavigate={navigate} />;
+      case "/health/vitals/detail":
+        return <VitalsDetailPage onNavigate={navigate} />;
+      case "/health/exercise":
+        return <ExercisePage onNavigate={navigate} />;
+      case "/health/activity":
+        return <ActivityPage onNavigate={navigate} />;
       case "/food":
-        return <PlaceholderPage title="식단 관리" description="식단 입력, 분석 결과, 기록 목록 화면을 연결할 영역입니다." />;
+        return <FoodPage onNavigate={navigate} />;
+      case "/food/analyze":
+        return <FoodAnalyzePage onNavigate={navigate} />;
       case "/reports":
-        return <PlaceholderPage title="리포트" description="주간 리포트 목록과 상세 화면을 연결할 영역입니다." />;
+        return <ReportListPage onNavigate={navigate} />;
+      case "/reports/detail":
+        return <ReportDetailPage onNavigate={navigate} />;
+      case "/reports/export":
+        return <ReportExportPage onNavigate={navigate} />;
       case "/challenges":
-        return <PlaceholderPage title="챌린지 관리" description="챌린지 목록, 참여, 체크인 화면을 연결할 영역입니다." />;
+        return <ChallengeDashboardPage onNavigate={navigate} />;
+      case "/challenges/list":
+        return <ChallengeListPage onNavigate={navigate} />;
+      case "/challenges/detail":
+        return <ChallengeDetailPage onNavigate={navigate} />;
+      case "/challenges/my":
+        return <MyChallengesPage onNavigate={navigate} />;
+      case "/challenges/leaderboard":
+        return <LeaderboardPage onNavigate={navigate} />;
+      case "/challenges/badges":
+        return <BadgePage onNavigate={navigate} />;
       case "/pet":
-        return <PlaceholderPage title="마이펫" description="펫 현황, 보상 과제, 도감 화면을 연결할 영역입니다." />;
+        return <PetPage onNavigate={navigate} />;
+      case "/pet/select":
+        return <PetSelectPage onNavigate={navigate} />;
+      case "/pet/encyclopedia":
+        return <PetEncyclopediaPage onNavigate={navigate} />;
       default:
-        return <HomePage />;
+        return <HomePage onNavigate={navigate} />;
     }
   }, [route]);
 
   if (publicRoutes.has(route)) {
     return <PublicLayout onNavigate={navigate}>{page}</PublicLayout>;
+  }
+
+  if (standaloneRoutes.has(route)) {
+    return page;
   }
 
   return (

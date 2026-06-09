@@ -1,5 +1,7 @@
 import { useState, useEffect } from "react";
 import type { AppRoute } from "../App";
+import { getStoredAccessToken } from "../api/auth";
+import { createHealthSurveyInput } from "../api/predictions";
 import { Stepper } from "../components/common/Stepper";
 
 interface HealthSurveyPageProps {
@@ -12,6 +14,107 @@ function OptionButton({ label, selected, onClick }: { label: string; selected: b
       {label}
     </button>
   );
+}
+
+function optionalNumber(value: string): number | null {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  return Number.isNaN(parsed) ? null : parsed;
+}
+
+function diseaseCodes(items: string[]) {
+  const map: Record<string, string | null> = {
+    고혈압: "HYPERTENSION",
+    당뇨: "DIABETES",
+    신장질환: "CKD",
+    고지혈증: "DYSLIPIDEMIA",
+    기타: "OTHER",
+    없음: null,
+  };
+  return items.map(item => map[item]).filter((item): item is string => Boolean(item));
+}
+
+function medicationCodes(items: string[]) {
+  const map: Record<string, string | null> = {
+    "고혈압 약": "HYPERTENSION",
+    "당뇨 약": "DIABETES",
+    "복용중인 약 없음": null,
+  };
+  return items.map(item => map[item]).filter((item): item is string => Boolean(item));
+}
+
+function smokingCode(value: string): 0 | 1 | 2 {
+  if (value === "예") return 2;
+  if (value === "과거 흡연") return 1;
+  return 0;
+}
+
+function alcoholFrequencyCode(value: string): 0 | 1 | 3 {
+  if (value === "주 3회 이상") return 3;
+  if (value === "월 1~2회" || value === "주 1~2회") return 1;
+  return 0;
+}
+
+function alcoholAmountCode(value: string): number | null {
+  const map: Record<string, number> = {
+    "1~2잔": 1,
+    "3~4잔": 2,
+    "5~6잔": 3,
+    "7~9잔": 4,
+    "10잔 이상": 5,
+  };
+  return map[value] ?? null;
+}
+
+function walkingDaysValue(value: string): number | null {
+  const map: Record<string, number> = {
+    "0일": 0,
+    "1~2일": 2,
+    "3~4일": 4,
+    "5~6일": 6,
+    "매일": 7,
+  };
+  return map[value] ?? null;
+}
+
+function exerciseFrequencyValue(value: string): number {
+  const map: Record<string, number> = {
+    "거의 안 함": 0,
+    "주 1~2회": 2,
+    "주 3~4회": 4,
+    "거의 매일": 7,
+  };
+  return map[value] ?? 0;
+}
+
+function sleepHoursValue(value: string): number | null {
+  const map: Record<string, number> = {
+    "5시간 이하": 5,
+    "6~7시간": 6.5,
+    "8시간 이상": 8,
+  };
+  return map[value] ?? null;
+}
+
+function sedentaryHoursValue(value: string): number | null {
+  const map: Record<string, number> = {
+    "2시간 미만": 1,
+    "2~5시간": 3.5,
+    "5~8시간": 6.5,
+    "8~10시간": 9,
+    "10시간 이상": 10,
+  };
+  return map[value] ?? null;
+}
+
+function dietScoreValue(mealPattern: string, foodPreference: string): number | null {
+  if (!mealPattern && !foodPreference) return null;
+  let score = 6;
+  if (mealPattern === "규칙적인 식사") score += 2;
+  if (mealPattern === "야식 자주 섭취" || mealPattern === "끼니를 거르는 편") score -= 2;
+  if (foodPreference === "채소 섭취가 많은 편") score += 2;
+  if (["단 음식 선호", "짠 음식 선호", "기름진 음식 선호"].includes(foodPreference)) score -= 2;
+  return Math.max(0, Math.min(10, score));
 }
 
 export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
@@ -55,6 +158,8 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   const [foodPreference, setFoodPreference] = useState("");
   const [sittingTime, setSittingTime] = useState("");
   const [stressLevel, setStressLevel] = useState(2);
+  const [isSavingSurvey, setIsSavingSurvey] = useState(false);
+  const [surveyError, setSurveyError] = useState("");
 
   useEffect(() => {
     const h = parseFloat(height);
@@ -373,26 +478,62 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   const stressEmojis = ["😄", "🙂", "😐", "😟", "😫"];
   const stressLabels = ["매우 낮음", "낮음", "보통", "높음", "매우 높음"];
 
-  const handleComplete = () => {
-    // TODO: API 연결 — POST /api/v1/prediction-inputs
-    // body: {
-    //   input_mode: "DEEP",
-    //   birth_date, height, weight, waist_circumference,
-    //   diagnosed_diseases, medications,
-    //   last_checkup_period: lastCheckup,
-    //   sbp: systolic, dbp: diastolic, glucose_fasting: fastingGlucose,
-    //   fh_diabetes_father, fh_diabetes_mother, fh_diabetes_sibling,
-    //   fh_hypertension_father, fh_hypertension_mother, fh_hypertension_sibling,
-    //   family_history_ckd: fhCkd,
-    //   smoking_status: ("예"→2, "과거 흡연"→1, "아니오"→0),
-    //   alcohol_frequency: ("안 마심"→0, "월 1~2회"→0, "주 1~2회"→1, "주 3회 이상"→3),
-    //   alcohol_amount: ("1~2잔"→1, "3~4잔"→2, "5~6잔"→3, "7~9잔"→4, "10잔 이상"→5),
-    //   walking_days, sedentary_hours, exercise_frequency,
-    //   physical_activity_min: Number(physicalActivityMin),
-    //   sleep_hours, stress_level, diet_score
-    // }
-    // ※ gender는 회원가입 저장값 사용 (body에 포함하지 않음)
-    onNavigate("/onboarding-complete");
+  const handleComplete = async () => {
+    setSurveyError("");
+    const token = getStoredAccessToken();
+    if (!token) {
+      setSurveyError("로그인이 필요합니다. 다시 로그인해주세요.");
+      return;
+    }
+
+    const alcoholFrequency = alcoholFrequencyCode(drinking);
+    const alcoholAmount = alcoholFrequency === 0 ? null : alcoholAmountCode(drinkingAmount);
+    if (alcoholFrequency !== 0 && alcoholAmount === null) {
+      setSurveyError("1회 평균 음주량을 선택해주세요.");
+      return;
+    }
+
+    setIsSavingSurvey(true);
+    try {
+      await createHealthSurveyInput(
+        {
+          input_mode: "DEEP",
+          birth_date: birthDate,
+          height: Number(height),
+          weight: Number(weight),
+          waist_circumference: optionalNumber(waist),
+          diagnosed_diseases: diseaseCodes(diseases),
+          medications: medicationCodes(medications),
+          last_checkup_period: lastCheckup || null,
+          sbp: optionalNumber(systolic),
+          dbp: optionalNumber(diastolic),
+          glucose_fasting: optionalNumber(fastingGlucose),
+          fh_diabetes_father: fhDiabetesFather,
+          fh_diabetes_mother: fhDiabetesMother,
+          fh_diabetes_sibling: fhDiabetesSibling,
+          fh_hypertension_father: fhHypertensionFather,
+          fh_hypertension_mother: fhHypertensionMother,
+          fh_hypertension_sibling: fhHypertensionSibling,
+          family_history_ckd: fhCkd,
+          smoking_status: smokingCode(smoking),
+          alcohol_frequency: alcoholFrequency,
+          alcohol_amount: alcoholAmount,
+          walking_days: walkingDaysValue(walkingDays),
+          sedentary_hours: sedentaryHoursValue(sittingTime),
+          exercise_frequency: exerciseFrequencyValue(exerciseFreq),
+          physical_activity_min: optionalNumber(physicalActivityMin),
+          sleep_hours: sleepHoursValue(sleepTime),
+          stress_level: stressLevel + 1,
+          diet_score: dietScoreValue(mealPattern, foodPreference),
+        },
+        token,
+      );
+      onNavigate("/onboarding-complete");
+    } catch {
+      setSurveyError("건강 설문 저장에 실패했습니다. 입력값을 확인해주세요.");
+    } finally {
+      setIsSavingSurvey(false);
+    }
   };
 
   return (
@@ -437,7 +578,15 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
         </div>
       </div>
 
-      <NavButtons onPrev={() => setSurveyStep(2)} onNext={handleComplete} nextLabel="설문 완료" />
+      {surveyError && (
+        <p style={{ fontSize: 12, color: "#E24B4A", margin: "12px 0 0", textAlign: "right" }}>{surveyError}</p>
+      )}
+      <NavButtons
+        onPrev={() => setSurveyStep(2)}
+        onNext={handleComplete}
+        nextLabel={isSavingSurvey ? "저장 중..." : "설문 완료"}
+        nextDisabled={isSavingSurvey || !birthDate || !height || !weight}
+      />
     </PageWrapper>
   );
 }

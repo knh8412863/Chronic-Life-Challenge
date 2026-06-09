@@ -1,5 +1,7 @@
 import { useState } from "react";
 import type { AppRoute } from "../App";
+import { ApiError } from "../api/client";
+import { login, storeAccessToken } from "../api/auth";
 
 interface LoginPageProps {
   onLogin: () => void;
@@ -11,20 +13,30 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorCount, setErrorCount] = useState(0); // 0: 기본, 3: 3회남음, 1: 1회남음, -1: 잠금
+  const [rememberMe, setRememberMe] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
 
   const handleLogin = async () => {
+    if (!email || !password) return;
     setIsLoading(true);
-    // TODO: API 연결 — POST /api/v1/auth/sessions
-    // body: { email, password, remember_me: false }
-    // 응답: 200 { data: { access_token, token_type, expires_in: 900 } }
-    // Access Token은 sessionStorage에 저장 (localStorage 저장 금지, NFR-SEC-001)
-    // 실패 시: 401 INVALID_CREDENTIALS → detail.remaining_attempts로 남은 횟수 표시
-    // 5회 초과 시: 429 RATE_LIMIT_EXCEEDED → 잠금 화면 표시
-    setTimeout(() => {
-      setIsLoading(false);
+    setErrorMessage("");
+    try {
+      const response = await login({ email, password, remember_me: rememberMe });
+      storeAccessToken(response.access_token, rememberMe);
+      setErrorCount(0);
       onLogin();
-    }, 500);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 429) {
+        setErrorCount(-1);
+        setErrorMessage("짧은 시간 내 로그인 시도가 반복되었습니다. 잠시 후 다시 시도해주세요.");
+      } else {
+        setErrorCount(prev => (prev === 0 ? 3 : prev === 3 ? 1 : prev));
+        setErrorMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const BrandPanel = () => (
@@ -127,6 +139,9 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
               </button>
             </div>
             {errorCount === 3 && <p style={{ fontSize: 12, color: "#E24B4A", margin: "4px 0 0" }}>이메일 또는 비밀번호가 올바르지 않습니다. (3회 시도 남음)</p>}
+            {errorMessage && errorCount !== 3 && errorCount !== 1 && (
+              <p style={{ fontSize: 12, color: "#E24B4A", margin: "4px 0 0" }}>{errorMessage}</p>
+            )}
           </div>
 
           {errorCount === 1 && (
@@ -140,6 +155,16 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
               </div>
             </div>
           )}
+
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#555", cursor: "pointer" }}>
+            <input
+              type="checkbox"
+              checked={rememberMe}
+              onChange={(e) => setRememberMe(e.target.checked)}
+              style={{ width: 14, height: 14, cursor: "pointer" }}
+            />
+            로그인 상태 유지
+          </label>
 
           <button
             onClick={handleLogin} disabled={isLoading || !email || !password}
