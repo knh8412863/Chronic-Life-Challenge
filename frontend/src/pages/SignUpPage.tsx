@@ -1,15 +1,36 @@
 import { useState } from "react";
 import type { AppRoute } from "../App";
+import type { SignUpPayload } from "../api/auth";
 
 interface SignUpPageProps {
   onNavigate: (route: AppRoute) => void;
 }
 
 const DISEASES = ["당뇨", "고혈압", "고지혈증", "비만", "만성신장질환"];
+const SIGNUP_DRAFT_KEY = "auth.signupDraft";
+
+function validatePassword(value: string) {
+  if (value.length < 8) return "비밀번호는 8자 이상이어야 합니다.";
+  if (!/[A-Z]/.test(value)) return "대문자를 1개 이상 포함해야 합니다.";
+  if (!/[a-z]/.test(value)) return "소문자를 1개 이상 포함해야 합니다.";
+  if (!/[0-9]/.test(value)) return "숫자를 1개 이상 포함해야 합니다.";
+  if (!/[^a-zA-Z0-9]/.test(value)) return "특수문자를 1개 이상 포함해야 합니다.";
+  return "";
+}
+
+function validateEmail(value: string) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+function validatePhoneNumber(value: string) {
+  return /^(010-\d{4}-\d{4}|010\d{8}|\+8210\d{8})$/.test(value);
+}
 
 export function SignUpPage({ onNavigate }: SignUpPageProps) {
   const [name, setName] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "">("");
+  const [birthDate, setBirthDate] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [email, setEmail] = useState("");
   const [emailChecked, setEmailChecked] = useState(false);
   const [password, setPassword] = useState("");
@@ -18,41 +39,64 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
   const [showPwConfirm, setShowPwConfirm] = useState(false);
   const [selectedDiseases, setSelectedDiseases] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [formMessage, setFormMessage] = useState("");
 
   const toggleDisease = (d: string) => {
     setSelectedDiseases(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
   };
 
   const handleEmailCheck = () => {
-    // TODO: API 연결 — GET /api/v1/auth/email-availability?email={email}
-    // 응답: 200 { data: { available: bool } }
-    // available: true → "사용 가능한 이메일입니다." 표시
-    // available: false → 400 INVALID_EMAIL_FORMAT 또는 409 EMAIL_EXISTS
+    if (!validateEmail(email)) {
+      setEmailChecked(false);
+      setFormMessage("이메일 형식을 확인해주세요.");
+      return;
+    }
+    setFormMessage("이메일 형식이 확인되었습니다. 중복 여부는 가입 시 확인됩니다.");
     setEmailChecked(true);
   };
 
   const handleNext = () => {
+    const passwordError = validatePassword(password);
+    if (passwordError) {
+      setFormMessage(passwordError);
+      return;
+    }
+    if (!validatePhoneNumber(phoneNumber)) {
+      setFormMessage("휴대폰 번호는 01012345678, 010-1234-5678, +821012345678 형식으로 입력해주세요.");
+      return;
+    }
+
     setIsLoading(true);
-    // TODO: API 연결 — POST /api/v1/auth/registrations
-    // body: {
-    //   email, password, name,
-    //   gender: gender === "male" ? "M" : "F",
-    //   managed_diseases: selectedDiseases.map(d => DISEASE_CODE_MAP[d]),
-    //   consent_terms_version: "v1.0",
-    //   consent_privacy_agreed: true,   // 약관동의 단계에서 처리
-    //   consent_health_data: true,
-    //   consent_marketing: false
-    // }
-    // 응답: 201 { data: { user_id, email, name, gender, managed_diseases } }
-    // 실패: 409 EMAIL_EXISTS / 422 PASSWORD_TOO_WEAK / 422 DISEASE_SELECTION_REQUIRED
-    setTimeout(() => {
-      setIsLoading(false);
-      onNavigate("/terms");
-    }, 300);
+    const draft: SignUpPayload & { managed_diseases: string[] } = {
+      email,
+      password,
+      name,
+      gender: gender === "male" ? "MALE" : "FEMALE",
+      birth_date: birthDate,
+      phone_number: phoneNumber,
+      managed_diseases: selectedDiseases,
+    };
+    sessionStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify(draft));
+    setIsLoading(false);
+    onNavigate("/terms");
   };
 
   const pwMismatch = passwordConfirm.length > 0 && password !== passwordConfirm;
-  const isValid = name && gender && email && emailChecked && password && !pwMismatch && selectedDiseases.length > 0;
+  const passwordError = password ? validatePassword(password) : "";
+  const phoneError = phoneNumber && !validatePhoneNumber(phoneNumber);
+  const isValid =
+    name &&
+    gender &&
+    birthDate &&
+    phoneNumber &&
+    !phoneError &&
+    email &&
+    emailChecked &&
+    password &&
+    !passwordError &&
+    passwordConfirm &&
+    !pwMismatch &&
+    selectedDiseases.length > 0;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh" }}>
@@ -115,6 +159,21 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
             </div>
           </div>
 
+          {/* 생년월일 + 휴대폰 */}
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>생년월일</label>
+              <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)}
+                style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
+            </div>
+            <div>
+              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>휴대폰 번호</label>
+              <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="01012345678"
+                style={{ width: "100%", height: 34, border: `1.5px solid ${phoneError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
+              {phoneError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>휴대폰 번호 형식을 확인해주세요.</p>}
+            </div>
+          </div>
+
           {/* 이메일 */}
           <div>
             <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>이메일 (필수)</label>
@@ -122,9 +181,9 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
               <input type="email" value={email} onChange={e => { setEmail(e.target.value); setEmailChecked(false); }} placeholder="example@email.com"
                 style={{ flex: 1, height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
               <button onClick={handleEmailCheck}
-                style={{ height: 34, minWidth: 70, border: "1.5px solid #ddd", borderRadius: 5, background: "#f5f5f5", fontSize: 10, color: "#555", cursor: "pointer" }}>중복 확인</button>
+                style={{ height: 34, minWidth: 70, border: "1.5px solid #ddd", borderRadius: 5, background: "#f5f5f5", fontSize: 10, color: "#555", cursor: "pointer" }}>이메일 확인</button>
             </div>
-            {emailChecked && <p style={{ fontSize: 11, color: "#2e7d32", margin: "4px 0 0" }}>✓ 사용 가능한 이메일입니다.</p>}
+            {emailChecked && <p style={{ fontSize: 11, color: "#2e7d32", margin: "4px 0 0" }}>✓ 이메일 형식이 확인되었습니다.</p>}
           </div>
 
           {/* 비밀번호 */}
@@ -138,6 +197,7 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
                 {showPw ? "🙈" : "👁"}
               </button>
             </div>
+            {passwordError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>{passwordError}</p>}
           </div>
 
           {/* 비밀번호 확인 */}
@@ -169,6 +229,8 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
             </div>
             {selectedDiseases.length === 0 && <p style={{ fontSize: 11, color: "#E24B4A", margin: "6px 0 0" }}>관리 대상 질환을 1개 이상 선택해주세요.</p>}
           </div>
+
+          {formMessage && <p style={{ fontSize: 11, color: formMessage.includes("확인되었습니다") ? "#2e7d32" : "#E24B4A", margin: 0 }}>{formMessage}</p>}
 
           <button onClick={handleNext} disabled={!isValid || isLoading}
             style={{ width: "100%", height: 36, background: !isValid || isLoading ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !isValid || isLoading ? "not-allowed" : "pointer", marginTop: 6 }}>

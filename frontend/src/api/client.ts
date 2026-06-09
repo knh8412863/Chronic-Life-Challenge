@@ -4,6 +4,22 @@ type RequestOptions = RequestInit & {
   token?: string;
 };
 
+export class ApiError extends Error {
+  status: number;
+  detail?: unknown;
+
+  constructor(status: number, detail?: unknown) {
+    const message =
+      typeof detail === "string"
+        ? detail
+        : `API request failed: ${status}`;
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.detail = detail;
+  }
+}
+
 export async function apiRequest<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const headers = new Headers(options.headers);
 
@@ -17,11 +33,19 @@ export async function apiRequest<T>(path: string, options: RequestOptions = {}):
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     ...options,
+    credentials: options.credentials ?? "include",
     headers,
   });
 
   if (!response.ok) {
-    throw new Error(`API request failed: ${response.status}`);
+    let detail: unknown;
+    try {
+      const body = await response.json();
+      detail = body.detail ?? body.message ?? body.error ?? body;
+    } catch {
+      detail = response.statusText;
+    }
+    throw new ApiError(response.status, detail);
   }
 
   if (response.status === 204) {

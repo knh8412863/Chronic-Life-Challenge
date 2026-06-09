@@ -1,10 +1,33 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AppRoute } from "../App";
+import {
+  login,
+  requestEmailVerification,
+  requestPasswordReset,
+  resetPassword,
+  signup,
+  storeAccessToken,
+  verifyEmail,
+  type SignUpPayload,
+} from "../api/auth";
+import { ApiError } from "../api/client";
+import { getPolicyDocument, type ConsentType } from "../api/users";
 import { Stepper } from "../components/common/Stepper";
 
 // ──────────────────────────────────────────────
 // 약관 동의 페이지
 // ──────────────────────────────────────────────
+const SIGNUP_DRAFT_KEY = "auth.signupDraft";
+
+function validatePassword(value: string) {
+  if (value.length < 8) return "비밀번호는 8자 이상이어야 합니다.";
+  if (!/[A-Z]/.test(value)) return "대문자를 1개 이상 포함해야 합니다.";
+  if (!/[a-z]/.test(value)) return "소문자를 1개 이상 포함해야 합니다.";
+  if (!/[0-9]/.test(value)) return "숫자를 1개 이상 포함해야 합니다.";
+  if (!/[^a-zA-Z0-9]/.test(value)) return "특수문자를 1개 이상 포함해야 합니다.";
+  return "";
+}
+
 interface TermsAgreementPageProps {
   onNavigate: (route: AppRoute) => void;
 }
@@ -16,6 +39,10 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
     health: false,
     marketing: false,
   });
+  const [policyModal, setPolicyModal] = useState<{ title: string; content: string } | null>(null);
+  const [isPolicyLoading, setIsPolicyLoading] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitMessage, setSubmitMessage] = useState("");
 
   const allRequired = checked.service && checked.privacy && checked.health;
   const allChecked = allRequired && checked.marketing;
@@ -23,6 +50,71 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
   const toggleAll = () => {
     const next = !allChecked;
     setChecked({ service: next, privacy: next, health: next, marketing: next });
+  };
+
+  const openPolicy = async (type: ConsentType) => {
+    setIsPolicyLoading(true);
+    setPolicyModal({ title: "약관을 불러오는 중입니다.", content: "" });
+    try {
+      const document = await getPolicyDocument(type);
+      setPolicyModal({ title: document.title, content: document.content });
+    } catch {
+      setPolicyModal({
+        title: "약관 전문",
+        content: "약관 내용을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.",
+      });
+    } finally {
+      setIsPolicyLoading(false);
+    }
+  };
+
+  const handleSubmit = async () => {
+    if (!allRequired || isSubmitting) return;
+
+    const rawDraft = sessionStorage.getItem(SIGNUP_DRAFT_KEY);
+    if (!rawDraft) {
+      setSubmitMessage("회원가입 정보가 없습니다. 계정 정보 입력부터 다시 진행해주세요.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setSubmitMessage("");
+    try {
+      const { managed_diseases: _managedDiseases, ...draft } = JSON.parse(rawDraft) as SignUpPayload & {
+        managed_diseases?: string[];
+      };
+      const payload: SignUpPayload = {
+        ...draft,
+        consent_terms_version: "v1.0",
+        consent_privacy_agreed: checked.privacy,
+        consent_health_data: checked.health,
+        consent_marketing: checked.marketing,
+      };
+      await signup(payload);
+      const loginResponse = await login({
+        email: payload.email,
+        password: payload.password,
+        remember_me: false,
+      });
+      storeAccessToken(loginResponse.access_token);
+      try {
+        await requestEmailVerification();
+      } catch {
+        // 가입은 완료된 상태이므로 인증 화면에서 재발송할 수 있게 이동은 유지합니다.
+      }
+      sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+      onNavigate("/email-verify");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        setSubmitMessage(String(error.detail ?? "이미 사용 중인 이메일 또는 휴대폰 번호입니다."));
+      } else if (error instanceof ApiError && error.status === 422) {
+        setSubmitMessage("입력값을 확인해주세요. 비밀번호, 생년월일, 휴대폰 번호 형식이 필요 조건과 맞아야 합니다.");
+      } else {
+        setSubmitMessage("회원가입 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
+      }
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -48,10 +140,10 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
 
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {[
-              { key: "service" as const, label: "[필수] 서비스 이용약관" },
-              { key: "privacy" as const, label: "[필수] 개인정보 처리방침" },
-              { key: "health" as const, label: "[필수] 건강 데이터 수집·이용 동의" },
-              { key: "marketing" as const, label: "[선택] 마케팅 정보 수신 동의" },
+              { key: "service" as const, label: "[필수] 서비스 이용약관", policyType: "TOS" as const },
+              { key: "privacy" as const, label: "[필수] 개인정보 처리방침", policyType: "PRIVACY" as const },
+              { key: "health" as const, label: "[필수] 건강 데이터 수집·이용 동의", policyType: "HEALTH_DATA" as const },
+              { key: "marketing" as const, label: "[선택] 마케팅 정보 수신 동의", policyType: "MARKETING" as const },
             ].map(item => (
               <div key={item.key} style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
@@ -59,16 +151,23 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
                     style={{ width: 14, height: 14, cursor: "pointer" }} />
                   <span style={{ fontSize: 12, color: "#333" }}>{item.label}</span>
                 </label>
-                <button style={{ background: "none", border: "none", fontSize: 10, color: "#888", cursor: "pointer" }}>보기</button>
+                <button
+                  type="button"
+                  onClick={() => openPolicy(item.policyType)}
+                  style={{ background: "none", border: "none", fontSize: 10, color: "#888", cursor: "pointer" }}
+                >
+                  보기
+                </button>
               </div>
             ))}
           </div>
 
           <p style={{ fontSize: 11, color: "#aaa", textAlign: "right", margin: "14px 0 20px" }}>적용 약관 버전: v1.0</p>
 
-          <button onClick={() => onNavigate("/email-verify")} disabled={!allRequired}
-            style={{ width: "100%", height: 40, background: allRequired ? "#1a1a1a" : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: allRequired ? "pointer" : "not-allowed" }}>
-            다음
+          {submitMessage && <p style={{ fontSize: 11, color: "#E24B4A", margin: "0 0 10px" }}>{submitMessage}</p>}
+          <button onClick={handleSubmit} disabled={!allRequired || isSubmitting}
+            style={{ width: "100%", height: 40, background: allRequired && !isSubmitting ? "#1a1a1a" : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: allRequired && !isSubmitting ? "pointer" : "not-allowed" }}>
+            {isSubmitting ? "가입 처리 중..." : "다음"}
           </button>
         </div>
 
@@ -77,6 +176,23 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
           <button onClick={() => onNavigate("/login")} style={{ background: "none", border: "none", fontSize: 11, color: "#1a1a1a", cursor: "pointer", fontWeight: 600 }}>로그인</button>
         </p>
       </div>
+      {policyModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ width: "100%", maxWidth: 560, maxHeight: "80vh", background: "#fff", borderRadius: 12, padding: 24, overflow: "auto" }}>
+            <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 12px" }}>{policyModal.title}</h3>
+            <div style={{ whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.7, color: "#444", minHeight: 120 }}>
+              {isPolicyLoading ? "약관을 불러오는 중입니다." : policyModal.content}
+            </div>
+            <button
+              type="button"
+              onClick={() => setPolicyModal(null)}
+              style={{ width: "100%", height: 38, marginTop: 18, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, cursor: "pointer" }}
+            >
+              확인
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -90,20 +206,46 @@ interface EmailVerifyPageProps {
 
 export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [message, setMessage] = useState("");
+  const [verifyStatus, setVerifyStatus] = useState<"IDLE" | "VERIFYING" | "SUCCESS" | "FAILED">("IDLE");
+  const verificationToken = new URLSearchParams(window.location.search).get("token");
 
-  const handleResend = () => {
-    // TODO: API 연결 — POST /api/v1/auth/email-verification-requests
-    // Header: Authorization: Bearer <access_token> (필수)
-    // 응답: 204 No Content
-    // 재발송 시 기존 미사용 토큰 무효화 후 신규 토큰 발급
-    // 429 RATE_LIMIT_EXCEEDED: 분당 1회 제한 → 60초 쿨다운 UI 표시
+  useEffect(() => {
+    if (!verificationToken) return;
+    setVerifyStatus("VERIFYING");
+    verifyEmail(verificationToken)
+      .then(() => {
+        setVerifyStatus("SUCCESS");
+        setMessage("이메일 인증이 완료되었습니다.");
+      })
+      .catch(() => {
+        setVerifyStatus("FAILED");
+        setMessage("인증 링크가 만료되었거나 유효하지 않습니다. 인증 메일을 다시 요청해주세요.");
+      });
+  }, [verificationToken]);
+
+  const startCooldown = () => {
     setResendCooldown(60);
-    const timer = setInterval(() => {
+    const timer = window.setInterval(() => {
       setResendCooldown(prev => {
-        if (prev <= 1) { clearInterval(timer); return 0; }
+        if (prev <= 1) {
+          window.clearInterval(timer);
+          return 0;
+        }
         return prev - 1;
       });
     }, 1000);
+  };
+
+  const handleResend = async () => {
+    setMessage("");
+    try {
+      await requestEmailVerification();
+      setMessage("인증 메일을 다시 발송했습니다.");
+      startCooldown();
+    } catch {
+      setMessage("인증 메일 재발송에 실패했습니다. 로그인 상태를 확인해주세요.");
+    }
   };
 
   return (
@@ -137,12 +279,20 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
       {/* Right */}
       <div style={{ flex: 1, padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center", background: "#fff" }}>
         <div style={{ fontSize: 11, fontWeight: 500, color: "#888", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>이메일 인증</div>
-        <div style={{ fontSize: 12, color: "#555", marginBottom: 20 }}>아래 절차에 따라 인증을 완료해주세요</div>
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 20 }}>
+          {verificationToken ? "인증 링크를 확인하고 있습니다" : "아래 절차에 따라 인증을 완료해주세요"}
+        </div>
         <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "0 0 20px" }} />
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
           <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14, fontSize: 24 }}>📧</div>
-          <p style={{ fontSize: 12, color: "#555", textAlign: "center" }}>example@email.com 으로 인증 메일을 발송했습니다</p>
+          <p style={{ fontSize: 12, color: "#555", textAlign: "center" }}>
+            {verifyStatus === "VERIFYING"
+              ? "이메일 인증을 처리하는 중입니다."
+              : verifyStatus === "SUCCESS"
+                ? "이메일 인증이 완료되었습니다."
+                : "인증 메일을 확인하고 링크를 클릭해주세요."}
+          </p>
         </div>
 
         <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 8, padding: 16, marginBottom: 20 }}>
@@ -156,20 +306,22 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
           ))}
         </div>
 
-        <button onClick={handleResend} disabled={resendCooldown > 0}
+        <button onClick={handleResend} disabled={resendCooldown > 0 || verifyStatus === "SUCCESS"}
           style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 12, color: resendCooldown > 0 ? "#aaa" : "#333", cursor: resendCooldown > 0 ? "not-allowed" : "pointer", marginBottom: 10 }}>
           {resendCooldown > 0 ? `재발송 가능까지 ${resendCooldown}초` : "이메일 재발송"}
         </button>
+        {message && <p style={{ fontSize: 11, color: message.includes("실패") ? "#E24B4A" : "#2e7d32", margin: "0 0 10px" }}>{message}</p>}
         <button onClick={() => onNavigate("/signup")}
           style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 12, color: "#333", cursor: "pointer", marginBottom: 20 }}>
           이전으로 돌아가기
         </button>
 
-        {/* 개발용: 인증 완료 시뮬레이션 */}
-        <button onClick={() => onNavigate("/health-survey")}
-          style={{ width: "100%", height: 36, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, cursor: "pointer", marginBottom: 16 }}>
-          [개발용] 인증 완료 → 다음 단계
-        </button>
+        {verifyStatus === "SUCCESS" && (
+          <button onClick={() => onNavigate("/health-survey")}
+            style={{ width: "100%", height: 36, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, cursor: "pointer", marginBottom: 16 }}>
+            건강 설문으로 이동
+          </button>
+        )}
 
         <p style={{ textAlign: "center", fontSize: 11, color: "#888", cursor: "pointer", margin: 0 }}
           onClick={() => onNavigate("/login")}>로그인으로 돌아가기</p>
@@ -186,14 +338,19 @@ interface PasswordResetPageProps {
 }
 
 export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
-  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const resetToken = new URLSearchParams(window.location.search).get("token");
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(resetToken ? 3 : 1);
   const [email, setEmail] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const pwMismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
+  const passwordError = newPassword ? validatePassword(newPassword) : "";
+  const resetPasswordInvalid = !newPassword || !confirmPassword || Boolean(passwordError) || pwMismatch;
 
   const ProcessGuide = () => (
     <div style={{ width: "45%", background: "#f5f5f5", padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center", borderRight: "1px solid #e0e0e0" }}>
@@ -253,13 +410,24 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
                 style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
               <p style={{ fontSize: 11, color: "#aaa", margin: "4px 0 0" }}>가입된 이메일이 아니더라도 동일한 안내를 드립니다.</p>
             </div>
-            <button onClick={() => setStep(2)} disabled={!email}
+            <button
+              onClick={async () => {
+                setErrorMessage("");
+                setIsSubmitting(true);
+                try {
+                  await requestPasswordReset(email);
+                  setStep(2);
+                } catch {
+                  setErrorMessage("메일 발송 요청에 실패했습니다. 잠시 후 다시 시도해주세요.");
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              disabled={!email || isSubmitting}
               style={{ width: "100%", height: 36, background: email ? "#1a1a1a" : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: email ? "pointer" : "not-allowed" }}>
-              {/* TODO: API 연결 — POST /api/v1/auth/password-reset-requests */}
-              {/* body: { email } / 응답: 204 No Content (미가입 이메일도 동일 응답, 가입 여부 비노출) */}
-              {/* 재설정 토큰 유효시간 30분 / 429 RATE_LIMIT_EXCEEDED: 분당 3회/IP 제한 */}
-              인증 메일 발송
+              {isSubmitting ? "발송 중..." : "인증 메일 발송"}
             </button>
+            {errorMessage && <p style={{ fontSize: 11, color: "#E24B4A", margin: 0 }}>{errorMessage}</p>}
             <hr style={{ border: "none", borderTop: "1px solid #eee" }} />
             <p style={{ textAlign: "center", fontSize: 11, color: "#888", cursor: "pointer" }} onClick={() => onNavigate("/login")}>로그인으로 돌아가기</p>
           </div>
@@ -272,9 +440,18 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
               {email}으로 재설정 링크를 발송했습니다. 메일함을 확인하고 링크를 클릭해주세요.
             </p>
             <p style={{ fontSize: 11, color: "#aaa", margin: 0 }}>링크는 발송 후 1시간 동안 유효합니다. 스팸 메일함도 확인해보세요.</p>
-            <button onClick={() => {}} style={{ width: "100%", height: 36, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}>이메일 재발송</button>
-            {/* 개발용 */}
-            <button onClick={() => setStep(3)} style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 12, cursor: "pointer" }}>[개발용] 링크 클릭 → 다음 단계</button>
+            <button
+              onClick={async () => {
+                try {
+                  await requestPasswordReset(email);
+                } catch {
+                  setErrorMessage("이메일 재발송에 실패했습니다.");
+                }
+              }}
+              style={{ width: "100%", height: 36, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}
+            >
+              이메일 재발송
+            </button>
             <hr style={{ border: "none", borderTop: "1px solid #eee" }} />
             <p style={{ textAlign: "center", fontSize: 11, color: "#888", cursor: "pointer" }} onClick={() => onNavigate("/login")}>로그인으로 돌아가기</p>
           </div>
@@ -287,9 +464,10 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
               <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>새 비밀번호</label>
               <div style={{ position: "relative" }}>
                 <input type={showPw ? "text" : "password"} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="영문+숫자+특수문자 조합 8자 이상"
-                  style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 36px 0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
+                  style={{ width: "100%", height: 34, border: `1.5px solid ${passwordError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
                 <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>{showPw ? "🙈" : "👁"}</button>
               </div>
+              {passwordError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>{passwordError}</p>}
             </div>
             <div>
               <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>새 비밀번호 확인</label>
@@ -300,14 +478,36 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
               </div>
               {pwMismatch && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>비밀번호가 일치하지 않습니다.</p>}
             </div>
-            <button onClick={() => setStep(4)} disabled={!newPassword || !confirmPassword || pwMismatch}
-              style={{ width: "100%", height: 36, background: !newPassword || !confirmPassword || pwMismatch ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !newPassword || !confirmPassword || pwMismatch ? "not-allowed" : "pointer" }}>
-              {/* TODO: API 연결 — POST /api/v1/auth/password-resets */}
-              {/* body: { token (URL 파라미터), new_password, new_password_confirm } */}
-              {/* 응답: 204 No Content / 재설정 완료 시 기존 Refresh Token 세션 전체 무효화 */}
-              {/* 410 TOKEN_EXPIRED: 토큰 만료(30분) / 422 PASSWORD_MISMATCH */}
-              비밀번호 변경하기
+            <button
+              onClick={async () => {
+                if (!resetToken) {
+                  setErrorMessage("메일의 재설정 링크로 접속해야 비밀번호를 변경할 수 있습니다.");
+                  return;
+                }
+                if (passwordError) {
+                  setErrorMessage(passwordError);
+                  return;
+                }
+                setErrorMessage("");
+                setIsSubmitting(true);
+                try {
+                  await resetPassword(resetToken, newPassword, confirmPassword);
+                  setStep(4);
+                } catch (error) {
+                  const message =
+                    error instanceof ApiError && error.status === 410
+                      ? "재설정 링크가 만료되었습니다. 다시 요청해주세요."
+                      : "비밀번호 변경에 실패했습니다. 입력값을 확인해주세요.";
+                  setErrorMessage(message);
+                } finally {
+                  setIsSubmitting(false);
+                }
+              }}
+              disabled={resetPasswordInvalid || isSubmitting}
+              style={{ width: "100%", height: 36, background: resetPasswordInvalid ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: resetPasswordInvalid ? "not-allowed" : "pointer" }}>
+              {isSubmitting ? "변경 중..." : "비밀번호 변경하기"}
             </button>
+            {errorMessage && <p style={{ fontSize: 11, color: "#E24B4A", margin: 0 }}>{errorMessage}</p>}
           </div>
         )}
       </div>
