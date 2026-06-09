@@ -3,7 +3,7 @@ from typing import Annotated
 
 from pydantic import BaseModel, Field
 
-from app.core.validators import optional_after_validator, validate_phone_number
+from app.core.validators import optional_after_validator, validate_password, validate_phone_number
 from app.dtos.base import BaseSerializerModel
 from app.models.users import Gender, WithdrawalReason
 
@@ -80,3 +80,13 @@ class UserWithdrawalRequest(BaseModel):
     withdrawal_reason: WithdrawalReason
     withdrawal_comment: Annotated[str | None, Field(None, max_length=500)] = None
     confirm_agreed: bool
+
+
+class PasswordChangeRequest(BaseModel):
+    current_password: Annotated[str, Field(min_length=8, max_length=128)]
+    new_password: Annotated[str, Field(min_length=8, max_length=128), optional_after_validator(validate_password)]
+    new_password_confirm: Annotated[str, Field(min_length=8, max_length=128)]
+
+    def model_post_init(self, __context) -> None:
+        if self.new_password != self.new_password_confirm:
+            raise ValueError("비밀번호가 일치하지 않습니다.")

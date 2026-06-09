@@ -6,9 +6,10 @@ from tortoise.transactions import in_transaction
 
 from app.core import config
 from app.core.utils.common import normalize_phone_number
-from app.core.utils.security import verify_password
+from app.core.utils.security import hash_password, verify_password
 from app.dtos.users import (
     ConsentUpdateRequest,
+    PasswordChangeRequest,
     PolicyChangeResponse,
     PolicyDocumentResponse,
     UserConsentItemResponse,
@@ -146,6 +147,17 @@ class UserManageService:
             await UserWithdrawal.create(user_id=user.id, **payload)
             user.is_active = False
             await user.save(update_fields=["is_active", "updated_at"])
+
+    async def change_password(self, user: User, data: PasswordChangeRequest) -> None:
+        if not verify_password(data.current_password, user.hashed_password):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="현재 비밀번호가 올바르지 않습니다.")
+        if verify_password(data.new_password, user.hashed_password):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="새 비밀번호는 현재 비밀번호와 달라야 합니다.",
+            )
+
+        await self.repo.update_password(user.id, hash_password(data.new_password))
 
     @staticmethod
     def _build_profile_update_payload(

@@ -7,6 +7,7 @@ from starlette.responses import Response as EmptyResponse
 from app.dependencies.security import get_request_user
 from app.dtos.users import (
     ConsentUpdateRequest,
+    PasswordChangeRequest,
     PolicyDocumentResponse,
     UserConsentItemResponse,
     UserConsentListResponse,
@@ -38,6 +39,16 @@ async def update_user_me_info(
 ) -> Response:
     result = await user_manage_service.update_user_info(user=user, data=update_data)
     return Response(result.model_dump(mode="json"), status_code=status.HTTP_200_OK)
+
+
+@user_router.patch("/me/password", status_code=status.HTTP_204_NO_CONTENT)
+async def change_user_me_password(
+    request: PasswordChangeRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    user_manage_service: Annotated[UserManageService, Depends(UserManageService)],
+) -> EmptyResponse:
+    await user_manage_service.change_password(user=user, data=request)
+    return EmptyResponse(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @user_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)
