@@ -93,6 +93,23 @@ export type PredictionResult = {
   disclaimer: string;
 };
 
+export type PredictionResultListItem = {
+  result_id: number;
+  prediction_mode: string;
+  created_at: string;
+  overall_risk_level: "LOW" | "MEDIUM" | "HIGH" | string;
+  highest_risk_disease: string | null;
+  highest_risk_probability: number | null;
+  disease_risks: Record<string, DiseaseRisk>;
+  input_completeness: PredictionResult["input_completeness"];
+  feedback_submitted: boolean;
+};
+
+export type PredictionResultList = {
+  total: number;
+  items: PredictionResultListItem[];
+};
+
 export type PredictionFeedbackPayload = {
   feedback_type: "CORRECT" | "INCORRECT" | "UNSURE";
   actual_diagnosis?: Record<string, boolean> | null;
@@ -136,6 +153,12 @@ export function getPredictionTaskStatus(taskUuid: string, token?: string) {
 
 export function getPredictionResult(resultId: number, token?: string) {
   return apiRequest<{ data: PredictionResult }>(`/prediction-results/${resultId}`, {
+    token,
+  });
+}
+
+export function getPredictionResults(limit = 20, token?: string) {
+  return apiRequest<{ data: PredictionResultList }>(`/prediction-results?limit=${limit}`, {
     token,
   });
 }
