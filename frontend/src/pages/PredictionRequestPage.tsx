@@ -1,6 +1,8 @@
 import { useMemo, useState } from "react";
 
 import type { AppRoute } from "../App";
+import { getStoredAccessToken } from "../api/auth";
+import { createPredictionTask, getLatestHealthSurveyInput } from "../api/predictions";
 
 type PredictionRequestPageProps = {
   onNavigate: (route: AppRoute) => void;
@@ -19,6 +21,8 @@ const dataRows = [
 export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps) {
   const [selectedDiseases, setSelectedDiseases] = useState(() => new Set(diseases));
   const [analysisMode, setAnalysisMode] = useState<"BASIC" | "DEEP">("BASIC");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const isAllSelected = selectedDiseases.size === diseases.length;
   const selectedCount = selectedDiseases.size;
@@ -43,6 +47,45 @@ export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps
 
   const toggleAllDiseases = () => {
     setSelectedDiseases(isAllSelected ? new Set() : new Set(diseases));
+  };
+
+  const handleStartPrediction = async () => {
+    if (selectedDiseases.size === 0) {
+      setErrorMessage("예측할 질환을 1개 이상 선택해 주세요.");
+      return;
+    }
+
+    const token = getStoredAccessToken();
+    if (!token) {
+      setErrorMessage("로그인 후 예측을 요청할 수 있습니다.");
+      onNavigate("/login");
+      return;
+    }
+
+    setIsSubmitting(true);
+    setErrorMessage("");
+
+    try {
+      const latestInput = await getLatestHealthSurveyInput(token);
+      const task = await createPredictionTask(
+        {
+          health_input_id: latestInput.data.health_input_id,
+          prediction_mode: "SCREENING",
+        },
+        token,
+      );
+
+      sessionStorage.setItem("predictionTaskUuid", task.data.task_uuid);
+      sessionStorage.removeItem("predictionResultId");
+      sessionStorage.setItem("predictionSelectedDiseases", JSON.stringify([...selectedDiseases]));
+      sessionStorage.setItem("predictionAnalysisMode", analysisMode);
+      window.history.pushState({}, "", `/prediction/progress?task_uuid=${task.data.task_uuid}`);
+      onNavigate("/prediction/progress");
+    } catch {
+      setErrorMessage("최근 건강설문 입력을 찾을 수 없습니다. 건강설문을 먼저 저장해 주세요.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -96,9 +139,18 @@ export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps
               </div>
             ))}
           </div>
-          <button className="green-button" type="button" onClick={() => onNavigate("/prediction/progress")}>
-            예측 시작
+          <button className="green-button" disabled={isSubmitting || selectedCount === 0} type="button" onClick={handleStartPrediction}>
+            {isSubmitting ? "예측 요청 중..." : "예측 시작"}
           </button>
+          {errorMessage && (
+            <div className="warning-banner compact">
+              <strong>!</strong>
+              <span>{errorMessage}</span>
+              <button type="button" onClick={() => onNavigate("/health-survey")}>
+                건강설문 입력
+              </button>
+            </div>
+          )}
         </aside>
       </section>
       <section className="warning-banner compact">

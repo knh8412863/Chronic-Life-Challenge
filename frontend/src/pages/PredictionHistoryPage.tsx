@@ -4,13 +4,9 @@ type PredictionHistoryPageProps = {
   onNavigate: (route: AppRoute) => void;
 };
 
-const historyRows = [
-  ["2026-05-10", "고혈압 위험 높음", "72%"],
-  ["2026-04-20", "당뇨 위험 중간", "41%"],
-  ["2026-03-15", "모두 저위험", "28%"],
-];
-
 export function PredictionHistoryPage({ onNavigate }: PredictionHistoryPageProps) {
+  const latestResultId = sessionStorage.getItem("predictionResultId");
+
   return (
     <div className="page-stack">
       <section className="section-header-row">
@@ -35,22 +31,33 @@ export function PredictionHistoryPage({ onNavigate }: PredictionHistoryPageProps
             </tr>
           </thead>
           <tbody>
-            {historyRows.map(([date, summary, risk]) => (
-              <tr key={date}>
-                <td>{date}</td>
-                <td>{summary}</td>
-                <td>{risk}</td>
+            {latestResultId ? (
+              <tr>
+                <td>최근 예측</td>
+                <td>현재 세션에서 생성한 예측 결과</td>
+                <td>결과 상세에서 확인</td>
                 <td>
-                  <button className="small-button" type="button" onClick={() => onNavigate("/prediction/result")}>
+                  <button
+                    className="small-button"
+                    type="button"
+                    onClick={() => {
+                      window.history.pushState({}, "", `/prediction/result?result_id=${latestResultId}`);
+                      onNavigate("/prediction/result");
+                    }}
+                  >
                     상세
                   </button>
                 </td>
               </tr>
-            ))}
+            ) : (
+              <tr>
+                <td colSpan={4}>예측 이력 목록 API가 아직 없어 최근 세션 결과만 표시됩니다.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </section>
-      <section className="dashboard-card chart-placeholder">시계열 위험도 변화 차트</section>
+      <section className="dashboard-card chart-placeholder">예측 결과 목록 API 연동 후 시계열 위험도 변화 차트를 표시합니다.</section>
     </div>
   );
 }
