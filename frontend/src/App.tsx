@@ -15,39 +15,11 @@ import { PredictionHistoryPage } from "./pages/PredictionHistoryPage";
 import { PredictionProgressPage } from "./pages/PredictionProgressPage";
 import { PredictionRequestPage } from "./pages/PredictionRequestPage";
 import { PredictionResultPage } from "./pages/PredictionResultPage";
-import { ActivityPage } from "./pages/health/ActivityPage";
-import { ExercisePage } from "./pages/health/ExercisePage";
-import { GoalEditPage } from "./pages/health/GoalEditPage";
-import { GoalPage } from "./pages/health/GoalPage";
-import { HealthHubPage } from "./pages/health/HealthHubPage";
-import { HealthProfilePage } from "./pages/health/HealthProfilePage";
-import { VitalsDetailPage } from "./pages/health/VitalsDetailPage";
-import { VitalsInputPage } from "./pages/health/VitalsInputPage";
-import { VitalsListPage } from "./pages/health/VitalsListPage";
-import { BadgePage } from "./pages/challenge/BadgePage";
-import { ChallengeDashboardPage } from "./pages/challenge/ChallengeDashboardPage";
-import { ChallengeDetailPage } from "./pages/challenge/ChallengeDetailPage";
-import { ChallengeListPage } from "./pages/challenge/ChallengeListPage";
-import { LeaderboardPage } from "./pages/challenge/LeaderboardPage";
-import { MyChallengesPage } from "./pages/challenge/MyChallengesPage";
 
-// ── front/food-management 브랜치에서 추가
-import { FoodPage } from "./pages/FoodPage";
-import { FoodAnalyzePage } from "./pages/FoodAnalyzePage";
-
-// -- front/report-ㅡmanagement 브랜치에서 추가
-import ReportListPage from "./pages/report/ReportListPage";
-import ReportDetailPage from "./pages/report/ReportDetailPage";
-import ReportExportPage from "./pages/report/ReportExportPage";
-// ── front/auth-onboarding 브랜치에서 추가
-import { SignUpPage } from "./pages/SignUpPage";
-import { TermsAgreementPage, EmailVerifyPage, PasswordResetPage, OnboardingCompletePage } from "./pages/AuthOnboardingPages";
-import { HealthSurveyPage } from "./pages/HealthSurveyPage";
-
-// ── front/pet-management 브랜치에서 추가
-import { PetPage } from "./pages/PetPage";
-import { PetSelectPage } from "./pages/PetSelectPage";
-import { PetEncyclopediaPage } from "./pages/PetEncyclopediaPage";
+// ── front/mypage-management 브랜치에서 추가
+import { MyInfoPage } from "./pages/MyInfoPage";
+import { EditProfilePage } from "./pages/EditProfilePage";
+import { ChangePasswordPage, NotificationSettingsPage, TermsManagementPage, WithdrawalPage } from "./pages/MyPageSubPages";
 
 export type AppRoute =
   | "/"
@@ -69,18 +41,25 @@ export type AppRoute =
   | "/prediction/feedback"
   | "/mypage"
   | "/mypage/profile"
+  | "/mypage/edit"
+  | "/mypage/change-password"
+  | "/mypage/notifications"
+  | "/mypage/terms"
+  | "/mypage/withdrawal"
   | "/health"
   | "/health/goal"
   | "/health/goal/edit"
   | "/health/profile"
   | "/health/vitals"
-  | "/health/vitals/detail"
   | "/health/vitals/input"
+  | "/health/vitals/detail"
   | "/health/exercise"
   | "/health/activity"
   | "/food"
   | "/food/analyze"
   | "/reports"
+  | "/reports/detail"
+  | "/reports/export"
   | "/challenges"
   | "/challenges/list"
   | "/challenges/detail"
@@ -89,18 +68,9 @@ export type AppRoute =
   | "/challenges/badges"
   | "/pet"
   | "/pet/select"
-  | "/pet/encyclopedia"
-  | "/reports/detail"
-  | "/reports/export";
+  | "/pet/encyclopedia";
 
-const publicRoutes = new Set<AppRoute>([
-  "/",
-  "/login",
-  "/signup",
-  "/terms",
-  "/email-verify",
-  "/password-reset",
-]);
+const publicRoutes = new Set<AppRoute>(["/", "/login"]);
 
 function normalizePath(pathname: string): AppRoute {
   const knownRoutes: AppRoute[] = [
@@ -123,18 +93,25 @@ function normalizePath(pathname: string): AppRoute {
     "/prediction/feedback",
     "/mypage",
     "/mypage/profile",
+    "/mypage/edit",
+    "/mypage/change-password",
+    "/mypage/notifications",
+    "/mypage/terms",
+    "/mypage/withdrawal",
     "/health",
     "/health/goal",
     "/health/goal/edit",
     "/health/profile",
     "/health/vitals",
-    "/health/vitals/detail",
     "/health/vitals/input",
+    "/health/vitals/detail",
     "/health/exercise",
     "/health/activity",
     "/food",
     "/food/analyze",
     "/reports",
+    "/reports/detail",
+    "/reports/export",
     "/challenges",
     "/challenges/list",
     "/challenges/detail",
@@ -144,8 +121,6 @@ function normalizePath(pathname: string): AppRoute {
     "/pet",
     "/pet/select",
     "/pet/encyclopedia",
-    "/reports/detail",
-    "/reports/export",
   ];
 
   return knownRoutes.includes(pathname as AppRoute) ? (pathname as AppRoute) : "/home";
@@ -153,10 +128,6 @@ function normalizePath(pathname: string): AppRoute {
 
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(() => normalizePath(window.location.pathname));
-
-  // TODO: API 연결 시 sessionStorage 토큰 체크로 교체 (REQ-AUTH-002, NFR-SEC-001)
-  // const [isLoggedIn, setIsLoggedIn] = useState(() => !!sessionStorage.getItem("access_token"));
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   useEffect(() => {
     const onPopState = () => setRoute(normalizePath(window.location.pathname));
@@ -169,33 +140,12 @@ export default function App() {
     setRoute(nextRoute);
   };
 
-  // 로그인 안 된 상태에서 보호된 경로 접근 시 → /login으로 이동
-  const onboardingRoutes = new Set(["/health-survey", "/onboarding-complete"]);
-  const effectiveRoute = useMemo(() => {
-    if (!isLoggedIn && !publicRoutes.has(route) && !onboardingRoutes.has(route)) {
-      return "/login" as AppRoute;
-    }
-    return route;
-  }, [route, isLoggedIn]);
-
   const page = useMemo(() => {
-    switch (effectiveRoute) {
+    switch (route) {
       case "/":
         return <LandingPage onNavigate={navigate} />;
       case "/login":
-        return <LoginPage onLogin={() => { setIsLoggedIn(true); navigate("/home"); }} onNavigate={navigate} />;
-      case "/signup":
-        return <SignUpPage onNavigate={navigate} />;
-      case "/terms":
-        return <TermsAgreementPage onNavigate={navigate} />;
-      case "/email-verify":
-        return <EmailVerifyPage onNavigate={navigate} />;
-      case "/password-reset":
-        return <PasswordResetPage onNavigate={navigate} />;
-      case "/health-survey":
-        return <HealthSurveyPage onNavigate={navigate} />;
-      case "/onboarding-complete":
-        return <OnboardingCompletePage onNavigate={navigate} />;
+        return <LoginPage onLogin={() => navigate("/home")} />;
       case "/home":
         return <HomePage onNavigate={navigate} />;
       case "/notifications":
@@ -216,64 +166,38 @@ export default function App() {
         return <PredictionFeedbackPage onNavigate={navigate} />;
       case "/mypage":
       case "/mypage/profile":
-        return <MyProfilePage />;
+        return <MyInfoPage onNavigate={navigate} />;
+      case "/mypage/edit":
+        return <EditProfilePage onNavigate={navigate} />;
+      case "/mypage/change-password":
+        return <ChangePasswordPage onNavigate={navigate} />;
+      case "/mypage/notifications":
+        return <NotificationSettingsPage onNavigate={navigate} />;
+      case "/mypage/terms":
+        return <TermsManagementPage onNavigate={navigate} />;
+      case "/mypage/withdrawal":
+        return <WithdrawalPage onNavigate={navigate} />;
       case "/health":
-        return <HealthHubPage onNavigate={navigate} />;
-      case "/health/goal":
-        return <GoalPage onNavigate={navigate} />;
-      case "/health/goal/edit":
-        return <GoalEditPage onNavigate={navigate} />;
-      case "/health/profile":
-        return <HealthProfilePage onNavigate={navigate} />;
-      case "/health/vitals":
-        return <VitalsListPage onNavigate={navigate} />;
-      case "/health/vitals/detail":
-        return <VitalsDetailPage onNavigate={navigate} />;
-      case "/health/vitals/input":
-        return <VitalsInputPage onNavigate={navigate} />;
-      case "/health/exercise":
-        return <ExercisePage onNavigate={navigate} />;
-      case "/health/activity":
-        return <ActivityPage onNavigate={navigate} />;
+        return <PlaceholderPage title="건강 관리" description="건강 기록 입력/조회 화면을 연결할 영역입니다." />;
       case "/food":
-        return <FoodPage onNavigate={navigate} />;
-      case "/food/analyze":
-        return <FoodAnalyzePage onNavigate={navigate} />;
+        return <PlaceholderPage title="식단 관리" description="식단 입력, 분석 결과, 기록 목록 화면을 연결할 영역입니다." />;
       case "/reports":
-        return <ReportListPage onNavigate={navigate} />;
-      case "/reports/detail":
-        return <ReportDetailPage onNavigate={navigate} />;
-      case "/reports/export":
-        return <ReportExportPage onNavigate={navigate} />;
+        return <PlaceholderPage title="리포트" description="주간 리포트 목록과 상세 화면을 연결할 영역입니다." />;
       case "/challenges":
-        return <ChallengeDashboardPage onNavigate={navigate} />;
-      case "/challenges/list":
-        return <ChallengeListPage onNavigate={navigate} />;
-      case "/challenges/detail":
-        return <ChallengeDetailPage onNavigate={navigate} />;
-      case "/challenges/my":
-        return <MyChallengesPage onNavigate={navigate} />;
-      case "/challenges/leaderboard":
-        return <LeaderboardPage onNavigate={navigate} />;
-      case "/challenges/badges":
-        return <BadgePage onNavigate={navigate} />;
+        return <PlaceholderPage title="챌린지 관리" description="챌린지 목록, 참여, 체크인 화면을 연결할 영역입니다." />;
       case "/pet":
-        return <PetPage onNavigate={navigate} />;
-      case "/pet/select":
-        return <PetSelectPage onNavigate={navigate} />;
-      case "/pet/encyclopedia":
-        return <PetEncyclopediaPage onNavigate={navigate} />;
+        return <PlaceholderPage title="마이펫" description="펫 현황, 보상 과제, 도감 화면을 연결할 영역입니다." />;
       default:
         return <HomePage />;
     }
-  }, [effectiveRoute]);
+  }, [route]);
 
-  if (publicRoutes.has(effectiveRoute) || effectiveRoute === "/health-survey" || effectiveRoute === "/onboarding-complete") {
+  if (publicRoutes.has(route)) {
     return <PublicLayout onNavigate={navigate}>{page}</PublicLayout>;
   }
 
   return (
-    <AppLayout currentRoute={effectiveRoute} onNavigate={navigate}>
+    <AppLayout currentRoute={route} onNavigate={navigate}>
       {page}
     </AppLayout>
   );
