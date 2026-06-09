@@ -156,7 +156,10 @@ export default function ReportDetailPage({ onNavigate }: Props) {
         <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
           <button
             type="button"
-            onClick={() => onNavigate("/reports/export")}
+            onClick={() => {
+              sessionStorage.setItem(selectedReportStorageKey(), String(report.report_id));
+              onNavigate("/reports/export");
+            }}
             style={{ padding: "6px 14px", border: "1.5px solid #ddd", borderRadius: 6, background: "#fff", fontSize: 12, cursor: "pointer" }}
           >
             내보내기

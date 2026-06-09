@@ -67,24 +67,55 @@ const LINK_ROUTE_MAP: Record<string, AppRoute> = {
   "/home": "/home",
   "/notifications": "/notifications",
   "/prediction/request": "/prediction/request",
+  "/prediction/progress": "/prediction/progress",
   "/prediction/result": "/prediction/result",
   "/prediction/history": "/prediction/history",
   "/prediction/feedback": "/prediction/feedback",
   "/advices/today": "/advices/today",
   "/advices/history": "/advices/history",
   "/health": "/health",
+  "/health/goal": "/health/goal",
+  "/health/goal/edit": "/health/goal/edit",
+  "/health/profile": "/health/profile",
+  "/health/vitals": "/health/vitals",
+  "/health/vitals/input": "/health/vitals/input",
+  "/health/vitals/detail": "/health/vitals/detail",
+  "/health/exercise": "/health/exercise",
+  "/health/activity": "/health/activity",
   "/food": "/food",
   "/food/analyze": "/food/analyze",
   "/reports": "/reports",
+  "/reports/detail": "/reports/detail",
+  "/reports/export": "/reports/export",
   "/challenges": "/challenges",
+  "/challenges/list": "/challenges/list",
+  "/challenges/detail": "/challenges/detail",
+  "/challenges/my": "/challenges/my",
+  "/challenges/leaderboard": "/challenges/leaderboard",
+  "/challenges/badges": "/challenges/badges",
   "/pet": "/pet",
+  "/pet/select": "/pet/select",
+  "/pet/encyclopedia": "/pet/encyclopedia",
   "/mypage": "/mypage",
   "/mypage/profile": "/mypage/profile",
+  "/mypage/edit": "/mypage/edit",
+  "/mypage/change-password": "/mypage/change-password",
+  "/mypage/notifications": "/mypage/notifications",
+  "/mypage/terms": "/mypage/terms",
+  "/mypage/withdrawal": "/mypage/withdrawal",
 };
 
-function resolveNotificationRoute(linkUrl: string | null): AppRoute {
-  if (!linkUrl) return "/home";
-  return LINK_ROUTE_MAP[linkUrl] ?? "/home";
+function resolveNotificationTarget(linkUrl: string | null): { route: AppRoute; url: string } {
+  if (!linkUrl) return { route: "/home", url: "/home" };
+
+  try {
+    const parsed = new URL(linkUrl, window.location.origin);
+    const route = LINK_ROUTE_MAP[parsed.pathname] ?? "/home";
+    return { route, url: route === "/home" ? "/home" : `${route}${parsed.search}` };
+  } catch {
+    const route = LINK_ROUTE_MAP[linkUrl] ?? "/home";
+    return { route, url: route };
+  }
 }
 
 function formatNotificationTime(createdAt: string) {
@@ -170,7 +201,11 @@ export function NotificationsPage({ onNavigate }: NotificationsPageProps) {
       }
     }
 
-    onNavigate(resolveNotificationRoute(item.link_url));
+    const target = resolveNotificationTarget(item.link_url);
+    if (target.url !== target.route) {
+      window.history.pushState({}, "", target.url);
+    }
+    onNavigate(target.route);
   };
 
   return (
@@ -181,7 +216,7 @@ export function NotificationsPage({ onNavigate }: NotificationsPageProps) {
           <button className="small-button" type="button" onClick={handleMarkAllRead}>
             모두 읽음 처리
           </button>
-          <button className="small-button" type="button">
+          <button className="small-button" type="button" onClick={() => onNavigate("/mypage/notifications")}>
             알림 설정
           </button>
         </div>

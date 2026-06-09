@@ -93,6 +93,13 @@ export default function ReportListPage({ onNavigate }: Props) {
     onNavigate("/reports/detail");
   }
 
+  function handleExport(reportId?: number) {
+    if (reportId) {
+      sessionStorage.setItem(selectedReportStorageKey(), String(reportId));
+    }
+    onNavigate("/reports/export");
+  }
+
   if (isLoading) return <LoadingState message="주간 리포트를 불러오는 중입니다." />;
 
   return (
@@ -147,7 +154,7 @@ export default function ReportListPage({ onNavigate }: Props) {
           <div style={{ marginBottom: 20 }}>
             <button
               type="button"
-              onClick={() => onNavigate("/reports/export")}
+              onClick={() => handleExport(current?.report?.report_id)}
               style={{ padding: "8px 16px", border: "1.5px solid #ccc", borderRadius: 6, background: "#fff", fontSize: 13, cursor: "pointer", color: "#333" }}
             >
               내보내기
@@ -176,7 +183,7 @@ export default function ReportListPage({ onNavigate }: Props) {
                   </button>
                   <button
                     type="button"
-                    onClick={() => onNavigate("/reports/export")}
+                    onClick={() => handleExport(report.report_id)}
                     style={{ padding: "7px 14px", background: "#fff", color: "#777", border: "1.5px solid #ddd", borderRadius: 6, fontSize: 12, cursor: "pointer" }}
                   >
                     내보내기

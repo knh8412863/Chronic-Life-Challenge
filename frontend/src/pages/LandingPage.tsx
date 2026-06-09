@@ -65,7 +65,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
             </div>
           </div>
           <div className="hero-actions">
-            <button className="dark-button" type="button" onClick={() => onNavigate("/login")}>
+            <button className="dark-button" type="button" onClick={() => onNavigate("/signup")}>
               무료로 시작하기
             </button>
             <button className="outline-button" type="button" onClick={() => scrollToSection("features")}>
@@ -254,7 +254,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         <h2>지금 바로 건강을 시작하세요</h2>
         <p>무료로 가입하고 AI 건강 예측 서비스를 경험해 보세요.</p>
         <div className="hero-actions">
-          <button className="dark-button" type="button" onClick={() => onNavigate("/login")}>
+          <button className="dark-button" type="button" onClick={() => onNavigate("/signup")}>
             무료로 시작하기
           </button>
           <button className="outline-button" type="button" onClick={() => scrollToSection("features")}>
