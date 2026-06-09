@@ -170,7 +170,11 @@ export default function App() {
   }, []);
 
   const navigate = (nextRoute: AppRoute) => {
-    window.history.pushState({}, "", nextRoute);
+    const nextUrl =
+      window.location.pathname === nextRoute && window.location.search
+        ? `${nextRoute}${window.location.search}`
+        : nextRoute;
+    window.history.pushState({}, "", nextUrl);
     setRoute(nextRoute);
   };
 

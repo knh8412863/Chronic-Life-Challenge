@@ -19,10 +19,13 @@ const menuItems: Array<{ label: string; route: AppRoute }> = [
 ];
 
 function isActive(currentRoute: AppRoute, itemRoute: AppRoute) {
-  if (itemRoute === "/mypage/profile") {
-    return currentRoute.startsWith("/mypage");
+  if (itemRoute === "/home") {
+    return currentRoute === "/home";
   }
-  return currentRoute === itemRoute;
+  if (itemRoute === "/mypage/profile") {
+    return currentRoute === "/mypage" || currentRoute.startsWith("/mypage/");
+  }
+  return currentRoute === itemRoute || currentRoute.startsWith(`${itemRoute}/`);
 }
 
 export function Sidebar({ collapsed, currentRoute, onNavigate, onToggle }: SidebarProps) {

@@ -24,7 +24,7 @@ export function PublicLayout({ children, onNavigate }: PublicLayoutProps) {
           <button className="outline-button" type="button" onClick={() => onNavigate("/login")}>
             로그인
           </button>
-          <button className="dark-button" type="button" onClick={() => onNavigate("/login")}>
+          <button className="dark-button" type="button" onClick={() => onNavigate("/signup")}>
             시작하기
           </button>
         </div>
