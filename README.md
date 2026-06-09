@@ -68,17 +68,23 @@ uv sync --group ai   # AI 워커용
 
 ### 2. 환경 변수 설정
 
-`envs/` 디렉토리에 있는 예시 파일을 복사하여 `.env` 파일을 생성합니다.
-- 로컬용 
-    ```bash
-    cp envs/example.local.env envs/.local.env
-    ```
-- 배포용 
-    ```bash
-    cp envs/example.prod.env envs/.prod.env
-    ```
+애플리케이션과 Docker Compose는 프로젝트 루트의 `.env` 파일을 읽습니다.
+예시 파일을 복사한 뒤, 실제 비밀번호와 API 키는 로컬에서만 입력하세요.
 
-생성된 `env` 파일 내의 환경변수들은 프로젝트 상황에 맞게 수정하세요.
+```bash
+# 로컬 uvicorn / 로컬 MySQL 기준
+cp envs/example.local.env .env
+
+# 배포 서버 / docker compose 기준
+cp envs/example.prod.env .env
+```
+
+주의사항:
+- `.env`, `envs/.local.env`, `envs/.prod.env`는 커밋하지 않습니다.
+- `OPENAI_API_KEY`에는 실제 키를 로컬 또는 배포 서버에서만 입력합니다.
+- 개발 중 LLM 호출을 끄려면 `ADVICE_LLM_ENABLED=false`, `REPORT_LLM_ENABLED=false`로 둡니다.
+- 로컬에서 `uv run uvicorn ...`으로 실행하면 `DB_HOST=localhost`, `REDIS_URL=redis://localhost:6379/0`을 사용합니다.
+- Docker Compose 컨테이너에서 실행하면 `DB_HOST=mysql`, `REDIS_URL=redis://redis:6379/0`을 사용합니다.
 
 ---
 
@@ -107,12 +113,26 @@ uv run uvicorn app.main:app --reload
 docker compose up -d --build app
 ```
 
+Swagger UI는 `/api/docs`에서 확인합니다.
+
+```text
+http://127.0.0.1:8000/api/docs
+```
+
 **AI Worker 실행:**
 ```bash
 uv run python -m ai_worker.main
 # or
 docker compose up -d --build ai_worker
 ```
+
+**DB 마이그레이션 적용:**
+```bash
+uv run aerich upgrade
+```
+
+로컬 Mac/Windows에서 이미 3306 포트를 사용하는 MySQL이 있으면 Docker MySQL이 뜨지 않을 수 있습니다.
+그 경우 `.env`의 `DB_EXPOSE_PORT`를 예: `3307`로 바꾸고, 테스트용 포트도 맞춰주세요.
 
 ### 2. EC2 배포 환경 (Production)
 
@@ -166,6 +186,25 @@ chmod +x scripts/certbot.sh
 
 # 정적 타입 검사 (Mypy)
 ./scripts/ci/check_mypy.sh
+```
+
+개별 명령으로 확인할 수도 있습니다.
+
+```bash
+uv run pytest
+uv run ruff check .
+uv run ruff format . --check
+```
+
+테스트 DB는 기본적으로 루트 `.env`의 DB 설정을 참고합니다.
+pytest만 다른 DB를 사용하려면 `.env`에 `TEST_DB_*` 값을 설정하세요.
+
+```env
+TEST_DB_HOST=127.0.0.1
+TEST_DB_PORT=3306
+TEST_DB_USER=root
+TEST_DB_PASSWORD=your-local-root-password
+TEST_DB_NAME=test
 ```
 
 ---
