@@ -17,7 +17,7 @@ from app.dtos.foods import (
     MealNutritionSummaryResponse,
 )
 from app.dtos.predictions import MealType
-from app.models.foods import FoodAnalysisResult
+from app.models.foods import FoodAnalysis, FoodAnalysisResult, FoodAnalysisStatus
 from app.models.predictions import MealLog
 from app.models.users import User
 
@@ -26,25 +26,46 @@ MAX_ADVICE_LENGTH = 500
 
 class FoodAnalysisService:
     async def analyze(self, user: User, data: FoodAnalysisRequest) -> FoodAnalysisResponse:
-        score, risk_flags, advice_text = self._analyze_nutrition(data)
-        result = await FoodAnalysisResult.create(
+        task_uuid = str(uuid.uuid4())
+        analysis = await FoodAnalysis.create(
             user=user,
-            task_uuid=str(uuid.uuid4()),
-            meal_date=data.meal_date,
             meal_type=data.meal_type.value if data.meal_type else None,
-            food_name=data.food_name,
-            amount=data.amount,
-            calories=data.calories,
-            carbs_g=self._optional_decimal(data.carbs_g),
-            protein_g=self._optional_decimal(data.protein_g),
-            fat_g=self._optional_decimal(data.fat_g),
-            sodium_mg=self._optional_decimal(data.sodium_mg),
-            sugar_g=self._optional_decimal(data.sugar_g),
-            fiber_g=self._optional_decimal(data.fiber_g),
-            health_score=score,
-            risk_flags=risk_flags,
-            advice_text=advice_text,
+            image_s3_key=self._build_manual_analysis_key(user, task_uuid),
+            task_uuid=task_uuid,
+            status=FoodAnalysisStatus.RUNNING,
         )
+        try:
+            score, risk_flags, advice_text = self._analyze_nutrition(data)
+            result = await FoodAnalysisResult.create(
+                food_analysis=analysis,
+                user=user,
+                task_uuid=task_uuid,
+                status=FoodAnalysisStatus.SUCCESS,
+                meal_date=data.meal_date,
+                meal_type=data.meal_type.value if data.meal_type else None,
+                food_name=data.food_name,
+                amount=data.amount,
+                calories=data.calories,
+                carbs_g=self._optional_decimal(data.carbs_g),
+                protein_g=self._optional_decimal(data.protein_g),
+                fat_g=self._optional_decimal(data.fat_g),
+                sodium_mg=self._optional_decimal(data.sodium_mg),
+                sugar_g=self._optional_decimal(data.sugar_g),
+                fiber_g=self._optional_decimal(data.fiber_g),
+                health_score=score,
+                risk_flags=risk_flags,
+                advice_text=advice_text,
+            )
+        except Exception as exc:
+            analysis.status = FoodAnalysisStatus.FAILED
+            analysis.completed_at = datetime.now(config.TIMEZONE)
+            analysis.error_message = self._limit_text(str(exc), 500)
+            await analysis.save(update_fields=["status", "completed_at", "error_message"])
+            raise
+
+        analysis.status = FoodAnalysisStatus.SUCCESS
+        analysis.completed_at = datetime.now(config.TIMEZONE)
+        await analysis.save(update_fields=["status", "completed_at"])
         return self._to_response(result)
 
     async def get_result(self, user: User, task_uuid: str) -> FoodAnalysisResponse:
@@ -202,6 +223,10 @@ class FoodAnalysisService:
         if len(text) <= max_length:
             return text
         return text[: max_length - 1].rstrip() + "…"
+
+    @staticmethod
+    def _build_manual_analysis_key(user: User, task_uuid: str) -> str:
+        return f"manual-food-analyses/user-{user.id}/{task_uuid}.json"
 
     @staticmethod
     def _today() -> date:

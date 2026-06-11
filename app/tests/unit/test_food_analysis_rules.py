@@ -49,6 +49,21 @@ def test_food_analysis_rules_returns_no_risk_for_balanced_input():
     assert "큰 위험 신호는 없습니다" in advice_text
 
 
+def test_food_analysis_status_supports_job_lifecycle_values():
+    assert FoodAnalysisStatus.PENDING == "PENDING"
+    assert FoodAnalysisStatus.RUNNING == "RUNNING"
+    assert FoodAnalysisStatus.SUCCESS == "SUCCESS"
+    assert FoodAnalysisStatus.FAILED == "FAILED"
+
+
+def test_food_analysis_manual_key_is_scoped_by_user_and_task_uuid():
+    user = SimpleNamespace(id=42)
+
+    key = FoodAnalysisService._build_manual_analysis_key(user, "task-uuid")
+
+    assert key == "manual-food-analyses/user-42/task-uuid.json"
+
+
 def test_food_analysis_response_converts_decimal_nutrition_values():
     now = datetime(2026, 6, 2, 18, 0, 0)
     result = SimpleNamespace(
