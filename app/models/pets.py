@@ -6,6 +6,9 @@ from tortoise import fields, models
 class PetType(StrEnum):
     DOG = "DOG"
     CAT = "CAT"
+    RABBIT = "RABBIT"
+    CAPYBARA = "CAPYBARA"
+    HAMSTER = "HAMSTER"
 
 
 class PetGrowthStage(StrEnum):

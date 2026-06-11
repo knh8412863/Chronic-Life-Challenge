@@ -1,6 +1,6 @@
 import { apiRequest } from "./client";
 
-export type PetType = "DOG" | "CAT";
+export type PetType = "DOG" | "CAT" | "RABBIT" | "CAPYBARA" | "HAMSTER";
 export type PetGrowthStage = "STAGE_1" | "STAGE_2" | "STAGE_3";
 
 export type VirtualPet = {

@@ -521,10 +521,19 @@ button {
 }
 
 .feature-icon {
-  display: block;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 48px;
   height: 48px;
   border-radius: 12px;
+  overflow: hidden;
+}
+
+.feature-icon img {
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
 }
 
 .tone-green {
@@ -662,7 +671,7 @@ button {
 
 .disease-yellow span {
   background: #f0d46f;
-  color: #7c5d00;
+  color: #ca9400;
 }
 
 .disease-blue {
@@ -672,7 +681,7 @@ button {
 
 .disease-blue span {
   background: #b8d0f2;
-  color: #245a93;
+  color: #3176bd;
 }
 
 .disease-pink {
@@ -682,7 +691,7 @@ button {
 
 .disease-pink span {
   background: #efb6ca;
-  color: #9c2f58;
+  color: #d6608c;
 }
 
 .disease-orange {
@@ -737,9 +746,20 @@ button {
 }
 
 .challenge-swatch {
+  display: flex;
+  align-items: center;
+  justify-content: center;
   width: 44px;
   height: 44px;
   border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.challenge-swatch img {
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
 }
 
 .challenge-status {
@@ -779,7 +799,7 @@ button {
   overflow: hidden;
   height: 10px;
   border-radius: 999px;
-  background: #f1f4f1;
+  background: #f5f6f8;
 }
 
 .progress-track i {
@@ -1144,7 +1164,7 @@ button {
   border-radius: 8px;
   background: transparent;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 15px;
   font-weight: 700;
   text-align: left;
 }
@@ -1435,14 +1455,14 @@ button {
   overflow: hidden;
   border: 0;
   border-radius: 999px;
-  background: #e5e7ea;
+  background: #f5f6f8;
 }
 
 .challenge-lines progress::-webkit-progress-bar,
 .goal-lines progress::-webkit-progress-bar,
 .disease-card progress::-webkit-progress-bar,
 .dashboard-card progress::-webkit-progress-bar {
-  background: #e5e7ea;
+  background: #f5f6f8;
 }
 
 .challenge-lines progress::-webkit-progress-value,
@@ -1760,16 +1780,16 @@ button {
 
 .health-bars span:nth-child(2),
 .health-bars span:nth-child(6) {
-  background: #d1aa22;
+  background: #f2cf4e;
 }
 
 .health-bars span:nth-child(3),
 .health-bars span:nth-child(7) {
-  background: #4e83bc;
+  background: #71a3da;
 }
 
 .health-bars span:nth-child(4) {
-  background: #c25b7c;
+  background: #df8aac;
 }
 
 .goal-lines {
@@ -1789,15 +1809,15 @@ button {
 }
 
 .goal-lines progress:last-child {
-  accent-color: #c25b7c;
+  accent-color: #df8aac;
 }
 
 .goal-lines progress:last-child::-webkit-progress-value {
-  background: #c25b7c;
+  background: #df8aac;
 }
 
 .goal-lines progress:last-child::-moz-progress-bar {
-  background: #c25b7c;
+  background: #df8aac;
 }
 
 .quick-record-section {
@@ -2102,13 +2122,13 @@ button {
 .risk-outline.pink {
   border-color: #d85880;
   background: #ffe8f0;
-  color: #c4335a;
+  color: #e44774;
 }
 
 .risk-outline.yellow {
-  border-color: #d1aa22;
+  border-color: #f2cf4e;
   background: #fff4c7;
-  color: #b68100;
+  color: #fdb42f;
 }
 
 .risk-outline.muted {
@@ -2656,7 +2676,7 @@ button {
 .goal-progress-bar-wrap {
   height: 8px;
   border-radius: 99px;
-  background: #eceff3;
+  background: #f5f6f8;
   overflow: hidden;
 }
 
@@ -3774,7 +3794,7 @@ button {
 .challenge-progress-bar {
   width: 100%;
   height: 8px;
-  background: #e5e7ea;
+  background: #f5f6f8;
   border-radius: 4px;
   overflow: hidden;
 }
@@ -3796,11 +3816,11 @@ button {
 }
 
 .challenge-tag.walk   { background: #dff4e5; color: #2d7a46; }
-.challenge-tag.water  { background: #e7effc; color: #2756a8; }
-.challenge-tag.exercise { background: #fff3c4; color: #8c6900; }
-.challenge-tag.sleep  { background: #eee9ff; color: #5b3fa6; }
-.challenge-tag.diet   { background: #ffe8df; color: #a04020; }
-.challenge-tag.comprehensive { background: var(--soft-pink); color: #8c2040; }
+.challenge-tag.water  { background: #e7effc; color: #71a3da; }
+.challenge-tag.exercise { background: #fff3c4; color: #f2cf4e; }
+.challenge-tag.sleep  { background: #eee9ff; color: #9f8ae4; }
+.challenge-tag.diet   { background: #ffe8df; color: #cc7759; }
+.challenge-tag.comprehensive { background: var(--soft-pink); color: #d85882; }
 .challenge-tag.status-in-progress { background: #dff4e5; color: #2d7a46; }
 
 .challenge-diff-tag {
@@ -3814,8 +3834,8 @@ button {
 }
 
 .challenge-diff-tag.easy   { background: #dff4e5; color: #2d7a46; }
-.challenge-diff-tag.normal { background: #fff3c4; color: #8c6900; }
-.challenge-diff-tag.hard   { background: #ffe8df; color: #a04020; }
+.challenge-diff-tag.normal { background: #fff3c4; color: #f2cf4e; }
+.challenge-diff-tag.hard   { background: #ffe8df; color: #e44774; }
 
 /* ── 챌린지 대시보드 ── */
 .challenge-dashboard-grid {
@@ -4268,7 +4288,7 @@ button {
 .challenge-participants-bar {
   width: 100%;
   height: 8px;
-  background: #e5e7ea;
+  background: #f5f6f8;
   border-radius: 4px;
   overflow: hidden;
   margin-top: 8px;
@@ -4568,7 +4588,7 @@ button {
 
 .badge-total-bar {
   height: 10px;
-  background: #e5e7ea;
+  background: #f5f6f8;
   border-radius: 5px;
   overflow: hidden;
 }
@@ -4797,4 +4817,67 @@ button {
 .streak-record-box .streak-sub {
   font-size: 13px;
   color: var(--muted-foreground);
+}
+
+.pet-stage-tooltip {
+  position: relative;
+  width: 17px;
+  height: 17px;
+  border-radius: 999px;
+  border: 1px solid #d8d8d8;
+  background: #fff;
+  color: #777;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: help;
+  outline: none;
+}
+
+.pet-stage-tooltip__bubble {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 10px);
+  transform: translateX(-50%) translateY(4px);
+  width: 240px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f1f3f5;
+  color: #333;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  text-align: center;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 20;
+}
+
+.pet-stage-tooltip__bubble::after {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 100%;
+  transform: translateX(-50%);
+  border-width: 6px 6px 0;
+  border-style: solid;
+  border-color: #f1f3f5 transparent transparent;
+}
+
+.pet-stage-tooltip__bubble span {
+  display: block;
+}
+
+.pet-stage-tooltip__bubble span + span {
+  margin-top: 3px;
+}
+
+.pet-stage-tooltip:hover .pet-stage-tooltip__bubble,
+.pet-stage-tooltip:focus .pet-stage-tooltip__bubble {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
 }

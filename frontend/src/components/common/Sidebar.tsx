@@ -24,7 +24,6 @@ const menuItems: MenuItem[] = [
     children: [
       { label: "오늘의 조언", route: "/advices/today" },
       { label: "내 조언 이력", route: "/advices/history" },
-      { label: "조언 피드백", route: "/advices/feedback" },
     ],
   },
   { label: "질환 예측", route: "/prediction/request" },
@@ -49,6 +48,7 @@ const menuItems: MenuItem[] = [
       { label: "내 챌린지 요약", route: "/challenges" },
       { label: "내 챌린지 현황", route: "/challenges/my" },
       { label: "챌린지 리더보드", route: "/challenges/leaderboard" },
+      { label: "뱃지 목록", route: "/challenges/badges" },
     ],
   },
   { label: "나만의 펫 키우기", route: "/pet" },

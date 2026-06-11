@@ -34,58 +34,37 @@ BASE_REWARD_TASKS = [
 
 PET_CATALOG = [
     {
-        "catalog_id": "DOG_POMERANIAN",
+        "catalog_id": "PET_DOG",
         "pet_type": PetType.DOG,
-        "display_name": "포메라니안",
+        "display_name": "강아지",
         "required_streak_days": 0,
         "affinity_score": 3,
     },
     {
-        "catalog_id": "DOG_GOLDEN_RETRIEVER",
-        "pet_type": PetType.DOG,
-        "display_name": "골든 리트리버",
-        "required_streak_days": 3,
-        "affinity_score": 2,
-    },
-    {
-        "catalog_id": "DOG_BICHON_FRISE",
-        "pet_type": PetType.DOG,
-        "display_name": "비숑 프리제",
-        "required_streak_days": 7,
-        "affinity_score": 1,
-    },
-    {
-        "catalog_id": "DOG_MIXED",
-        "pet_type": PetType.DOG,
-        "display_name": "믹스견",
-        "required_streak_days": 30,
-        "affinity_score": 5,
-    },
-    {
-        "catalog_id": "CAT_KOREAN_SHORT_HAIR",
+        "catalog_id": "PET_CAT",
         "pet_type": PetType.CAT,
-        "display_name": "코리안 숏헤어",
+        "display_name": "고양이",
         "required_streak_days": 0,
         "affinity_score": 3,
     },
     {
-        "catalog_id": "CAT_RUSSIAN_BLUE",
-        "pet_type": PetType.CAT,
-        "display_name": "러시안 블루",
+        "catalog_id": "PET_RABBIT",
+        "pet_type": PetType.RABBIT,
+        "display_name": "토끼",
         "required_streak_days": 3,
         "affinity_score": 2,
     },
     {
-        "catalog_id": "CAT_PERSIAN",
-        "pet_type": PetType.CAT,
-        "display_name": "페르시안",
+        "catalog_id": "PET_CAPYBARA",
+        "pet_type": PetType.CAPYBARA,
+        "display_name": "카피바라",
         "required_streak_days": 7,
         "affinity_score": 1,
     },
     {
-        "catalog_id": "CAT_SIAMESE",
-        "pet_type": PetType.CAT,
-        "display_name": "샴",
+        "catalog_id": "PET_HAMSTER",
+        "pet_type": PetType.HAMSTER,
+        "display_name": "햄스터",
         "required_streak_days": 30,
         "affinity_score": 5,
     },
@@ -348,6 +327,12 @@ class VirtualPetService:
             return round(base_reward * 1.2)
         if pet_type == PetType.CAT and task_type == "DAILY_HEALTH_LOG":
             return round(base_reward * 1.2)
+        if pet_type == PetType.RABBIT and task_type == "VITAL_BP":
+            return round(base_reward * 1.2)
+        if pet_type == PetType.CAPYBARA and task_type == "WATER_CHALLENGE":
+            return round(base_reward * 1.2)
+        if pet_type == PetType.HAMSTER and task_type == "DAILY_HEALTH_LOG":
+            return round(base_reward * 1.1)
         return base_reward
 
     @staticmethod
