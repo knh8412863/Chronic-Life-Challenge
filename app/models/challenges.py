@@ -17,6 +17,19 @@ class Challenge(models.Model):
         table = "challenges"
 
 
+class ChallengeDiseaseTag(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    challenge = fields.ForeignKeyField("models.Challenge", related_name="disease_tags", on_delete=fields.CASCADE)
+    disease_code = fields.CharField(max_length=30)
+    priority = fields.IntField(default=100)
+    created_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "challenge_disease_tags"
+        unique_together = (("challenge", "disease_code"),)
+        indexes = (("disease_code", "priority"),)
+
+
 class ChallengeParticipation(models.Model):
     id = fields.BigIntField(primary_key=True)
     user = fields.ForeignKeyField("models.User", related_name="challenge_participations", on_delete=fields.CASCADE)

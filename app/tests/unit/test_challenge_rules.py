@@ -81,6 +81,28 @@ def test_challenge_summaries_can_be_sorted_by_popularity_and_duration():
     assert [item.challenge_id for item in duration] == [3, 1, 2]
 
 
+def test_challenge_recommendations_prioritize_managed_disease_tags():
+    challenges = [
+        SimpleNamespace(challenge_id=1, participant_count=10),
+        SimpleNamespace(challenge_id=2, participant_count=20),
+        SimpleNamespace(challenge_id=3, participant_count=30),
+        SimpleNamespace(challenge_id=4, participant_count=40),
+    ]
+    tagged_rows = [
+        {"challenge_id": 1, "disease_code": "DIABETES", "priority": 20},
+        {"challenge_id": 2, "disease_code": "HYPERTENSION", "priority": 10},
+        {"challenge_id": 3, "disease_code": "DIABETES", "priority": 10},
+    ]
+
+    ranked_ids = ChallengeService._rank_challenge_ids_by_disease_tags(
+        tagged_rows,
+        managed_diseases=["DIABETES", "HYPERTENSION"],
+    )
+    result = ChallengeService._rank_recommendations_by_tags(challenges, ranked_ids)
+
+    assert [item.challenge_id for item in result] == [3, 1, 2, 4]
+
+
 def test_challenge_detail_calculates_average_completion_and_guides():
     challenge = SimpleNamespace(
         target_metric="WATER",

@@ -22,9 +22,17 @@ from app.dtos.challenges import (
     ChallengeWeeklyLeaderboardResponse,
     MyChallengeResponse,
 )
-from app.models.challenges import Challenge, ChallengeCheckin, ChallengeLeaderboard, ChallengeParticipation, UserBadge
+from app.models.challenges import (
+    Challenge,
+    ChallengeCheckin,
+    ChallengeDiseaseTag,
+    ChallengeLeaderboard,
+    ChallengeParticipation,
+    UserBadge,
+)
 from app.models.users import User
 from app.services.account_stats import sync_user_account_stats
+from app.services.managed_diseases import get_user_managed_disease_codes
 
 DEFAULT_CHALLENGES = [
     {
@@ -60,6 +68,28 @@ DEFAULT_CHALLENGES = [
         "duration_days": 21,
     },
 ]
+DEFAULT_CHALLENGE_DISEASE_TAGS = {
+    "30일 걷기 챌린지": {
+        "DIABETES": 10,
+        "HYPERTENSION": 20,
+        "OBESITY": 30,
+        "DYSLIPIDEMIA": 40,
+    },
+    "수분 섭취 챌린지": {
+        "CKD": 10,
+        "DIABETES": 30,
+    },
+    "저염식 습관 챌린지": {
+        "HYPERTENSION": 10,
+        "CKD": 20,
+    },
+    "규칙적 운동 챌린지": {
+        "DIABETES": 10,
+        "HYPERTENSION": 20,
+        "OBESITY": 30,
+        "DYSLIPIDEMIA": 40,
+    },
+}
 
 BADGE_DEFINITIONS = [
     {
@@ -198,8 +228,20 @@ class ChallengeService:
         return self._to_my_challenge(participation, date.today())
 
     async def get_recommendations(self, user: User, limit: int = 5) -> list[ChallengeSummaryResponse]:
+        await self._ensure_default_challenges()
+        managed_diseases = await get_user_managed_disease_codes(user.id)
         challenges = await self.get_challenges(user, sort="POPULAR")
-        return [challenge for challenge in challenges if not challenge.is_joined][:limit]
+        available = [challenge for challenge in challenges if not challenge.is_joined]
+        if not managed_diseases:
+            return available[:limit]
+
+        tagged_rows = await ChallengeDiseaseTag.filter(disease_code__in=managed_diseases).values(
+            "challenge_id",
+            "disease_code",
+            "priority",
+        )
+        ranked_ids = self._rank_challenge_ids_by_disease_tags(tagged_rows, managed_diseases)
+        return self._rank_recommendations_by_tags(available, ranked_ids)[:limit]
 
     async def get_dashboard_summary(self, user: User) -> ChallengeDashboardSummaryResponse:
         today = date.today()
@@ -299,9 +341,24 @@ class ChallengeService:
 
     @staticmethod
     async def _ensure_default_challenges() -> None:
-        if await Challenge.exists():
-            return
-        await Challenge.bulk_create([Challenge(**challenge) for challenge in DEFAULT_CHALLENGES])
+        if not await Challenge.exists():
+            await Challenge.bulk_create([Challenge(**challenge) for challenge in DEFAULT_CHALLENGES])
+        await ChallengeService._ensure_default_challenge_disease_tags()
+
+    @staticmethod
+    async def _ensure_default_challenge_disease_tags() -> None:
+        challenges = await Challenge.filter(title__in=list(DEFAULT_CHALLENGE_DISEASE_TAGS)).all()
+        challenge_by_title = {challenge.title: challenge for challenge in challenges}
+        for title, tags in DEFAULT_CHALLENGE_DISEASE_TAGS.items():
+            challenge = challenge_by_title.get(title)
+            if challenge is None:
+                continue
+            for disease_code, priority in tags.items():
+                await ChallengeDiseaseTag.get_or_create(
+                    challenge_id=challenge.id,
+                    disease_code=disease_code,
+                    defaults={"priority": priority},
+                )
 
     @staticmethod
     async def _get_active_challenge(challenge_id: int) -> Challenge:
@@ -513,6 +570,40 @@ class ChallengeService:
         if sort_key == "DURATION":
             return sorted(summaries, key=lambda item: (item.duration_days, item.challenge_id))
         return sorted(summaries, key=lambda item: item.challenge_id)
+
+    @staticmethod
+    def _rank_challenge_ids_by_disease_tags(
+        tagged_rows: list[dict],
+        managed_diseases: list[str],
+    ) -> dict[int, tuple[int, int]]:
+        disease_order = {disease_code: index for index, disease_code in enumerate(managed_diseases)}
+        ranks: dict[int, tuple[int, int]] = {}
+        for row in tagged_rows:
+            challenge_id = row["challenge_id"]
+            rank = (disease_order.get(row["disease_code"], 999), row["priority"])
+            if challenge_id not in ranks or rank < ranks[challenge_id]:
+                ranks[challenge_id] = rank
+        return ranks
+
+    @staticmethod
+    def _rank_recommendations_by_tags(
+        challenges: list[ChallengeSummaryResponse],
+        ranked_ids: dict[int, tuple[int, int]],
+    ) -> list[ChallengeSummaryResponse]:
+        tagged = [challenge for challenge in challenges if challenge.challenge_id in ranked_ids]
+        fallback = [challenge for challenge in challenges if challenge.challenge_id not in ranked_ids]
+        return (
+            sorted(
+                tagged,
+                key=lambda item: (
+                    ranked_ids[item.challenge_id][0],
+                    ranked_ids[item.challenge_id][1],
+                    -item.participant_count,
+                    item.challenge_id,
+                ),
+            )
+            + fallback
+        )
 
     @staticmethod
     def _average_completion_rate(participations: list[ChallengeParticipation]) -> float:
