@@ -80,7 +80,6 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
     try {
       await updateCurrentUser(
         {
-          name,
           phone_number: phone,
           height: height ? Number(height) : undefined,
           weight: weight ? Number(weight) : undefined,
@@ -125,9 +124,10 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               {/* 이름 */}
               <div>
-                <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>이름</label>
-                <input value={name} onChange={e => setName(e.target.value)} placeholder="홍길동"
-                  style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>이름 (읽기 전용)</label>
+                <div style={{ height: 34, border: "1.5px solid #e0e0e0", borderRadius: 5, background: "#fafafa", padding: "0 10px", display: "flex", alignItems: "center" }}>
+                  <span style={{ fontSize: 11, color: "#aaa" }}>{name}</span>
+                </div>
               </div>
 
               {/* 이메일 — 수정 불가 */}
@@ -135,7 +135,14 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
                 <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>이메일</label>
                 <div style={{ height: 34, border: "1.5px solid #e0e0e0", borderRadius: 5, background: "#fafafa", padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                   <span style={{ fontSize: 11, color: "#aaa" }}>{email}</span>
-                  <span style={{ padding: "2px 8px", border: "1px solid #e0e0e0", borderRadius: 20, fontSize: 10, color: "#888", background: "#fff", cursor: "pointer", whiteSpace: "nowrap" }}>인증 후 변경</span>
+                  <button
+                    type="button"
+                    disabled
+                    title="이메일 변경 API가 준비되면 활성화됩니다."
+                    style={{ padding: "2px 8px", border: "1px solid #e0e0e0", borderRadius: 20, fontSize: 10, color: "#888", background: "#fff", cursor: "not-allowed", whiteSpace: "nowrap" }}
+                  >
+                    인증 후 변경
+                  </button>
                 </div>
                 <p style={{ fontSize: 10, color: "#aaa", margin: "4px 0 0" }}>이메일 변경 시 본인 인증이 필요합니다.</p>
               </div>
@@ -230,7 +237,7 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
+      <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 24 }}>
         <button onClick={handleSave} disabled={isSaving}
           style={{ padding: "10px 24px", border: "none", borderRadius: 8, background: isSaving ? "#aaa" : "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: isSaving ? "not-allowed" : "pointer" }}>
           {isSaving ? "저장 중..." : "저장"}
@@ -238,6 +245,15 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
         <button onClick={() => onNavigate("/mypage")}
           style={{ padding: "10px 24px", border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer" }}>
           취소
+        </button>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
+        <button
+          type="button"
+          onClick={() => onNavigate("/mypage/withdrawal")}
+          style={{ border: "none", background: "transparent", color: "#999", fontSize: 11, cursor: "pointer", textDecoration: "underline" }}
+        >
+          회원 탈퇴하기
         </button>
       </div>
     </div>

@@ -56,3 +56,25 @@ export async function createLipidRecord(body: CreateLipidBody, token?: string) {
     token,
   });
 }
+
+type ApiLipidRecord = Omit<LipidRecord, "id"> & {
+  record_id: number;
+};
+
+function toLipidRecord(record: ApiLipidRecord): LipidRecord {
+  return {
+    ...record,
+    id: record.record_id,
+    ldl: record.ldl_cholesterol ?? record.ldl,
+    hdl: record.hdl_cholesterol ?? record.hdl,
+    waist_cm: record.waist_circumference ?? record.waist_cm,
+  };
+}
+
+export async function getLipidRecords(query: { limit?: number } = {}, token?: string) {
+  const params = new URLSearchParams();
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const response = await apiRequest<{ data: ApiLipidRecord[] }>(`/health/lipid-obesity-records${qs ? `?${qs}` : ""}`, { token });
+  return { data: response.data.map(toLipidRecord) };
+}

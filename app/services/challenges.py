@@ -25,6 +25,41 @@ from app.dtos.challenges import (
 from app.models.challenges import Challenge, ChallengeCheckin, ChallengeParticipation
 from app.models.users import User
 
+DEFAULT_CHALLENGES = [
+    {
+        "title": "30일 걷기 챌린지",
+        "description": "매일 걸음 수 목표를 달성해 건강한 걷기 습관을 만듭니다.",
+        "category": "WALK",
+        "target_metric": "STEPS",
+        "goal_value": 6000,
+        "duration_days": 30,
+    },
+    {
+        "title": "수분 섭취 챌린지",
+        "description": "매일 충분한 물 섭취를 기록해 수분 관리 습관을 만듭니다.",
+        "category": "WATER",
+        "target_metric": "WATER",
+        "goal_value": 8,
+        "duration_days": 14,
+    },
+    {
+        "title": "저염식 습관 챌린지",
+        "description": "나트륨 섭취를 줄이는 식단 실천을 기록합니다.",
+        "category": "DIET",
+        "target_metric": "DIET",
+        "goal_value": 1,
+        "duration_days": 14,
+    },
+    {
+        "title": "규칙적 운동 챌린지",
+        "description": "꾸준한 운동 기록으로 활동량을 높입니다.",
+        "category": "EXERCISE",
+        "target_metric": "EXERCISE",
+        "goal_value": 30,
+        "duration_days": 21,
+    },
+]
+
 
 class ChallengeService:
     async def get_challenges(
@@ -34,6 +69,7 @@ class ChallengeService:
         target_metric: str | None = None,
         sort: str = "LATEST",
     ) -> list[ChallengeSummaryResponse]:
+        await self._ensure_default_challenges()
         query = Challenge.filter(is_active=True)
         if category:
             query = query.filter(category=category)
@@ -70,6 +106,7 @@ class ChallengeService:
         return self._sort_challenge_summaries(summaries, sort)
 
     async def get_challenge(self, user: User, challenge_id: int) -> ChallengeDetailResponse:
+        await self._ensure_default_challenges()
         challenge = await self._get_active_challenge(challenge_id)
         participation = await ChallengeParticipation.get_or_none(
             user_id=user.id,
@@ -99,6 +136,7 @@ class ChallengeService:
         )
 
     async def join_challenge(self, user: User, challenge_id: int) -> ChallengeJoinResponse:
+        await self._ensure_default_challenges()
         challenge = await self._get_active_challenge(challenge_id)
         existing = await ChallengeParticipation.get_or_none(
             user_id=user.id,
@@ -119,6 +157,7 @@ class ChallengeService:
         return self._to_join_response(participation)
 
     async def get_my_challenges(self, user: User) -> list[MyChallengeResponse]:
+        await self._ensure_default_challenges()
         participations = (
             await ChallengeParticipation.filter(user_id=user.id)
             .order_by("-created_at")
@@ -126,6 +165,19 @@ class ChallengeService:
         )
         today = date.today()
         return [self._to_my_challenge(participation, today) for participation in participations]
+
+    async def get_participation(self, user: User, participation_id: int) -> MyChallengeResponse:
+        participation = await ChallengeParticipation.get_or_none(id=participation_id, user_id=user.id).prefetch_related(
+            "challenge",
+            "checkins",
+        )
+        if participation is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="참여 중인 챌린지를 찾을 수 없습니다.")
+        return self._to_my_challenge(participation, date.today())
+
+    async def get_recommendations(self, user: User, limit: int = 5) -> list[ChallengeSummaryResponse]:
+        challenges = await self.get_challenges(user, sort="POPULAR")
+        return [challenge for challenge in challenges if not challenge.is_joined][:limit]
 
     async def get_dashboard_summary(self, user: User) -> ChallengeDashboardSummaryResponse:
         today = date.today()
@@ -215,6 +267,12 @@ class ChallengeService:
         participation.status = ChallengeParticipationStatus.CANCELED.value
         await participation.save(update_fields=["status", "updated_at"])
         return self._to_cancel_response(participation)
+
+    @staticmethod
+    async def _ensure_default_challenges() -> None:
+        if await Challenge.exists():
+            return
+        await Challenge.bulk_create([Challenge(**challenge) for challenge in DEFAULT_CHALLENGES])
 
     @staticmethod
     async def _get_active_challenge(challenge_id: int) -> Challenge:

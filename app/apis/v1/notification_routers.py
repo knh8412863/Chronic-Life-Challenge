@@ -62,6 +62,19 @@ async def mark_notification_read(
 
 
 @notification_router.patch(
+    "/notifications/{notification_id}/read-status",
+    response_model=DataResponse[NotificationMarkReadResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def mark_notification_read_status(
+    notification_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[NotificationService, Depends(NotificationService)],
+) -> Response:
+    return await mark_notification_read(notification_id, user, service)
+
+
+@notification_router.patch(
     "/notifications/read-all",
     response_model=DataResponse[NotificationMarkAllReadResponse],
     status_code=status.HTTP_200_OK,
@@ -72,6 +85,18 @@ async def mark_all_notifications_read(
 ) -> Response:
     result = await service.mark_all_read(user)
     return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@notification_router.patch(
+    "/notifications/read-status",
+    response_model=DataResponse[NotificationMarkAllReadResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def mark_all_notifications_read_status(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[NotificationService, Depends(NotificationService)],
+) -> Response:
+    return await mark_all_notifications_read(user, service)
 
 
 @notification_router.get(

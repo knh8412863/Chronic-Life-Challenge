@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { AppLayout } from "./layouts/AppLayout";
 import { AdviceHistoryPage } from "./pages/AdviceHistoryPage";
+import { AdviceFeedbackPage } from "./pages/AdviceFeedbackPage";
 import { AdviceTodayPage } from "./pages/AdviceTodayPage";
 import { TermsAgreementPage, EmailVerifyPage, PasswordResetPage, OnboardingCompletePage } from "./pages/AuthOnboardingPages";
 import { BadgePage } from "./pages/challenge/BadgePage";
@@ -11,14 +12,12 @@ import { ChallengeListPage } from "./pages/challenge/ChallengeListPage";
 import { LeaderboardPage } from "./pages/challenge/LeaderboardPage";
 import { MyChallengesPage } from "./pages/challenge/MyChallengesPage";
 import { PublicLayout } from "./layouts/PublicLayout";
-import { FoodAnalyzePage } from "./pages/FoodAnalyzePage";
 import { FoodPage } from "./pages/FoodPage";
 import { HomePage } from "./pages/HomePage";
 import { ActivityPage } from "./pages/health/ActivityPage";
 import { ExercisePage } from "./pages/health/ExercisePage";
 import { GoalEditPage } from "./pages/health/GoalEditPage";
 import { GoalPage } from "./pages/health/GoalPage";
-import { HealthHubPage } from "./pages/health/HealthHubPage";
 import { HealthProfilePage } from "./pages/health/HealthProfilePage";
 import { VitalsDetailPage } from "./pages/health/VitalsDetailPage";
 import { VitalsInputPage } from "./pages/health/VitalsInputPage";
@@ -58,6 +57,7 @@ export type AppRoute =
   | "/notifications"
   | "/advices/today"
   | "/advices/history"
+  | "/advices/feedback"
   | "/prediction/request"
   | "/prediction/progress"
   | "/prediction/result"
@@ -120,6 +120,7 @@ function normalizePath(pathname: string): AppRoute {
     "/notifications",
     "/advices/today",
     "/advices/history",
+    "/advices/feedback",
     "/prediction/request",
     "/prediction/progress",
     "/prediction/result",
@@ -203,7 +204,9 @@ export default function App() {
       case "/advices/today":
         return <AdviceTodayPage onNavigate={navigate} />;
       case "/advices/history":
-        return <AdviceHistoryPage />;
+        return <AdviceHistoryPage onNavigate={navigate} />;
+      case "/advices/feedback":
+        return <AdviceFeedbackPage onNavigate={navigate} />;
       case "/prediction/request":
         return <PredictionRequestPage onNavigate={navigate} />;
       case "/prediction/progress":
@@ -228,7 +231,7 @@ export default function App() {
       case "/mypage/withdrawal":
         return <WithdrawalPage onNavigate={navigate} />;
       case "/health":
-        return <HealthHubPage onNavigate={navigate} />;
+        return <HealthProfilePage onNavigate={navigate} />;
       case "/health/goal":
         return <GoalPage onNavigate={navigate} />;
       case "/health/goal/edit":
@@ -248,7 +251,7 @@ export default function App() {
       case "/food":
         return <FoodPage onNavigate={navigate} />;
       case "/food/analyze":
-        return <FoodAnalyzePage onNavigate={navigate} />;
+        return <FoodPage onNavigate={navigate} view="input" />;
       case "/reports":
         return <ReportListPage onNavigate={navigate} />;
       case "/reports/detail":

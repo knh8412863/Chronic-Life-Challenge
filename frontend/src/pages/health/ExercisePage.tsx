@@ -17,17 +17,16 @@ import {
 } from "../../api/exercise";
 import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingState } from "../../components/common/LoadingState";
+import { localDateString, localDaysAgoString } from "../../utils/date";
 
 type Tab = "input" | "list";
 type QuickPeriod = "TODAY" | "7D" | "1M" | "3M";
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateString();
 }
 function daysAgoStr(days: number) {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+  return localDaysAgoString(days);
 }
 function formatDateShort(s: string) {
   const p = s.split("-");
@@ -323,7 +322,7 @@ function ExerciseInputForm({ onSave, onCancel }: ExerciseInputFormProps) {
               max={todayStr()}
               onChange={(e) => setDate(e.target.value)}
             />
-            <p className="goal-section-note">* API body: exercise_date (date), duration_minutes (int)</p>
+            <p className="goal-section-note">* 운동한 날짜와 시간을 선택해주세요.</p>
           </div>
           <div className="vi-field">
             <span className="field-label">운동 시간 (분)</span>
@@ -349,7 +348,7 @@ function ExerciseInputForm({ onSave, onCancel }: ExerciseInputFormProps) {
             value={calories}
             onChange={(e) => setCalories(e.target.value)}
           />
-          <p className="goal-section-note">* calories_burned (optional 직접 입력) — 자동계산 미구현</p>
+          <p className="goal-section-note">* 소모 칼로리를 알고 있다면 입력해주세요.</p>
         </div>
       </section>
 

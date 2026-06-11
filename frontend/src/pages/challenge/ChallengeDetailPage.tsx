@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
+import { ApiError } from "../../api/client";
 import {
   getChallengeDetail,
   joinChallenge,
@@ -43,6 +44,7 @@ export function ChallengeDetailPage({ onNavigate }: Props) {
   const [hasError, setHasError] = useState(false);
   const [isJoined, setIsJoined] = useState(false);
   const [isJoining, setIsJoining] = useState(false);
+  const [joinErrorMessage, setJoinErrorMessage] = useState("");
 
   const challengeId = Number(sessionStorage.getItem("selectedChallengeId") ?? "1");
 
@@ -51,19 +53,25 @@ export function ChallengeDetailPage({ onNavigate }: Props) {
     if (!token) return;
     setIsLoading(true);
     getChallengeDetail(challengeId, token)
-      .then((res) => { setData(res.data); setHasError(false); })
+      .then((res) => { setData(res.data); setIsJoined(Boolean(res.data.is_joined)); setHasError(false); })
       .catch(() => setHasError(true))
       .finally(() => setIsLoading(false));
   }, [challengeId]);
 
   async function handleJoin() {
     const token = getStoredAccessToken();
+    if (!token) {
+      setJoinErrorMessage("로그인 후 챌린지에 참여할 수 있습니다.");
+      return;
+    }
+
     setIsJoining(true);
     try {
-      if (token) await joinChallenge(challengeId, token);
+      await joinChallenge(challengeId, token);
       setIsJoined(true);
-    } catch {
-      alert("참여 신청에 실패했습니다.");
+    } catch (error) {
+      const detail = error instanceof ApiError ? error.detail : undefined;
+      setJoinErrorMessage(typeof detail === "string" ? detail : "챌린지 참여에 실패했습니다. 로그인 상태 또는 참여 조건을 확인해 주세요.");
     } finally {
       setIsJoining(false);
     }
@@ -77,7 +85,7 @@ export function ChallengeDetailPage({ onNavigate }: Props) {
     <div className="challenge-page">
       <section className="section-header-row page-heading-row">
         <div className="page-heading">
-          <p className="eyebrow">챌린지 관리</p>
+          <p className="eyebrow">챌린지</p>
           <h1>챌린지 상세</h1>
         </div>
         <button type="button" className="green-button" onClick={() => onNavigate?.("/challenges/list")}>
@@ -196,6 +204,17 @@ export function ChallengeDetailPage({ onNavigate }: Props) {
           </div>
         </div>
       </div>
+      {joinErrorMessage && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ width: 360, background: "#fff", borderRadius: 12, padding: 22, boxShadow: "0 18px 40px rgba(15,23,42,0.16)" }}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 16 }}>챌린지 참여 실패</h3>
+            <p style={{ margin: "0 0 18px", color: "#555", fontSize: 13, lineHeight: 1.5 }}>{joinErrorMessage}</p>
+            <button type="button" className="green-button" style={{ width: "100%" }} onClick={() => setJoinErrorMessage("")}>
+              확인
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -91,7 +91,7 @@ export function ChallengeDashboardPage({ onNavigate }: Props) {
     <div className="challenge-page">
       <section className="section-header-row page-heading-row">
         <div className="page-heading">
-          <p className="eyebrow">챌린지 관리</p>
+          <p className="eyebrow">챌린지</p>
           <h1>챌린지 요약</h1>
         </div>
       </section>

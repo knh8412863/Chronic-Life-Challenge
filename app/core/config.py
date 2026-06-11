@@ -69,6 +69,18 @@ class Config(BaseSettings):
     PASSWORD_RESET_EXPIRE_MINUTES: int = 30
     PASSWORD_RESET_COOLDOWN_SECONDS: int = 60
 
+    FRONTEND_BASE_URL: str = "http://localhost:5173"
+    SMTP_HOST: str | None = None
+    SMTP_PORT: int = 587
+    SMTP_USERNAME: str | None = None
+    SMTP_PASSWORD: str | None = None
+    SMTP_FROM_EMAIL: str = "no-reply@all4health.local"
+    SMTP_USE_TLS: bool = True
+
+    GOOGLE_CLIENT_ID: str | None = None
+    GOOGLE_JWKS_URL: str = "https://www.googleapis.com/oauth2/v3/certs"
+    GOOGLE_ISSUERS: str = "https://accounts.google.com,accounts.google.com"
+
     ADVICE_LLM_ENABLED: bool = False
     REPORT_LLM_ENABLED: bool = False
     OPENAI_API_KEY: str | None = None

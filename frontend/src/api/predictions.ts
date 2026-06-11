@@ -52,6 +52,13 @@ export type HealthSurveyRecord = HealthSurveyResponse & {
   diagnosed_diseases: string[];
   medications: string[];
   last_checkup_period?: string | null;
+  fh_diabetes_father?: boolean;
+  fh_diabetes_mother?: boolean;
+  fh_diabetes_sibling?: boolean;
+  fh_hypertension_father?: boolean;
+  fh_hypertension_mother?: boolean;
+  fh_hypertension_sibling?: boolean;
+  family_history_ckd?: boolean;
 };
 
 export type PredictionTaskCreatePayload = {

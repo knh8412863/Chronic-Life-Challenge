@@ -5,6 +5,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import ORJSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
+from app.core.logger import default_logger
+
 ERROR_CODE_BY_STATUS = {
     status.HTTP_400_BAD_REQUEST: "BAD_REQUEST",
     status.HTTP_401_UNAUTHORIZED: "UNAUTHORIZED",
@@ -15,6 +17,7 @@ ERROR_CODE_BY_STATUS = {
     status.HTTP_422_UNPROCESSABLE_CONTENT: "VALIDATION_ERROR",
     status.HTTP_423_LOCKED: "LOCKED",
     status.HTTP_429_TOO_MANY_REQUESTS: "RATE_LIMIT_EXCEEDED",
+    status.HTTP_500_INTERNAL_SERVER_ERROR: "INTERNAL_SERVER_ERROR",
 }
 
 
@@ -58,6 +61,20 @@ async def request_validation_exception_handler(request: Request, exc: RequestVal
     )
 
 
+async def unhandled_exception_handler(request: Request, exc: Exception) -> ORJSONResponse:
+    default_logger.exception("Unhandled server error")
+    return ORJSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content=build_error_response(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="서버 오류가 발생했습니다.",
+            code="INTERNAL_SERVER_ERROR",
+            message="서버 오류가 발생했습니다.",
+        ),
+    )
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, request_validation_exception_handler)
+    app.add_exception_handler(Exception, unhandled_exception_handler)

@@ -1,4 +1,5 @@
 import type { AppRoute } from "../App";
+import { localDotDateLabel } from "../utils/date";
 
 type LandingPageProps = {
   onNavigate: (route: AppRoute) => void;
@@ -77,7 +78,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
         <aside className="dashboard-preview" aria-label="나의 건강 대시보드 미리보기">
           <div className="preview-header">
             <strong>나의 건강 대시보드</strong>
-            <span>2026. 05. 29</span>
+            <span>{localDotDateLabel()}</span>
           </div>
           <div className="risk-grid">
             <div className="risk-card risk-low">

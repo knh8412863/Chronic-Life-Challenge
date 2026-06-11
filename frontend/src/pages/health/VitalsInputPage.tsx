@@ -1,21 +1,40 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
+import { saveActivity } from "../../api/activity";
+import {
+  EXERCISE_TYPE_ICONS,
+  EXERCISE_TYPE_LABELS,
+  EXERCISE_TYPES,
+  createExerciseLog,
+  type CreateExerciseBody,
+  type ExerciseTypeCode,
+} from "../../api/exercise";
 import { createKidneyRecord, type CreateKidneyBody } from "../../api/kidney";
 import { createLipidRecord, type CreateLipidBody } from "../../api/lipid";
-import { createVital, isBpType, type CreateVitalBody, type MeasureType } from "../../api/vitals";
+import { createVital, getVitals, isBpType, type CreateVitalBody, type MeasureType } from "../../api/vitals";
+import { localDateString } from "../../utils/date";
 
-type Tab = "bp" | "lipid" | "kidney";
+type Tab = "bp" | "lipid" | "kidney" | "exercise" | "activity";
 type BpCategory = "BP" | "BG";
 type BpTime = "MORNING" | "LUNCH" | "EVENING";
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateString();
 }
 function nowTimeStr() {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function isToday(iso: string) {
+  return iso.slice(0, 10) === todayStr();
+}
+function nonNegativeValue(value: string): string {
+  if (value === "") return "";
+  const n = Number(value);
+  if (Number.isNaN(n)) return "";
+  return String(Math.max(0, n));
 }
 
 type VitalsInputPageProps = {
@@ -30,7 +49,7 @@ export function VitalsInputPage({ onNavigate }: VitalsInputPageProps) {
       <section className="section-header-row page-heading-row">
         <div className="page-heading">
           <p className="eyebrow">건강 관리</p>
-          <h1>{tab === "bp" ? "혈압/혈당 입력" : tab === "lipid" ? "지질 지표 입력" : "신장 지표 입력"}</h1>
+          <h1>건강 기록 입력</h1>
         </div>
       </section>
 
@@ -57,11 +76,37 @@ export function VitalsInputPage({ onNavigate }: VitalsInputPageProps) {
         >
           신장
         </button>
+        <button
+          type="button"
+          className={`vi-tab ${tab === "exercise" ? "vi-tab--active" : ""}`}
+          onClick={() => setTab("exercise")}
+        >
+          운동 기록
+        </button>
+        <button
+          type="button"
+          className={`vi-tab ${tab === "activity" ? "vi-tab--active" : ""}`}
+          onClick={() => setTab("activity")}
+        >
+          일일 활동 기록
+        </button>
       </div>
 
-      {tab === "bp" && <BpForm onNavigate={onNavigate} />}
-      {tab === "lipid" && <LipidForm onNavigate={onNavigate} />}
-      {tab === "kidney" && <KidneyForm onNavigate={onNavigate} />}
+      <div style={{ display: tab === "bp" ? "block" : "none" }}>
+        <BpForm onNavigate={onNavigate} />
+      </div>
+      <div style={{ display: tab === "lipid" ? "block" : "none" }}>
+        <LipidForm onNavigate={onNavigate} />
+      </div>
+      <div style={{ display: tab === "kidney" ? "block" : "none" }}>
+        <KidneyForm onNavigate={onNavigate} />
+      </div>
+      <div style={{ display: tab === "exercise" ? "block" : "none" }}>
+        <ExerciseInputPanel onNavigate={onNavigate} />
+      </div>
+      <div style={{ display: tab === "activity" ? "block" : "none" }}>
+        <ActivityInputPanel onNavigate={onNavigate} />
+      </div>
     </div>
   );
 }
@@ -72,41 +117,73 @@ function BpForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
   const [bpTime, setBpTime] = useState<BpTime>("MORNING");
   const [systolic, setSystolic] = useState("");
   const [diastolic, setDiastolic] = useState("");
-  const [glucose, setGlucose] = useState("");
-  const [glucoseTime, setGlucoseTime] = useState<"FASTING" | "POSTPRANDIAL">("FASTING");
+  const [fastingGlucose, setFastingGlucose] = useState("");
+  const [postprandialGlucose, setPostprandialGlucose] = useState("");
   const [date, setDate] = useState(todayStr());
   const [time, setTime] = useState(nowTimeStr());
   const [memo, setMemo] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [todayBpCount, setTodayBpCount] = useState(0);
 
   const isBpWarning = category === "BP" && Number(systolic) >= 140;
 
-  function getMeasureType(): MeasureType {
-    if (category === "BP") {
-      return `BP_${bpTime}` as MeasureType;
+  function refreshTodayBpCount() {
+    const token = getStoredAccessToken();
+    if (!token) {
+      setTodayBpCount(0);
+      return;
     }
-    return glucoseTime === "FASTING" ? "GLUCOSE_FASTING" : "GLUCOSE_POSTPRANDIAL";
+    getVitals({ limit: 100 }, token)
+      .then((res) => {
+        const count = res.data.items.filter((item) => isBpType(item.measure_type) && isToday(item.measured_at)).length;
+        setTodayBpCount(Math.min(count, 3));
+      })
+      .catch(() => setTodayBpCount(0));
   }
+
+  useEffect(() => {
+    refreshTodayBpCount();
+  }, []);
 
   async function handleSave() {
     const token = getStoredAccessToken();
     const measuredAt = `${date}T${time}:00`;
-    const mt = getMeasureType();
-    const body: CreateVitalBody = { measure_type: mt, measured_at: measuredAt };
+    const requests: CreateVitalBody[] = [];
 
-    if (isBpType(mt)) {
+    if (category === "BP") {
       if (!systolic || !diastolic) { alert("수축기 및 이완기 혈압을 입력해 주세요."); return; }
-      body.systolic = Number(systolic);
-      body.diastolic = Number(diastolic);
+      requests.push({
+        measure_type: `BP_${bpTime}` as MeasureType,
+        measured_at: measuredAt,
+        systolic: Number(systolic),
+        diastolic: Number(diastolic),
+      });
     } else {
-      if (!glucose) { alert("혈당 값을 입력해 주세요."); return; }
-      body.glucose = Number(glucose);
+      if (!fastingGlucose && !postprandialGlucose) { alert("공복 또는 식후 혈당 값을 입력해 주세요."); return; }
+      if (fastingGlucose) {
+        requests.push({
+          measure_type: "GLUCOSE_FASTING",
+          measured_at: measuredAt,
+          glucose: Number(fastingGlucose),
+        });
+      }
+      if (postprandialGlucose) {
+        requests.push({
+          measure_type: "GLUCOSE_POSTPRANDIAL",
+          measured_at: measuredAt,
+          glucose: Number(postprandialGlucose),
+        });
+      }
     }
-    if (memo.trim()) body.memo = memo.trim();
+    const memoText = memo.trim();
+    if (memoText) {
+      requests.forEach((body) => { body.memo = memoText; });
+    }
 
     setIsSaving(true);
     try {
-      await createVital(body, token ?? undefined);
+      await Promise.all(requests.map((body) => createVital(body, token ?? undefined)));
+      refreshTodayBpCount();
       onNavigate?.("/health/vitals");
     } catch {
       alert("저장에 실패했습니다. 다시 시도해 주세요.");
@@ -118,7 +195,7 @@ function BpForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
   return (
     <div className="vi-form-body">
       <div className="vi-form-hint-row">
-        <span className="goal-section-note">오늘 2/3회 입력 완료</span>
+        <span className="goal-section-note">오늘 {todayBpCount}/3회 입력 완료</span>
       </div>
 
       {/* 측정 유형 */}
@@ -144,10 +221,10 @@ function BpForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
         </div>
       </section>
 
-      {/* 측정 시간 (혈압: 아침/점심/저녁, 혈당: 공복/식후) */}
-      <section className="dashboard-card vi-section">
-        <h2>측정 시간</h2>
-        {category === "BP" ? (
+      {/* 측정 시간 */}
+      {category === "BP" && (
+        <section className="dashboard-card vi-section">
+          <h2>측정 시간</h2>
           <div className="vi-time-grid">
             {(["MORNING", "LUNCH", "EVENING"] as BpTime[]).map((t) => (
               <button
@@ -159,29 +236,9 @@ function BpForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
                 {t === "MORNING" ? "아침" : t === "LUNCH" ? "점심" : "저녁"}
               </button>
             ))}
-            <p className="goal-section-note" style={{ gridColumn: "1/-1", marginTop: "4px" }}>
-              * measure_type: BP_MORNING / BP_LUNCH / BP_EVENING
-            </p>
           </div>
-        ) : (
-          <div className="vi-time-grid">
-            <button
-              type="button"
-              className={`vi-time-btn ${glucoseTime === "FASTING" ? "vi-time-btn--active" : ""}`}
-              onClick={() => setGlucoseTime("FASTING")}
-            >
-              공복
-            </button>
-            <button
-              type="button"
-              className={`vi-time-btn ${glucoseTime === "POSTPRANDIAL" ? "vi-time-btn--active" : ""}`}
-              onClick={() => setGlucoseTime("POSTPRANDIAL")}
-            >
-              식후
-            </button>
-          </div>
-        )}
-      </section>
+        </section>
+      )}
 
       {/* 수치 입력 */}
       <section className="dashboard-card vi-section">
@@ -194,9 +251,9 @@ function BpForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
                 className="vi-bp-input vi-bp-systolic"
                 placeholder="수축기"
                 value={systolic}
-                min={60}
+                min={0}
                 max={250}
-                onChange={(e) => setSystolic(e.target.value)}
+                onChange={(e) => setSystolic(nonNegativeValue(e.target.value))}
               />
             </div>
             <span className="vi-bp-sep">/</span>
@@ -206,25 +263,39 @@ function BpForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
                 className="vi-bp-input vi-bp-diastolic"
                 placeholder="이완기"
                 value={diastolic}
-                min={40}
+                min={0}
                 max={150}
-                onChange={(e) => setDiastolic(e.target.value)}
+                onChange={(e) => setDiastolic(nonNegativeValue(e.target.value))}
               />
             </div>
             <span className="vi-bp-unit">mmHg</span>
           </div>
         ) : (
-          <div className="vi-glucose-row">
-            <input
-              type="number"
-              className="vi-bp-input"
-              placeholder="예: 98"
-              value={glucose}
-              min={40}
-              max={600}
-              onChange={(e) => setGlucose(e.target.value)}
-            />
-            <span className="vi-bp-unit">mg/dL</span>
+          <div className="vi-lipid-grid">
+            <div className="vi-lipid-field">
+              <label className="field-label">공복 혈당 (mg/dL)</label>
+              <input
+                type="number"
+                className="vi-lipid-input vi-lipid-neutral"
+                placeholder="예: 98"
+                value={fastingGlucose}
+                min={0}
+                max={600}
+                onChange={(e) => setFastingGlucose(nonNegativeValue(e.target.value))}
+              />
+            </div>
+            <div className="vi-lipid-field">
+              <label className="field-label">식후 혈당 (mg/dL)</label>
+              <input
+                type="number"
+                className="vi-lipid-input vi-lipid-neutral"
+                placeholder="예: 140"
+                value={postprandialGlucose}
+                min={0}
+                max={600}
+                onChange={(e) => setPostprandialGlucose(nonNegativeValue(e.target.value))}
+              />
+            </div>
           </div>
         )}
 
@@ -260,7 +331,6 @@ function BpForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
             />
           </div>
         </div>
-        <p className="goal-section-note">* API: measured_at (datetime 단일 필드)</p>
       </section>
 
       {/* 메모 */}
@@ -332,23 +402,23 @@ function LipidForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
         <div className="vi-lipid-grid">
           <div className="vi-lipid-field">
             <label className="field-label">총 콜레스테롤 (mg/dL)</label>
-            <input type="number" className="vi-lipid-input vi-lipid-neutral" placeholder="예: 200" value={totalCholesterol} onChange={(e) => setTotalCholesterol(e.target.value)} />
+            <input type="number" min={0} className="vi-lipid-input vi-lipid-neutral" placeholder="예: 200" value={totalCholesterol} onChange={(e) => setTotalCholesterol(nonNegativeValue(e.target.value))} />
           </div>
           <div className="vi-lipid-field">
             <label className="field-label">LDL 콜레스테롤 (mg/dL)</label>
-            <input type="number" className="vi-lipid-input vi-lipid-pink" placeholder="예: 100" value={ldl} onChange={(e) => setLdl(e.target.value)} />
+            <input type="number" min={0} className="vi-lipid-input vi-lipid-neutral" placeholder="예: 100" value={ldl} onChange={(e) => setLdl(nonNegativeValue(e.target.value))} />
           </div>
           <div className="vi-lipid-field">
             <label className="field-label">HDL 콜레스테롤 (mg/dL)</label>
-            <input type="number" className="vi-lipid-input vi-lipid-green" placeholder="예: 50" value={hdl} onChange={(e) => setHdl(e.target.value)} />
+            <input type="number" min={0} className="vi-lipid-input vi-lipid-neutral" placeholder="예: 50" value={hdl} onChange={(e) => setHdl(nonNegativeValue(e.target.value))} />
           </div>
           <div className="vi-lipid-field">
             <label className="field-label">중성지방 (mg/dL)</label>
-            <input type="number" className="vi-lipid-input vi-lipid-yellow" placeholder="예: 150" value={triglycerides} onChange={(e) => setTriglycerides(e.target.value)} />
+            <input type="number" min={0} className="vi-lipid-input vi-lipid-neutral" placeholder="예: 150" value={triglycerides} onChange={(e) => setTriglycerides(nonNegativeValue(e.target.value))} />
           </div>
           <div className="vi-lipid-field">
             <label className="field-label">허리둘레 (cm)</label>
-            <input type="number" className="vi-lipid-input vi-lipid-neutral" placeholder="예: 80" value={waist} onChange={(e) => setWaist(e.target.value)} />
+            <input type="number" min={0} className="vi-lipid-input vi-lipid-neutral" placeholder="예: 80" value={waist} onChange={(e) => setWaist(nonNegativeValue(e.target.value))} />
           </div>
         </div>
       </section>
@@ -358,7 +428,6 @@ function LipidForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
         <div className="vi-field" style={{ marginBottom: "16px" }}>
           <span className="field-label">측정 날짜</span>
           <input type="date" className="vi-date-input" value={date} max={todayStr()} onChange={(e) => setDate(e.target.value)} />
-          <p className="goal-section-note">* API body: record_date (date 타입), 시간 필드 없음</p>
         </div>
         <div className="vi-field" style={{ marginBottom: "16px" }}>
           <span className="field-label">측정 출처 (선택)</span>
@@ -432,10 +501,11 @@ function KidneyForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
             <input
               type="number"
               step="0.1"
+              min={0}
               className="vi-kidney-input"
               placeholder="예: 1.0"
               value={creatinine}
-              onChange={(e) => setCreatinine(e.target.value)}
+              onChange={(e) => setCreatinine(nonNegativeValue(e.target.value))}
             />
           </div>
           <div className="vi-field" style={{ marginBottom: "16px" }}>
@@ -443,10 +513,11 @@ function KidneyForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
             <input
               type="number"
               step="0.1"
+              min={0}
               className="vi-kidney-input"
               placeholder="예: 15"
               value={bun}
-              onChange={(e) => setBun(e.target.value)}
+              onChange={(e) => setBun(nonNegativeValue(e.target.value))}
             />
           </div>
           <div className="vi-field">
@@ -459,12 +530,23 @@ function KidneyForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
             <input
               type="number"
               step="0.1"
+              min={0}
               className="vi-kidney-input"
               placeholder="직접 입력"
               value={egfr}
-              onChange={(e) => setEgfr(e.target.value)}
+              onChange={(e) => setEgfr(nonNegativeValue(e.target.value))}
               style={{ marginTop: "8px" }}
             />
+            {calculatedEgfr && (
+              <button
+                type="button"
+                className="wide-subtle-button"
+                style={{ marginTop: "8px" }}
+                onClick={() => setEgfr(calculatedEgfr)}
+              >
+                자동계산 값 사용
+              </button>
+            )}
             <p className="goal-section-note">* 크레아티닌+나이+성별로 자동계산되지만 직접 입력도 가능합니다</p>
           </div>
         </section>
@@ -490,7 +572,7 @@ function KidneyForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
             </button>
           </div>
           <p className="goal-section-note" style={{ marginTop: "8px" }}>
-            * ERD: urine_protein_pos (boolean) — 참/모두 달력 입력
+            * 검사 결과지에 표시된 단백뇨 여부를 선택해주세요.
           </p>
         </section>
       </div>
@@ -505,7 +587,6 @@ function KidneyForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
         <div className="vi-field">
           <span className="field-label">메모 / 측정 기관 (선택)</span>
           <textarea className="vi-memo-input" placeholder="예: OO병원에서 측정" value={memo} onChange={(e) => setMemo(e.target.value)} />
-          <p className="goal-section-note">* API body: memo 필드로 측정 기관 정보 포함 가능</p>
         </div>
       </section>
 
@@ -516,6 +597,166 @@ function KidneyForm({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
         <button type="button" className="wide-subtle-button" onClick={() => onNavigate?.("/health/vitals")}>
           취소
         </button>
+      </div>
+    </div>
+  );
+}
+
+function ExerciseInputPanel({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
+  const [selectedType, setSelectedType] = useState<ExerciseTypeCode>("RUNNING");
+  const [date, setDate] = useState(todayStr());
+  const [minutes, setMinutes] = useState(30);
+  const [calories, setCalories] = useState("");
+  const [memo, setMemo] = useState("");
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function handleSave() {
+    const token = getStoredAccessToken();
+    const body: CreateExerciseBody = {
+      exercise_type: selectedType,
+      duration_minutes: minutes,
+      exercise_date: date,
+    };
+    if (calories) body.calories_burned = Number(calories);
+    if (memo.trim()) body.memo = memo.trim();
+
+    setIsSaving(true);
+    try {
+      await createExerciseLog(body, token ?? undefined);
+      onNavigate?.("/health/vitals");
+    } catch {
+      alert("저장에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="ex-input-body">
+      <section className="dashboard-card vi-section">
+        <h2>운동 종류</h2>
+        <div className="ex-type-grid">
+          {EXERCISE_TYPES.map((t) => (
+            <button
+              key={t}
+              type="button"
+              className={`ex-type-btn ${selectedType === t ? "ex-type-btn--active" : ""}`}
+              onClick={() => setSelectedType(t)}
+            >
+              <span className="ex-type-icon">{EXERCISE_TYPE_ICONS[t]}</span>
+              <span>{EXERCISE_TYPE_LABELS[t]}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+      <section className="dashboard-card vi-section">
+        <h2>운동 정보</h2>
+        <div className="ex-info-row">
+          <div className="vi-field" style={{ flex: 1 }}>
+            <span className="field-label">운동 날짜</span>
+            <input type="date" className="vi-date-input" value={date} max={todayStr()} onChange={(e) => setDate(e.target.value)} />
+          </div>
+          <div className="vi-field">
+            <span className="field-label">운동 시간 (분)</span>
+            <div className="ex-stepper">
+              <button type="button" className="ex-stepper-btn" onClick={() => setMinutes((m) => Math.max(1, m - 5))}>−</button>
+              <span className="ex-stepper-val">{minutes}</span>
+              <button type="button" className="ex-stepper-btn" onClick={() => setMinutes((m) => Math.min(720, m + 5))}>+</button>
+              <span className="field-label">분</span>
+            </div>
+          </div>
+        </div>
+      </section>
+      <section className="dashboard-card vi-section">
+        <h2>소모 칼로리 (선택)</h2>
+        <input type="number" min={0} className="vi-date-input" placeholder="예: 180" value={calories} onChange={(e) => setCalories(nonNegativeValue(e.target.value))} />
+      </section>
+      <section className="dashboard-card vi-section">
+        <h2>운동 메모 (선택)</h2>
+        <textarea className="vi-memo-input" placeholder="운동 중에 느낀 점을 기록하세요..." value={memo} onChange={(e) => setMemo(e.target.value)} />
+      </section>
+      <div className="goal-edit-actions">
+        <button type="button" className="wide-subtle-button" onClick={() => onNavigate?.("/health/vitals")}>취소</button>
+        <button type="button" className="green-button" onClick={handleSave} disabled={isSaving}>{isSaving ? "저장 중..." : "저장"}</button>
+      </div>
+    </div>
+  );
+}
+
+function ActivityInputPanel({ onNavigate }: { onNavigate?: (r: AppRoute) => void }) {
+  const [steps, setSteps] = useState("");
+  const [exerciseMinutes, setExerciseMinutes] = useState("");
+  const [sleepHours, setSleepHours] = useState("");
+  const [waterMl, setWaterMl] = useState("");
+  const [stressLevel, setStressLevel] = useState(3);
+  const [dietScore, setDietScore] = useState(7);
+  const [isSaving, setIsSaving] = useState(false);
+
+  async function handleSave() {
+    const token = getStoredAccessToken();
+    setIsSaving(true);
+    try {
+      await saveActivity(
+        {
+          steps: steps ? Number(steps) : undefined,
+          exercise_minutes: exerciseMinutes ? Number(exerciseMinutes) : undefined,
+          sleep_hours: sleepHours ? Number(sleepHours) : undefined,
+          water_ml: waterMl ? Number(waterMl) : undefined,
+          stress_level: stressLevel,
+          diet_score: dietScore,
+        },
+        token ?? undefined,
+      );
+      onNavigate?.("/health/vitals");
+    } catch {
+      alert("저장에 실패했습니다. 다시 시도해 주세요.");
+    } finally {
+      setIsSaving(false);
+    }
+  }
+
+  return (
+    <div className="activity-page page-stack">
+      <div className="act-two-col">
+        <section className="dashboard-card act-section">
+          <h2>활동량</h2>
+          <div className="vi-field" style={{ marginBottom: "20px" }}>
+            <label className="field-label">걸음 수 (보)</label>
+            <input type="number" min={0} className="act-input" placeholder="예: 8,000" value={steps} onChange={(e) => setSteps(nonNegativeValue(e.target.value))} />
+          </div>
+          <div className="vi-field">
+            <label className="field-label">운동 시간 (분)</label>
+            <input type="number" min={0} className="act-input" placeholder="예: 30" value={exerciseMinutes} onChange={(e) => setExerciseMinutes(nonNegativeValue(e.target.value))} />
+          </div>
+        </section>
+        <section className="dashboard-card act-section">
+          <h2>생활 습관</h2>
+          <div className="vi-field" style={{ marginBottom: "20px" }}>
+            <label className="field-label">수면 시간 (시간)</label>
+            <input type="number" step="0.5" min={0} max={24} className="act-input" placeholder="예: 7.5" value={sleepHours} onChange={(e) => setSleepHours(nonNegativeValue(e.target.value))} />
+          </div>
+          <div className="vi-field">
+            <label className="field-label">물 섭취 (ml)</label>
+            <input type="number" step="50" min={0} className="act-input" placeholder="예: 1,800" value={waterMl} onChange={(e) => setWaterMl(nonNegativeValue(e.target.value))} />
+          </div>
+        </section>
+      </div>
+      <section className="dashboard-card act-section">
+        <h2>컨디션</h2>
+        <div className="act-slider-row">
+          <div className="act-slider-item">
+            <label className="field-label">스트레스 수준 {stressLevel} / 5</label>
+            <input type="range" className="act-slider" min={1} max={5} step={1} value={stressLevel} onChange={(e) => setStressLevel(Number(e.target.value))} />
+          </div>
+          <div className="act-slider-item">
+            <label className="field-label">식단 점수 {dietScore.toFixed(1)} / 10</label>
+            <input type="range" className="act-slider" min={0} max={10} step={0.1} value={dietScore} onChange={(e) => setDietScore(Number(e.target.value))} />
+          </div>
+        </div>
+      </section>
+      <div className="goal-edit-actions">
+        <button type="button" className="wide-subtle-button" onClick={() => onNavigate?.("/health/vitals")}>취소</button>
+        <button type="button" className="green-button" onClick={handleSave} disabled={isSaving}>{isSaving ? "저장 중..." : "저장"}</button>
       </div>
     </div>
   );

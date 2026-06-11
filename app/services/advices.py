@@ -9,6 +9,7 @@ from app.dtos.advices import (
     AdviceFeedbackCreateResponse,
     AdviceFeedbackType,
     AdviceGenerateRequest,
+    AdviceHistoryItemResponse,
     AdviceTriggerType,
     DailyAdviceResponse,
 )
@@ -23,6 +24,7 @@ RULE_BASED_MODEL = "daily-advice-rules-v1"
 ADVICE_TITLE = "오늘의 건강 조언"
 MAX_ADVICE_LENGTH = 200
 ADVICE_DISCLAIMER = "본 조언은 진단이 아니며, 증상이나 우려가 있으면 전문의와 상담하세요."
+MAX_DAILY_MANUAL_REGENERATIONS = 2
 
 
 class AdviceService:
@@ -31,17 +33,27 @@ class AdviceService:
         advice = await self._latest_advice(user.id, today)
         if advice is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="오늘 생성된 조언이 없습니다.")
-        return self._to_response(advice, generated=False)
+        remaining = await self._remaining_manual_regeneration_count(user.id, today)
+        return self._to_response(advice, generated=False, remaining_regeneration_count=remaining)
 
     async def generate_today(self, user: User, data: AdviceGenerateRequest) -> DailyAdviceResponse:
         today = date.today()
-        existing = await LLMAdvice.filter(
-            user_id=user.id,
-            advice_date=today,
-            trigger_type=data.trigger_type.value,
-        ).first()
-        if existing:
-            return self._to_response(existing, generated=False)
+        if data.trigger_type == AdviceTriggerType.AUTO:
+            existing = await LLMAdvice.filter(
+                user_id=user.id,
+                advice_date=today,
+                trigger_type=data.trigger_type.value,
+            ).first()
+            if existing:
+                remaining = await self._remaining_manual_regeneration_count(user.id, today)
+                return self._to_response(existing, generated=False, remaining_regeneration_count=remaining)
+        else:
+            remaining = await self._remaining_manual_regeneration_count(user.id, today)
+            if remaining <= 0:
+                raise HTTPException(
+                    status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                    detail="오늘 조언 재생성 가능 횟수를 모두 사용했습니다.",
+                )
 
         context = await self._build_context(user)
         llm_result = await self._generate_llm_advice(context)
@@ -59,7 +71,21 @@ class AdviceService:
             cache_read_tokens=llm_result.cache_read_tokens if llm_result else 0,
             trigger_type=data.trigger_type.value,
         )
-        return self._to_response(advice, generated=True)
+        remaining = await self._remaining_manual_regeneration_count(user.id, today)
+        return self._to_response(advice, generated=True, remaining_regeneration_count=remaining)
+
+    async def get_history(
+        self,
+        user: User,
+        sort: str = "LATEST",
+        limit: int = 20,
+    ) -> list[AdviceHistoryItemResponse]:
+        order_by = "-created_at" if sort == "LATEST" else "created_at"
+        advices = await LLMAdvice.filter(user_id=user.id).order_by(order_by).limit(limit)
+        advice_ids = [advice.id for advice in advices]
+        feedbacks = await AdviceFeedback.filter(advice_id__in=advice_ids) if advice_ids else []
+        feedback_by_advice_id = {feedback.advice_id: feedback for feedback in feedbacks}
+        return [self._to_history_item(advice, feedback_by_advice_id.get(advice.id)) for advice in advices]
 
     async def create_feedback(
         self,
@@ -86,6 +112,15 @@ class AdviceService:
     @staticmethod
     async def _latest_advice(user_id: int, advice_date: date) -> LLMAdvice | None:
         return await LLMAdvice.filter(user_id=user_id, advice_date=advice_date).order_by("-created_at").first()
+
+    @staticmethod
+    async def _remaining_manual_regeneration_count(user_id: int, advice_date: date) -> int:
+        manual_count = await LLMAdvice.filter(
+            user_id=user_id,
+            advice_date=advice_date,
+            trigger_type=AdviceTriggerType.MANUAL.value,
+        ).count()
+        return max(MAX_DAILY_MANUAL_REGENERATIONS - manual_count, 0)
 
     @staticmethod
     async def _build_context(user: User) -> dict[str, Any]:
@@ -214,7 +249,11 @@ class AdviceService:
         return AdviceService._limit_text(normalized, MAX_ADVICE_LENGTH)
 
     @staticmethod
-    def _to_response(advice: LLMAdvice, generated: bool) -> DailyAdviceResponse:
+    def _to_response(
+        advice: LLMAdvice,
+        generated: bool,
+        remaining_regeneration_count: int = 0,
+    ) -> DailyAdviceResponse:
         return DailyAdviceResponse(
             advice_id=advice.id,
             advice_date=advice.advice_date,
@@ -226,6 +265,20 @@ class AdviceService:
             generated=generated,
             created_at=advice.created_at,
             source_type="LLM" if advice.provider == OPENAI_PROVIDER else "RULE_BASED",
+            remaining_regeneration_count=remaining_regeneration_count,
+        )
+
+    @staticmethod
+    def _to_history_item(advice: LLMAdvice, feedback: AdviceFeedback | None) -> AdviceHistoryItemResponse:
+        return AdviceHistoryItemResponse(
+            advice_id=advice.id,
+            advice_date=advice.advice_date,
+            title=ADVICE_TITLE,
+            advice_text=advice.advice_text,
+            trigger_type=AdviceTriggerType(advice.trigger_type),
+            source_type="LLM" if advice.provider == OPENAI_PROVIDER else "RULE_BASED",
+            feedback_type=AdviceFeedbackType(feedback.feedback_type) if feedback else None,
+            created_at=advice.created_at,
         )
 
     @staticmethod

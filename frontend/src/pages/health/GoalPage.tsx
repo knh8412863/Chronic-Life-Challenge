@@ -158,6 +158,13 @@ export function GoalPage({ onNavigate }: GoalPageProps) {
           >
             목표 수정
           </button>
+          <button
+            type="button"
+            className="wide-subtle-button"
+            onClick={() => onNavigate?.("/health/vitals/input")}
+          >
+            건강 수치 기록하기
+          </button>
         </div>
       </section>
 
@@ -224,20 +231,18 @@ export function GoalPage({ onNavigate }: GoalPageProps) {
           isDefault={current.triglycerides === null}
         />
         <GoalRow
-          label="체중 또는 BMI"
+          label="체중"
           currentText={
             current.weight_kg != null
-              ? `${current.weight_kg}/${current.bmi}kg`
+              ? `${current.weight_kg}kg`
               : "—kg"
           }
           targetText={
             cdg.target_weight_kg != null
-              ? `${cdg.target_weight_kg}/${cdg.target_bmi}kg`
-              : cdg.target_bmi != null
-                ? `BMI ${cdg.target_bmi}`
-                : "미설정"
+              ? `${cdg.target_weight_kg}kg`
+              : "미설정"
           }
-          progress={calcProgress(current.bmi, cdg.target_bmi, false)}
+          progress={calcProgress(current.weight_kg, cdg.target_weight_kg, false)}
         />
         <GoalRow
           label="eGFR"
@@ -285,7 +290,7 @@ export function GoalPage({ onNavigate }: GoalPageProps) {
         <div className="goal-section-header">
           <h2>최근 30일 건강 점수 추이</h2>
         </div>
-        <p className="goal-section-note">* /health/statistics API 기준 기간 건강 지표 요약</p>
+        <p className="goal-section-note">* 최근 기록을 기준으로 건강 점수 변화를 보여줍니다.</p>
         {history.points.length === 0 ? (
           <div className="goal-chart-placeholder">
             <span>30일 건강 점수 추이 차트 (110점 만점)</span>

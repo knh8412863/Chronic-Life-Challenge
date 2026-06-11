@@ -51,6 +51,29 @@ button {
   cursor: pointer;
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(15, 23, 42, 0.42);
+}
+
+.modal-card {
+  width: min(560px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 20px 48px rgba(15, 23, 42, 0.22);
+}
+
+.app-main .eyebrow {
+  display: none;
+}
+
 .public-shell {
   min-height: 100vh;
   background: #f8faf8;
@@ -1102,6 +1125,36 @@ button {
   background: #f1f2f3;
 }
 
+.sidebar-menu-group {
+  display: grid;
+  gap: 6px;
+}
+
+.sidebar-subnav {
+  display: grid;
+  gap: 4px;
+  padding-left: 14px;
+}
+
+.sidebar-subitem {
+  width: 100%;
+  min-height: 34px;
+  padding: 8px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.sidebar-subitem:hover,
+.sidebar-subitem.is-active {
+  background: #e8f5e9;
+  color: var(--brand-green-dark);
+}
+
 .sidebar-profile {
   display: flex;
   align-items: center;
@@ -1116,6 +1169,24 @@ button {
   background: transparent;
   color: var(--sidebar-foreground);
   text-align: left;
+}
+
+.sidebar-logout {
+  width: calc(100% - 24px);
+  min-height: 38px;
+  margin: 0 12px 8px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #666666;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.sidebar-logout:hover {
+  background: #fff5f5;
+  border-color: #f0b8b8;
+  color: #b42318;
 }
 
 .sidebar-profile:hover {
@@ -1178,6 +1249,13 @@ button {
   margin-left: auto;
   padding: 0;
   border-top: 0;
+}
+
+.is-sidebar-collapsed .sidebar-logout {
+  width: 48px;
+  margin-right: auto;
+  margin-left: auto;
+  padding: 0;
 }
 
 .sidebar-icon {
@@ -1348,6 +1426,39 @@ button {
   width: 100%;
   height: 10px;
   accent-color: var(--brand-green);
+}
+
+.challenge-lines progress,
+.goal-lines progress,
+.disease-card progress,
+.dashboard-card progress {
+  overflow: hidden;
+  border: 0;
+  border-radius: 999px;
+  background: #e5e7ea;
+}
+
+.challenge-lines progress::-webkit-progress-bar,
+.goal-lines progress::-webkit-progress-bar,
+.disease-card progress::-webkit-progress-bar,
+.dashboard-card progress::-webkit-progress-bar {
+  background: #e5e7ea;
+}
+
+.challenge-lines progress::-webkit-progress-value,
+.goal-lines progress::-webkit-progress-value,
+.disease-card progress::-webkit-progress-value,
+.dashboard-card progress::-webkit-progress-value {
+  border-radius: 999px;
+  background: var(--brand-green);
+}
+
+.challenge-lines progress::-moz-progress-bar,
+.goal-lines progress::-moz-progress-bar,
+.disease-card progress::-moz-progress-bar,
+.dashboard-card progress::-moz-progress-bar {
+  border-radius: 999px;
+  background: var(--brand-green);
 }
 
 .home-page {
@@ -1679,6 +1790,14 @@ button {
 
 .goal-lines progress:last-child {
   accent-color: #c25b7c;
+}
+
+.goal-lines progress:last-child::-webkit-progress-value {
+  background: #c25b7c;
+}
+
+.goal-lines progress:last-child::-moz-progress-bar {
+  background: #c25b7c;
 }
 
 .quick-record-section {
@@ -2135,6 +2254,105 @@ button {
   color: var(--brand-green);
 }
 
+.advice-feedback-card {
+  display: grid;
+  max-width: 760px;
+  gap: 18px;
+}
+
+.advice-feedback-modal {
+  width: min(760px, calc(100vw - 64px));
+  padding: 32px;
+}
+
+.advice-feedback-modal .advice-text-box {
+  min-height: 130px;
+  font-size: 15px;
+  line-height: 1.75;
+}
+
+.advice-feedback-modal .feedback-choice-grid button {
+  min-height: 118px;
+  padding: 20px;
+}
+
+.advice-feedback-modal .advice-feedback-comment textarea {
+  min-height: 150px;
+}
+
+.advice-feedback-summary {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.advice-feedback-summary h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.advice-feedback-summary p {
+  margin: 4px 0 0;
+  color: var(--muted-foreground);
+  font-size: 12px;
+}
+
+.advice-feedback-ai {
+  display: inline-grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border-radius: 12px;
+  background: var(--brand-green);
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.advice-feedback-section {
+  display: grid;
+  gap: 12px;
+}
+
+.advice-feedback-section h2 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.advice-feedback-card .feedback-choice-grid {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.advice-feedback-card .feedback-choice-grid button {
+  display: grid;
+  min-height: 92px;
+  gap: 6px;
+  align-content: center;
+  padding: 14px;
+}
+
+.advice-feedback-card .feedback-choice-grid span {
+  color: var(--muted-foreground);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.advice-feedback-comment {
+  display: grid;
+  gap: 8px;
+  color: #333333;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.advice-feedback-comment textarea {
+  min-height: 118px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  resize: vertical;
+}
+
 .green-button:disabled {
   cursor: not-allowed;
   border-color: #cfd3d8;
@@ -2220,6 +2438,18 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.advice-feedback-positive {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
+  padding: 0 10px;
+  border-radius: 999px;
+  background: #e8f5e9;
+  color: var(--brand-green);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 .profile-grid {
@@ -4568,4 +4798,3 @@ button {
   font-size: 13px;
   color: var(--muted-foreground);
 }
-

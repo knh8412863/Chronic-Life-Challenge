@@ -94,6 +94,20 @@ async def get_my_challenges(
     return Response({"data": [item.model_dump(mode="json") for item in result]}, status_code=status.HTTP_200_OK)
 
 
+@challenge_router.get(
+    "/challenge-participations/{participation_id}",
+    response_model=DataResponse[MyChallengeResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def get_challenge_participation(
+    participation_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[ChallengeService, Depends(ChallengeService)],
+) -> Response:
+    result = await service.get_participation(user, participation_id)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
 @challenge_router.post(
     "/challenge-participations/{participation_id}/checkins/today",
     response_model=DataResponse[ChallengeCheckinResponse],
@@ -150,3 +164,17 @@ async def get_weekly_challenge_leaderboard(
 ) -> Response:
     result = await service.get_weekly_leaderboard(user, week_start=week_start, limit=limit)
     return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@challenge_router.get(
+    "/challenge-recommendations",
+    response_model=DataResponse[list[ChallengeSummaryResponse]],
+    status_code=status.HTTP_200_OK,
+)
+async def get_challenge_recommendations(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[ChallengeService, Depends(ChallengeService)],
+    limit: Annotated[int, Query(ge=1, le=20)] = 5,
+) -> Response:
+    result = await service.get_recommendations(user, limit=limit)
+    return Response({"data": [item.model_dump(mode="json") for item in result]}, status_code=status.HTTP_200_OK)

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
+import { ApiError } from "../../api/client";
 import {
   getChallengeList,
   joinChallenge,
@@ -23,8 +24,6 @@ const FALLBACK_CHALLENGES: Challenge[] = [
   { id: 5, name: "수면 개선 프로젝트", description: "규칙적인 수면 습관", category: "SLEEP", difficulty: "EASY", duration_days: 30, participant_count: 987, avg_completion_rate: 70, icon_emoji: "😴" },
   { id: 6, name: "종합 건강 관리", description: "전반적 건강 습관", category: "COMPREHENSIVE", difficulty: "NORMAL", duration_days: 90, participant_count: 1543, avg_completion_rate: 62, icon_emoji: "🎯" },
 ];
-
-const JOINED_IDS = new Set([1, 3]);
 
 type CategoryFilter = "ALL" | ChallengeCategory;
 type SortOption = "POPULAR" | "LATEST" | "DURATION";
@@ -54,7 +53,8 @@ export function ChallengeListPage({ onNavigate }: Props) {
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [hasMore, setHasMore] = useState(false);
-  const [joinedIds, setJoinedIds] = useState<Set<number>>(new Set(JOINED_IDS));
+  const [joinedIds, setJoinedIds] = useState<Set<number>>(new Set());
+  const [joinErrorMessage, setJoinErrorMessage] = useState("");
 
   const [category, setCategory] = useState<CategoryFilter>("ALL");
   const [difficulty, setDifficulty] = useState<ChallengeDifficulty | "ALL">("ALL");
@@ -65,7 +65,12 @@ export function ChallengeListPage({ onNavigate }: Props) {
     if (!token) return;
     setIsLoading(true);
     getChallengeList(query, token)
-      .then((res) => { setChallenges(res.data.items); setHasMore(res.data.has_more); setHasError(false); })
+      .then((res) => {
+        setChallenges(res.data.items);
+        setJoinedIds(new Set(res.data.items.filter((item) => item.is_joined).map((item) => item.id)));
+        setHasMore(res.data.has_more);
+        setHasError(false);
+      })
       .catch(() => setHasError(true))
       .finally(() => setIsLoading(false));
   }
@@ -74,7 +79,8 @@ export function ChallengeListPage({ onNavigate }: Props) {
     fetchList({ category: category === "ALL" ? "ALL" : category, difficulty, sort });
   }, [category, difficulty, sort]);
 
-  const displayItems = challenges.length > 0 ? challenges : filterFallback(FALLBACK_CHALLENGES, category, difficulty);
+  const isUsingFallback = challenges.length === 0;
+  const displayItems = isUsingFallback ? filterFallback(FALLBACK_CHALLENGES, category, difficulty) : challenges;
 
   function filterFallback(items: Challenge[], cat: CategoryFilter, diff: ChallengeDifficulty | "ALL") {
     return items
@@ -84,15 +90,21 @@ export function ChallengeListPage({ onNavigate }: Props) {
 
   async function handleJoin(challengeId: number) {
     const token = getStoredAccessToken();
+    if (!token) {
+      setJoinErrorMessage("로그인 후 챌린지에 참여할 수 있습니다.");
+      return;
+    }
+
     try {
-      if (token) await joinChallenge(challengeId, token);
+      await joinChallenge(challengeId, token);
       const next = new Set(joinedIds);
       next.add(challengeId);
       setJoinedIds(next);
       sessionStorage.setItem("selectedChallengeId", String(challengeId));
       onNavigate?.("/challenges/detail");
-    } catch {
-      alert("챌린지 참여에 실패했습니다.");
+    } catch (error) {
+      const detail = error instanceof ApiError ? error.detail : undefined;
+      setJoinErrorMessage(typeof detail === "string" ? detail : "챌린지 참여에 실패했습니다. 로그인 상태 또는 참여 조건을 확인해 주세요.");
     }
   }
 
@@ -107,7 +119,7 @@ export function ChallengeListPage({ onNavigate }: Props) {
     <div className="challenge-page">
       <section className="section-header-row page-heading-row">
         <div className="page-heading">
-          <p className="eyebrow">챌린지 관리</p>
+          <p className="eyebrow">챌린지</p>
           <h1>챌린지 목록</h1>
         </div>
       </section>
@@ -185,7 +197,18 @@ export function ChallengeListPage({ onNavigate }: Props) {
                 <span className="challenge-diff-tag">{c.duration_days}일</span>
               </div>
               <p className="challenge-card-participants">참여 {c.participant_count.toLocaleString()}명</p>
-              {isJoined ? (
+              {isUsingFallback ? (
+                <button
+                  type="button"
+                  className="challenge-joined-btn"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setJoinErrorMessage("현재 화면은 예시 챌린지입니다. 실제 챌린지 데이터가 등록된 뒤 참여할 수 있습니다.");
+                  }}
+                >
+                  참여 불가
+                </button>
+              ) : isJoined ? (
                 <button type="button" className="challenge-joined-btn" onClick={(e) => e.stopPropagation()}>참여 중</button>
               ) : (
                 <button
@@ -214,6 +237,17 @@ export function ChallengeListPage({ onNavigate }: Props) {
         <button type="button" className="challenge-load-more" disabled style={{ opacity: 0.5 }}>
           더 보기
         </button>
+      )}
+      {joinErrorMessage && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000 }}>
+          <div style={{ width: 360, background: "#fff", borderRadius: 12, padding: 22, boxShadow: "0 18px 40px rgba(15,23,42,0.16)" }}>
+            <h3 style={{ margin: "0 0 10px", fontSize: 16 }}>챌린지 참여 실패</h3>
+            <p style={{ margin: "0 0 18px", color: "#555", fontSize: 13, lineHeight: 1.5 }}>{joinErrorMessage}</p>
+            <button type="button" className="green-button" style={{ width: "100%" }} onClick={() => setJoinErrorMessage("")}>
+              확인
+            </button>
+          </div>
+        </div>
       )}
     </div>
   );

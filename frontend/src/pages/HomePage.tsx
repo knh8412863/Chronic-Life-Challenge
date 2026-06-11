@@ -3,8 +3,10 @@ import { useEffect, useMemo, useState } from "react";
 import type { AppRoute } from "../App";
 import { getStoredAccessToken } from "../api/auth";
 import { getHomeSummary, type HomeSummary } from "../api/home";
+import { getCurrentUser } from "../api/users";
 import { ErrorState } from "../components/common/ErrorState";
 import { LoadingState } from "../components/common/LoadingState";
+import { localDotDateLabel, localKoreanDateLabel } from "../utils/date";
 
 const fallbackHomeSummary: HomeSummary = {
   today_score: {
@@ -55,7 +57,11 @@ type HomePageProps = {
 };
 
 function formatDateLabel() {
-  return "2026년 5월 15일 목요일";
+  return localKoreanDateLabel();
+}
+
+function recentPredictionDateLabel(summary: HomeSummary) {
+  return summary.recent_prediction?.created_at?.slice(0, 10) ?? "예측 결과 없음";
 }
 
 function predictionLabel(summary: HomeSummary) {
@@ -69,6 +75,7 @@ function predictionLabel(summary: HomeSummary) {
 
 export function HomePage({ onNavigate }: HomePageProps) {
   const [summary, setSummary] = useState<HomeSummary>(fallbackHomeSummary);
+  const [userName, setUserName] = useState("사용자");
   const [isLoading, setIsLoading] = useState(false);
   const [hasApiError, setHasApiError] = useState(false);
 
@@ -79,6 +86,9 @@ export function HomePage({ onNavigate }: HomePageProps) {
     }
 
     setIsLoading(true);
+    getCurrentUser(token)
+      .then((user) => setUserName(user.name))
+      .catch(() => setUserName("사용자"));
     getHomeSummary(token)
       .then((response) => {
         setSummary(response.data);
@@ -98,7 +108,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
     <div className="home-page">
       <section className="home-header">
         <div>
-          <h1>안녕하세요, 홍길동님 👋</h1>
+          <h1>안녕하세요, {userName}님 👋</h1>
           <p>{formatDateLabel()}</p>
         </div>
         <button className="notification-button" type="button" onClick={() => onNavigate?.("/notifications")}>
@@ -146,7 +156,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
         <article className="dashboard-card recent-prediction-card">
           <h2>최근 예측 결과</h2>
           <div className="prediction-summary-box">
-            <p>2026-05-10 · 3대 만성질환</p>
+            <p>{recentPredictionDateLabel(summary)} · 3대 만성질환</p>
             <strong>{predictionLabel(summary)}</strong>
             <span>신뢰도 78% · 주요 요인: BMI, 수축기혈압, LDL</span>
           </div>
@@ -191,7 +201,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
       <section className="dashboard-card health-dashboard-card">
         <div className="section-header-row">
           <h2>나의 건강 대시보드</h2>
-          <span>2026. 05. 29</span>
+          <span>{localDotDateLabel()}</span>
         </div>
         <div className="metric-status-grid">
           <div className="metric-card metric-normal">
@@ -231,10 +241,9 @@ export function HomePage({ onNavigate }: HomePageProps) {
         <h2>빠른 기록</h2>
         <div className="quick-record-grid">
           {[
-            ["혈압 기록", "/health"],
-            ["혈당 기록", "/health"],
-            ["운동 기록", "/health"],
-            ["식단 기록", "/food"],
+            ["건강 수치 기록", "/health/vitals/input"],
+            ["운동 기록", "/health/vitals/input"],
+            ["식단 기록", "/food/analyze"],
           ].map(([label, route]) => (
             <button key={label} type="button" onClick={() => onNavigate?.(route as AppRoute)}>
               <span>+</span>

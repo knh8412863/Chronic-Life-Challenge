@@ -72,6 +72,7 @@ const LINK_ROUTE_MAP: Record<string, AppRoute> = {
   "/prediction/history": "/prediction/history",
   "/prediction/feedback": "/prediction/feedback",
   "/advices/today": "/advices/today",
+  "/advices/feedback": "/advices/feedback",
   "/advices/history": "/advices/history",
   "/health": "/health",
   "/health/goal": "/health/goal",

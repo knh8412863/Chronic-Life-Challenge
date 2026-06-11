@@ -7,6 +7,7 @@ from app.dependencies.security import get_request_user
 from app.dtos.predictions import DataResponse
 from app.dtos.reports import (
     CurrentWeeklyReportResponse,
+    WeeklyReportExportResponse,
     WeeklyReportGenerateRequest,
     WeeklyReportListItemResponse,
     WeeklyReportResponse,
@@ -69,4 +70,20 @@ async def get_weekly_report(
     service: Annotated[WeeklyReportService, Depends(WeeklyReportService)],
 ) -> Response:
     result = await service.get_report(user, report_id)
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
+
+
+@report_router.get(
+    "/weekly-reports/{report_id}/exports",
+    response_model=DataResponse[WeeklyReportExportResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def export_weekly_report(
+    report_id: int,
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[WeeklyReportService, Depends(WeeklyReportService)],
+    export_format: Annotated[str, Query(pattern="^(JSON|CSV|PDF)$")] = "JSON",
+    send_email: bool = False,
+) -> Response:
+    result = await service.export_report(user, report_id, export_format, send_email=send_email)
     return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)

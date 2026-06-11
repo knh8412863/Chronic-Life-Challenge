@@ -30,6 +30,18 @@ class DailyAdviceResponse(BaseModel):
     generated: bool
     created_at: datetime
     source_type: Literal["RULE_BASED", "LLM"] = "RULE_BASED"
+    remaining_regeneration_count: int = 0
+
+
+class AdviceHistoryItemResponse(BaseModel):
+    advice_id: int
+    advice_date: date
+    title: str
+    advice_text: str
+    trigger_type: AdviceTriggerType
+    source_type: Literal["RULE_BASED", "LLM"] = "RULE_BASED"
+    feedback_type: AdviceFeedbackType | None = None
+    created_at: datetime
 
 
 class AdviceFeedbackCreateRequest(BaseModel):

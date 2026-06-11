@@ -42,3 +42,23 @@ export async function createKidneyRecord(body: CreateKidneyBody, token?: string)
     token,
   });
 }
+
+type ApiKidneyRecord = Omit<KidneyRecord, "id"> & {
+  record_id: number;
+};
+
+function toKidneyRecord(record: ApiKidneyRecord): KidneyRecord {
+  return {
+    ...record,
+    id: record.record_id,
+    measured_date: record.measured_date ?? record.record_date ?? "",
+  };
+}
+
+export async function getKidneyRecords(query: { limit?: number } = {}, token?: string) {
+  const params = new URLSearchParams();
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const response = await apiRequest<{ data: ApiKidneyRecord[] }>(`/health/renal-records${qs ? `?${qs}` : ""}`, { token });
+  return { data: response.data.map(toKidneyRecord) };
+}

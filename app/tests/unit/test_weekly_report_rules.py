@@ -260,6 +260,28 @@ def test_weekly_report_summary_cards_mark_risk_and_missing_records():
     assert cards[4]["status"] == "CAUTION"
 
 
+def test_weekly_report_pdf_export_content_is_valid_pdf_bytes():
+    report = SimpleNamespace(
+        id=31,
+        week_start_date=date(2026, 6, 1),
+        week_end_date=date(2026, 6, 7),
+        status="AVAILABLE",
+        provider="RULE_BASED",
+        report_text="이번 주 건강 기록은 총 3건 입력되었습니다.",
+        summary_cards=[
+            {"label": "건강 기록", "value": "3건", "status": "NORMAL", "description": "이번 주 입력 기록"},
+        ],
+        metric_summaries=[
+            {"label": "식단", "value": "2", "unit": "건", "status": "NORMAL", "description": "식단 기록"},
+        ],
+    )
+
+    content = WeeklyReportService._to_pdf_content(report)
+
+    assert content.startswith(b"%PDF-1.4")
+    assert b"%%EOF" in content
+
+
 def test_weekly_report_challenge_summary_calculates_completion_rate():
     summary = WeeklyReportService._build_challenge_summary({"challenge_checkin_count": 4})
 
@@ -320,3 +342,31 @@ def test_weekly_report_overall_status_priority():
     assert WeeklyReportService._overall_status([{"status": "NORMAL"}, {"status": "CAUTION"}]) == "CAUTION"
     assert WeeklyReportService._overall_status([{"status": "HIGH"}, {"status": "CAUTION"}]) == "HIGH"
     assert WeeklyReportService._overall_status([]) == "UNAVAILABLE"
+
+
+def test_weekly_report_export_payload_contains_report_sections():
+    report = SimpleNamespace(
+        id=20,
+        week_start_date=date(2026, 6, 1),
+        week_end_date=date(2026, 6, 7),
+        status="AVAILABLE",
+        report_text="이번 주 리포트입니다.",
+        source_summary={"meal_log_count": 2},
+        summary_cards=[{"label": "식단 기록", "value": "2건", "status": "NORMAL", "description": "식단 기록 수"}],
+        metric_summaries=[
+            {"label": "식단", "value": "2", "unit": "건", "status": "NORMAL", "description": "식단 기록"}
+        ],
+        trend_summary={"status": "UNAVAILABLE", "message": "비교 없음"},
+        challenge_summary={"checkin_count": 0, "completion_rate": 0, "status": "UNAVAILABLE", "message": "체크인 없음"},
+        provider="RULE_BASED",
+        model_name=RULE_BASED_MODEL,
+        created_at=datetime(2026, 6, 7, 12, 0),
+    )
+
+    payload = WeeklyReportService._export_payload(report)
+    csv_content = WeeklyReportService._to_csv_content(report)
+
+    assert payload["report_id"] == 20
+    assert payload["summary_cards"][0]["label"] == "식단 기록"
+    assert "리포트 본문" in csv_content
+    assert "이번 주 리포트입니다." in csv_content

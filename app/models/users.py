@@ -33,6 +33,8 @@ class User(models.Model):
     birthday = fields.DateField()
     phone_number = fields.CharField(max_length=11)
     profile_image_url = fields.CharField(max_length=500, null=True)
+    auth_provider = fields.CharField(max_length=20, default="LOCAL")
+    google_sub = fields.CharField(max_length=128, null=True, unique=True)
     is_active = fields.BooleanField(default=True)
     is_email_verified = fields.BooleanField(default=False)
     is_admin = fields.BooleanField(default=False)

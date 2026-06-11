@@ -126,10 +126,7 @@ export function VitalsDetailPage({ onNavigate }: VitalsDetailPageProps) {
 
           <div className="vd-info-row">
             <span className="field-label">기록 유형</span>
-            <div>
-              <p className="vd-info-val">{MEASURE_TYPE_LABELS[detail.measure_type]}</p>
-              <p className="goal-section-note">measure_type: {detail.measure_type}</p>
-            </div>
+            <p className="vd-info-val">{MEASURE_TYPE_LABELS[detail.measure_type]}</p>
           </div>
 
           <div className="vd-info-row">
@@ -157,11 +154,8 @@ export function VitalsDetailPage({ onNavigate }: VitalsDetailPageProps) {
             <span className="field-label">상태</span>
             <div>
               <span className={`vl-status-badge ${detail.is_critical ? "vl-status-danger" : "vl-status-normal"} vd-status-large`}>
-                {detail.is_critical ? "✗ 위험" : "✓ 정상"}
+                {detail.is_critical ? "위험" : "정상"}
               </span>
-              <p className="goal-section-note" style={{ marginTop: "4px" }}>
-                * is_critical: {detail.is_critical ? "true" : "false"}
-              </p>
             </div>
           </div>
 
@@ -183,7 +177,6 @@ export function VitalsDetailPage({ onNavigate }: VitalsDetailPageProps) {
             <div className="vd-avg-list">
               <p>평균 수축기: {detail.avg_systolic_7d ?? "—"} mmHg</p>
               <p>평균 이완기: {detail.avg_diastolic_7d ?? "—"} mmHg</p>
-              <p className="goal-section-note">* /dashboard/vital-charts API 연동 (optional)</p>
             </div>
           )}
         </section>

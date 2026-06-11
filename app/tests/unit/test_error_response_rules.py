@@ -21,6 +21,10 @@ def create_test_app() -> FastAPI:
     async def create_sample(request: SampleRequest):
         return request
 
+    @app.get("/unexpected")
+    async def unexpected():
+        raise RuntimeError("database password leaked")
+
     return app
 
 
@@ -52,4 +56,20 @@ def test_validation_error_response_keeps_detail_list_and_adds_error_metadata():
         "code": "VALIDATION_ERROR",
         "message": "입력값 형식이 올바르지 않습니다.",
         "status_code": 422,
+    }
+
+
+def test_unhandled_exception_response_hides_internal_detail_and_adds_error_metadata():
+    client = TestClient(create_test_app(), raise_server_exceptions=False)
+
+    response = client.get("/unexpected")
+
+    assert response.status_code == 500
+    assert response.json() == {
+        "detail": "서버 오류가 발생했습니다.",
+        "error": {
+            "code": "INTERNAL_SERVER_ERROR",
+            "message": "서버 오류가 발생했습니다.",
+            "status_code": 500,
+        },
     }

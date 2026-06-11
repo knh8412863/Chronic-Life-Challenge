@@ -153,18 +153,6 @@ export default function ReportDetailPage({ onNavigate }: Props) {
         <span style={{ padding: "3px 8px", background: "#F3F4F6", borderRadius: 12, fontSize: 10, color: "#555" }}>
           {report.source_type === "LLM" ? "AI 생성" : "규칙 기반"}
         </span>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
-          <button
-            type="button"
-            onClick={() => {
-              sessionStorage.setItem(selectedReportStorageKey(), String(report.report_id));
-              onNavigate("/reports/export");
-            }}
-            style={{ padding: "6px 14px", border: "1.5px solid #ddd", borderRadius: 6, background: "#fff", fontSize: 12, cursor: "pointer" }}
-          >
-            내보내기
-          </button>
-        </div>
       </div>
 
       <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 18 }}>

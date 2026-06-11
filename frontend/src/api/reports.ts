@@ -83,6 +83,17 @@ export type WeeklyReportListItem = {
   created_at: string;
 };
 
+export type WeeklyReportExportFormat = "JSON" | "CSV" | "PDF";
+
+export type WeeklyReportExport = {
+  report_id: number;
+  file_name: string;
+  content_type: string;
+  content: string;
+  content_encoding: "TEXT" | "BASE64";
+  emailed: boolean;
+};
+
 export async function getCurrentWeeklyReport(token?: string) {
   return apiRequest<{ data: CurrentWeeklyReport }>("/weekly-reports/current", { token });
 }
@@ -101,4 +112,16 @@ export async function getWeeklyReports(limit = 20, token?: string) {
 
 export async function getWeeklyReport(reportId: number, token?: string) {
   return apiRequest<{ data: WeeklyReport }>(`/weekly-reports/${reportId}`, { token });
+}
+
+export async function exportWeeklyReport(
+  reportId: number,
+  exportFormat: WeeklyReportExportFormat,
+  token?: string,
+  sendEmail = false,
+) {
+  return apiRequest<{ data: WeeklyReportExport }>(
+    `/weekly-reports/${reportId}/exports?export_format=${exportFormat}&send_email=${sendEmail}`,
+    { token },
+  );
 }

@@ -123,7 +123,7 @@ export function PetSelectPage({ onNavigate }: PetSelectPageProps) {
       </div>
 
       <div style={{ background: "#fafafa", border: "1px solid #e0e0e0", borderRadius: 8, padding: "12px 16px", textAlign: "center" }}>
-        <p style={{ fontSize: 11, color: "#888", margin: 0 }}>💡 펫은 나중에 변경할 수 없으니 신중히 선택해주세요</p>
+        <p style={{ fontSize: 11, color: "#888", margin: 0 }}>선택한 펫과 함께 건강 활동을 시작합니다. 이후 다른 펫도 추가될 수 있어요.</p>
       </div>
 
       {/* 확인 모달 */}
@@ -136,7 +136,7 @@ export function PetSelectPage({ onNavigate }: PetSelectPageProps) {
             </div>
             <p style={{ fontSize: 14, color: "#555", textAlign: "center", margin: "0 0 24px", lineHeight: 1.6 }}>
               <strong>{petName}</strong>을(를) 선택하시겠어요?<br />
-              한 번 선택하면 변경할 수 없습니다.
+              선택한 펫으로 건강 여정을 시작합니다.
             </p>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setStep("name")}

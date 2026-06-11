@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { AppRoute } from "../App";
 import {
+  googleSignup,
   login,
   requestEmailVerification,
   requestPasswordReset,
@@ -9,6 +10,7 @@ import {
   storeAccessToken,
   verifyEmail,
   type SignUpPayload,
+  type GoogleSignUpPayload,
 } from "../api/auth";
 import { ApiError } from "../api/client";
 import { getPolicyDocument, type ConsentType } from "../api/users";
@@ -18,6 +20,16 @@ import { Stepper } from "../components/common/Stepper";
 // 약관 동의 페이지
 // ──────────────────────────────────────────────
 const SIGNUP_DRAFT_KEY = "auth.signupDraft";
+const GOOGLE_SIGNUP_DRAFT_KEY = "auth.googleSignupDraft";
+const SIGNUP_ERROR_KEY = "auth.signupError";
+const ONBOARDING_PROFILE_KEY = "auth.onboardingProfile";
+
+type SignupDraft = Partial<SignUpPayload> & {
+  auth_provider?: "GOOGLE";
+  id_token?: string;
+  remember_me?: boolean;
+  managed_diseases?: string[];
+};
 
 function validatePassword(value: string) {
   if (value.length < 8) return "비밀번호는 8자 이상이어야 합니다.";
@@ -26,6 +38,17 @@ function validatePassword(value: string) {
   if (!/[0-9]/.test(value)) return "숫자를 1개 이상 포함해야 합니다.";
   if (!/[^a-zA-Z0-9]/.test(value)) return "특수문자를 1개 이상 포함해야 합니다.";
   return "";
+}
+
+function getApiErrorMessage(error: unknown, fallback: string) {
+  if (!(error instanceof ApiError)) return fallback;
+  if (typeof error.detail === "string") return error.detail;
+  if (Array.isArray(error.detail)) return "입력값을 확인해주세요.";
+  if (error.detail && typeof error.detail === "object") {
+    const detail = error.detail as { message?: unknown; code?: unknown };
+    if (typeof detail.message === "string") return detail.message;
+  }
+  return fallback;
 }
 
 interface TermsAgreementPageProps {
@@ -80,23 +103,73 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
     setIsSubmitting(true);
     setSubmitMessage("");
     try {
-      const { managed_diseases: _managedDiseases, ...draft } = JSON.parse(rawDraft) as SignUpPayload & {
-        managed_diseases?: string[];
-      };
+      const parsedDraft = JSON.parse(rawDraft) as SignupDraft;
+      const { managed_diseases: _managedDiseases, ...draft } = parsedDraft;
+      if (parsedDraft.auth_provider === "GOOGLE") {
+        if (!parsedDraft.id_token || !parsedDraft.name || !parsedDraft.gender || !parsedDraft.birth_date || !parsedDraft.phone_number) {
+          setSubmitMessage("Google 가입 정보가 부족합니다. 계정 정보 입력부터 다시 진행해주세요.");
+          return;
+        }
+        const payload: GoogleSignUpPayload = {
+          id_token: parsedDraft.id_token,
+          name: parsedDraft.name,
+          gender: parsedDraft.gender,
+          birth_date: parsedDraft.birth_date,
+          phone_number: parsedDraft.phone_number,
+          consent_terms_version: "v1.0",
+          consent_privacy_agreed: checked.privacy,
+          consent_health_data: checked.health,
+          consent_marketing: checked.marketing,
+          remember_me: parsedDraft.remember_me,
+        };
+        const loginResponse = await googleSignup(payload);
+        storeAccessToken(loginResponse.access_token, Boolean(parsedDraft.remember_me));
+        sessionStorage.setItem(
+          ONBOARDING_PROFILE_KEY,
+          JSON.stringify({
+            birth_date: payload.birth_date,
+            gender: payload.gender,
+            managed_diseases: _managedDiseases ?? [],
+          }),
+        );
+        sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+        sessionStorage.removeItem(GOOGLE_SIGNUP_DRAFT_KEY);
+        onNavigate("/health-survey");
+        return;
+      }
+
       const payload: SignUpPayload = {
-        ...draft,
+        ...(draft as SignUpPayload),
         consent_terms_version: "v1.0",
         consent_privacy_agreed: checked.privacy,
         consent_health_data: checked.health,
         consent_marketing: checked.marketing,
       };
       await signup(payload);
-      const loginResponse = await login({
-        email: payload.email,
-        password: payload.password,
-        remember_me: false,
-      });
+
+      let loginResponse;
+      try {
+        loginResponse = await login({
+          email: payload.email,
+          password: payload.password,
+          remember_me: false,
+        });
+      } catch (error) {
+        setSubmitMessage(
+          `회원가입은 완료됐지만 자동 로그인에 실패했습니다. 로그인 화면에서 다시 로그인해주세요. (${getApiErrorMessage(error, "자동 로그인 실패")})`,
+        );
+        return;
+      }
+
       storeAccessToken(loginResponse.access_token);
+      sessionStorage.setItem(
+        ONBOARDING_PROFILE_KEY,
+        JSON.stringify({
+          birth_date: payload.birth_date,
+          gender: payload.gender,
+          managed_diseases: _managedDiseases ?? [],
+        }),
+      );
       try {
         await requestEmailVerification();
       } catch {
@@ -106,11 +179,15 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
       onNavigate("/email-verify");
     } catch (error) {
       if (error instanceof ApiError && error.status === 409) {
-        setSubmitMessage(String(error.detail ?? "이미 사용 중인 이메일 또는 휴대폰 번호입니다."));
+        const message = String(error.detail ?? "이미 사용 중인 이메일 또는 휴대폰 번호입니다.");
+        sessionStorage.setItem(SIGNUP_ERROR_KEY, message);
+        onNavigate("/signup");
       } else if (error instanceof ApiError && error.status === 422) {
-        setSubmitMessage("입력값을 확인해주세요. 비밀번호, 생년월일, 휴대폰 번호 형식이 필요 조건과 맞아야 합니다.");
+        const message = "입력값을 확인해주세요. 비밀번호, 생년월일, 휴대폰 번호 형식이 필요 조건과 맞아야 합니다.";
+        sessionStorage.setItem(SIGNUP_ERROR_KEY, message);
+        onNavigate("/signup");
       } else {
-        setSubmitMessage("회원가입 처리에 실패했습니다. 잠시 후 다시 시도해주세요.");
+        setSubmitMessage(getApiErrorMessage(error, "회원가입 처리에 실패했습니다. 잠시 후 다시 시도해주세요."));
       }
     } finally {
       setIsSubmitting(false);
@@ -209,6 +286,7 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
   const [message, setMessage] = useState("");
   const [verifyStatus, setVerifyStatus] = useState<"IDLE" | "VERIFYING" | "SUCCESS" | "FAILED">("IDLE");
   const verificationToken = new URLSearchParams(window.location.search).get("token");
+  const isLocalDev = import.meta.env.DEV;
 
   useEffect(() => {
     if (!verificationToken) return;
@@ -243,8 +321,8 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
       await requestEmailVerification();
       setMessage("인증 메일을 다시 발송했습니다.");
       startCooldown();
-    } catch {
-      setMessage("인증 메일 재발송에 실패했습니다. 로그인 상태를 확인해주세요.");
+    } catch (error) {
+      setMessage(getApiErrorMessage(error, "인증 메일 재발송에 실패했습니다. 로그인 상태를 확인해주세요."));
     }
   };
 
@@ -311,6 +389,20 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
           {resendCooldown > 0 ? `재발송 가능까지 ${resendCooldown}초` : "이메일 재발송"}
         </button>
         {message && <p style={{ fontSize: 11, color: message.includes("실패") ? "#E24B4A" : "#2e7d32", margin: "0 0 10px" }}>{message}</p>}
+        {isLocalDev && verifyStatus !== "SUCCESS" && (
+          <div style={{ border: "1px solid #f0d58c", background: "#fff8e1", borderRadius: 8, padding: 12, marginBottom: 10 }}>
+            <p style={{ fontSize: 11, color: "#6d5400", lineHeight: 1.6, margin: "0 0 8px" }}>
+              로컬 개발 환경에서는 실제 이메일 발송이 연결되지 않아 인증 링크를 받을 수 없습니다. 화면 흐름 확인을 위해 건강 설문으로 이동할 수 있습니다.
+            </p>
+            <button
+              type="button"
+              onClick={() => onNavigate("/health-survey")}
+              style={{ width: "100%", height: 34, border: "none", borderRadius: 8, background: "#8A6D00", color: "#fff", fontSize: 12, cursor: "pointer" }}
+            >
+              로컬 테스트용: 건강 설문으로 이동
+            </button>
+          </div>
+        )}
         <button onClick={() => onNavigate("/signup")}
           style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 12, color: "#333", cursor: "pointer", marginBottom: 20 }}>
           이전으로 돌아가기
@@ -326,6 +418,64 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
         <p style={{ textAlign: "center", fontSize: 11, color: "#888", cursor: "pointer", margin: 0 }}
           onClick={() => onNavigate("/login")}>로그인으로 돌아가기</p>
       </div>
+      {(verifyStatus === "SUCCESS" || verifyStatus === "FAILED") && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+          <div style={{ width: "100%", maxWidth: 420, background: "#fff", borderRadius: 12, padding: 28, textAlign: "center", boxShadow: "0 18px 50px rgba(0,0,0,0.18)" }}>
+            <div
+              style={{
+                width: 56,
+                height: 56,
+                borderRadius: "50%",
+                background: verifyStatus === "SUCCESS" ? "#2e7d32" : "#E24B4A",
+                color: "#fff",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                margin: "0 auto 18px",
+                fontSize: 24,
+                fontWeight: 700,
+              }}
+            >
+              {verifyStatus === "SUCCESS" ? "✓" : "!"}
+            </div>
+            <h3 style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a", margin: "0 0 8px" }}>
+              {verifyStatus === "SUCCESS" ? "이메일 인증 완료" : "이메일 인증 실패"}
+            </h3>
+            <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6, margin: "0 0 22px" }}>
+              {verifyStatus === "SUCCESS"
+                ? "이메일 인증이 완료되었습니다. 이제 건강 설문을 입력하고 서비스를 시작할 수 있습니다."
+                : "인증 링크가 만료되었거나 유효하지 않습니다. 인증 메일을 다시 요청해주세요."}
+            </p>
+            {verifyStatus === "SUCCESS" ? (
+              <button
+                type="button"
+                onClick={() => onNavigate("/health-survey")}
+                style={{ width: "100%", height: 40, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+              >
+                건강 설문으로 이동
+              </button>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                <button
+                  type="button"
+                  onClick={handleResend}
+                  disabled={resendCooldown > 0}
+                  style={{ width: "100%", height: 40, border: "none", borderRadius: 8, background: resendCooldown > 0 ? "#ccc" : "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: resendCooldown > 0 ? "not-allowed" : "pointer" }}
+                >
+                  {resendCooldown > 0 ? `재발송 가능까지 ${resendCooldown}초` : "인증 메일 재발송"}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onNavigate("/login")}
+                  style={{ width: "100%", height: 40, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", color: "#333", fontSize: 13, cursor: "pointer" }}
+                >
+                  로그인으로 돌아가기
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -417,8 +567,8 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
                 try {
                   await requestPasswordReset(email);
                   setStep(2);
-                } catch {
-                  setErrorMessage("메일 발송 요청에 실패했습니다. 잠시 후 다시 시도해주세요.");
+                } catch (error) {
+                  setErrorMessage(getApiErrorMessage(error, "메일 발송 요청에 실패했습니다. 잠시 후 다시 시도해주세요."));
                 } finally {
                   setIsSubmitting(false);
                 }
@@ -444,8 +594,8 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
               onClick={async () => {
                 try {
                   await requestPasswordReset(email);
-                } catch {
-                  setErrorMessage("이메일 재발송에 실패했습니다.");
+                } catch (error) {
+                  setErrorMessage(getApiErrorMessage(error, "이메일 재발송에 실패했습니다."));
                 }
               }}
               style={{ width: "100%", height: 36, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}

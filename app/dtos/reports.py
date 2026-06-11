@@ -83,3 +83,12 @@ class WeeklyReportListItemResponse(BaseModel):
     summary_text: str
     overall_status: Literal["NORMAL", "CAUTION", "HIGH", "UNAVAILABLE"]
     created_at: datetime
+
+
+class WeeklyReportExportResponse(BaseModel):
+    report_id: int
+    file_name: str
+    content_type: str
+    content: str
+    content_encoding: Literal["TEXT", "BASE64"] = "TEXT"
+    emailed: bool = False

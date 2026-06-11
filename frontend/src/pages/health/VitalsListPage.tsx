@@ -2,6 +2,10 @@ import { useEffect, useState } from "react";
 
 import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
+import { getActivityLogs } from "../../api/activity";
+import { EXERCISE_TYPE_LABELS, getExerciseLogs, type ExerciseTypeCode } from "../../api/exercise";
+import { getKidneyRecords } from "../../api/kidney";
+import { getLipidRecords } from "../../api/lipid";
 import {
   MEASURE_TYPE_LABELS,
   deleteVital,
@@ -56,7 +60,17 @@ const FALLBACK_ALL_ITEMS: VitalRecord[] = [
 ];
 
 type Period = "7D" | "30D" | "90D";
-type TypeFilter = "ALL" | "BP" | "BG";
+type TypeFilter = "ALL" | "BP" | "BG" | "LIPID" | "KIDNEY" | "EXERCISE" | "ACTIVITY";
+type HealthRecordRow = {
+  id: string;
+  date: string;
+  type: TypeFilter;
+  typeLabel: string;
+  value: string;
+  status: "정상" | "위험" | "기록";
+  memo: string;
+  vital?: VitalRecord;
+};
 
 function formatDateShort(iso: string) {
   const parts = iso.slice(0, 10).split("-");
@@ -72,7 +86,9 @@ function measureVal(rec: VitalRecord): string {
 
 function filterByType(items: VitalRecord[], t: TypeFilter): VitalRecord[] {
   if (t === "ALL") return items;
-  return items.filter((r) => (t === "BP" ? isBpType(r.measure_type) : !isBpType(r.measure_type)));
+  if (t === "BP") return items.filter((r) => isBpType(r.measure_type));
+  if (t === "BG") return items.filter((r) => !isBpType(r.measure_type));
+  return [];
 }
 
 function calcSummary(items: VitalRecord[]) {
@@ -93,23 +109,95 @@ type VitalsListPageProps = {
 
 export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
   const [apiData, setApiData] = useState<VitalsListData | null>(null);
+  const [recordRows, setRecordRows] = useState<HealthRecordRow[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasApiError, setHasApiError] = useState(false);
   const [period, setPeriod] = useState<Period>("30D");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
 
-  function fetchData(q: VitalsQuery) {
+  function fetchData(_q?: VitalsQuery) {
     const token = getStoredAccessToken();
     if (!token) return;
     setIsLoading(true);
-    getVitals(q, token)
-      .then((res) => { setApiData(res.data); setHasApiError(false); })
+    Promise.all([
+      getVitals({ limit: 100 }, token),
+      getLipidRecords({ limit: 100 }, token),
+      getKidneyRecords({ limit: 100 }, token),
+      getExerciseLogs({ limit: 100 }, token),
+      getActivityLogs({ limit: 100 }, token),
+    ])
+      .then(([vitalsRes, lipidRes, kidneyRes, exerciseRes, activityRes]) => {
+        setApiData(vitalsRes.data);
+        const rows: HealthRecordRow[] = [
+          ...vitalsRes.data.items.map((rec): HealthRecordRow => ({
+            id: `vital-${rec.id}`,
+            date: rec.measured_at.slice(0, 10),
+            type: isBpType(rec.measure_type) ? "BP" : "BG",
+            typeLabel: MEASURE_TYPE_LABELS[rec.measure_type],
+            value: measureVal(rec),
+            status: rec.is_critical ? "위험" : "정상",
+            memo: rec.memo ?? "—",
+            vital: rec,
+          })),
+          ...lipidRes.data.map((rec): HealthRecordRow => ({
+            id: `lipid-${rec.id}`,
+            date: rec.record_date,
+            type: "LIPID",
+            typeLabel: "지질 지표",
+            value: [
+              rec.total_cholesterol != null ? `총 ${rec.total_cholesterol}` : "",
+              rec.ldl != null ? `LDL ${rec.ldl}` : "",
+              rec.hdl != null ? `HDL ${rec.hdl}` : "",
+              rec.triglycerides != null ? `TG ${rec.triglycerides}` : "",
+            ].filter(Boolean).join(" / ") || "—",
+            status: "기록",
+            memo: rec.memo ?? "—",
+          })),
+          ...kidneyRes.data.map((rec): HealthRecordRow => ({
+            id: `kidney-${rec.id}`,
+            date: rec.record_date ?? rec.measured_date,
+            type: "KIDNEY",
+            typeLabel: "신장 지표",
+            value: [
+              rec.creatinine != null ? `Cr ${rec.creatinine}` : "",
+              rec.bun != null ? `BUN ${rec.bun}` : "",
+              rec.egfr != null ? `eGFR ${rec.egfr}` : "",
+            ].filter(Boolean).join(" / ") || "—",
+            status: "기록",
+            memo: rec.memo ?? "—",
+          })),
+          ...exerciseRes.data.items.map((log): HealthRecordRow => ({
+            id: `exercise-${log.id}`,
+            date: log.exercise_date,
+            type: "EXERCISE",
+            typeLabel: "운동 기록",
+            value: `${EXERCISE_TYPE_LABELS[log.exercise_type as ExerciseTypeCode] ?? log.exercise_type} · ${log.duration_minutes}분`,
+            status: "기록",
+            memo: log.memo ?? "—",
+          })),
+          ...activityRes.data.map((log): HealthRecordRow => ({
+            id: `activity-${log.id ?? log.activity_log_id ?? log.activity_date}`,
+            date: log.activity_date,
+            type: "ACTIVITY",
+            typeLabel: "일일 활동",
+            value: [
+              log.steps != null ? `${log.steps}보` : "",
+              log.sleep_hours != null ? `수면 ${log.sleep_hours}시간` : "",
+              log.water_ml != null ? `수분 ${log.water_ml}ml` : "",
+            ].filter(Boolean).join(" / ") || "—",
+            status: "기록",
+            memo: log.memo ?? "—",
+          })),
+        ];
+        setRecordRows(rows.sort((a, b) => b.date.localeCompare(a.date)));
+        setHasApiError(false);
+      })
       .catch(() => setHasApiError(true))
       .finally(() => setIsLoading(false));
   }
 
   useEffect(() => {
-    fetchData({ period, type: typeFilter });
+    fetchData({ period });
   }, [period, typeFilter]);
 
   async function handleDelete(id: number) {
@@ -117,7 +205,7 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
     const token = getStoredAccessToken();
     try {
       await deleteVital(id, token ?? undefined);
-      fetchData({ period, type: typeFilter });
+      fetchData({ period });
     } catch {
       alert("삭제에 실패했습니다.");
     }
@@ -135,6 +223,18 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
   const displayItems = apiData
     ? apiData.items
     : filterByType(FALLBACK_ALL_ITEMS, typeFilter);
+  const displayRows = recordRows.length
+    ? recordRows.filter((row) => typeFilter === "ALL" || row.type === typeFilter)
+    : filterByType(FALLBACK_ALL_ITEMS, typeFilter).map((rec): HealthRecordRow => ({
+      id: `fallback-${rec.id}`,
+      date: rec.measured_at.slice(0, 10),
+      type: isBpType(rec.measure_type) ? "BP" : "BG",
+      typeLabel: MEASURE_TYPE_LABELS[rec.measure_type],
+      value: measureVal(rec),
+      status: rec.is_critical ? "위험" : "정상",
+      memo: rec.memo ?? "—",
+      vital: rec,
+    }));
 
   const summary = apiData ? apiData.summary : calcSummary(displayItems);
 
@@ -177,18 +277,15 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
             </button>
           ))}
         </div>
-        <div className="vl-type-tabs">
-          {(["ALL", "BP", "BG"] as TypeFilter[]).map((t) => (
-            <button
-              key={t}
-              type="button"
-              className={`period-tab ${typeFilter === t ? "period-tab--active" : ""}`}
-              onClick={() => setTypeFilter(t)}
-            >
-              {t === "ALL" ? "전체" : t === "BP" ? "혈압" : "혈당"}
-            </button>
-          ))}
-        </div>
+        <select className="vi-date-input" value={typeFilter} onChange={(e) => setTypeFilter(e.target.value as TypeFilter)}>
+          <option value="ALL">전체</option>
+          <option value="BP">혈압</option>
+          <option value="BG">혈당</option>
+          <option value="LIPID">지질 지표</option>
+          <option value="KIDNEY">신장 지표</option>
+          <option value="EXERCISE">운동 기록</option>
+          <option value="ACTIVITY">일일 활동</option>
+        </select>
       </div>
 
       {/* 요약 카드 */}
@@ -224,7 +321,7 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
       {/* 기록 목록 테이블 */}
       <section className="dashboard-card">
         <h2 style={{ padding: "20px 20px 0", margin: 0, fontSize: "15px", fontWeight: 700 }}>
-          기록 목록 ({displayItems.length}건)
+          기록 목록 ({displayRows.length}건)
         </h2>
         <div className="table-card" style={{ border: "none", borderRadius: 0 }}>
           <table>
@@ -239,41 +336,43 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
               </tr>
             </thead>
             <tbody>
-              {displayItems.length === 0 ? (
+              {displayRows.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="empty-hint" style={{ textAlign: "center", padding: "32px" }}>
                     해당 조건에 기록이 없습니다.
                   </td>
                 </tr>
               ) : (
-                displayItems.map((rec) => (
+                displayRows.map((row) => (
                   <tr
-                    key={rec.id}
-                    className="vl-row-clickable"
-                    onClick={() => handleDetail(rec)}
+                    key={row.id}
+                    className={row.vital ? "vl-row-clickable" : undefined}
+                    onClick={() => row.vital && handleDetail(row.vital)}
                   >
-                    <td>{formatDateShort(rec.measured_at)}</td>
-                    <td>{MEASURE_TYPE_LABELS[rec.measure_type]}</td>
-                    <td>{measureVal(rec)}</td>
+                    <td>{formatDateShort(row.date)}</td>
+                    <td>{row.typeLabel}</td>
+                    <td>{row.value}</td>
                     <td>
-                      <span className={`vl-status-badge ${rec.is_critical ? "vl-status-danger" : "vl-status-normal"}`}>
-                        {rec.is_critical ? "위험" : "정상"}
+                      <span className={`vl-status-badge ${row.status === "위험" ? "vl-status-danger" : "vl-status-normal"}`}>
+                        {row.status}
                       </span>
                     </td>
-                    <td className="vl-memo-cell">{rec.memo ?? "—"}</td>
+                    <td className="vl-memo-cell">{row.memo}</td>
                     <td onClick={(e) => e.stopPropagation()}>
                       <div className="vl-action-row">
                         <button
                           type="button"
                           className="vl-action-btn"
-                          onClick={(e) => { e.stopPropagation(); handleDetail(rec); }}
+                          onClick={(e) => { e.stopPropagation(); row.vital && handleDetail(row.vital); }}
+                          disabled={!row.vital}
                         >
                           수정
                         </button>
                         <button
                           type="button"
                           className="vl-action-btn vl-delete-btn"
-                          onClick={(e) => { e.stopPropagation(); handleDelete(rec.id); }}
+                          onClick={(e) => { e.stopPropagation(); row.vital && handleDelete(row.vital.id); }}
+                          disabled={!row.vital}
                         >
                           삭제
                         </button>

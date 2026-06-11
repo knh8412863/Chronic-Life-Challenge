@@ -1,4 +1,5 @@
 import { apiRequest } from "./client";
+import { getLatestHealthSurveyInput, type HealthSurveyRecord } from "./predictions";
 
 export type FamilyHistoryItem = {
   condition: string;
@@ -45,7 +46,30 @@ type UserMeResponse = {
   managed_diseases: string[];
 };
 
-function toHealthProfile(user: UserMeResponse): HealthProfile {
+type MaybeData<T> = T | { data: T };
+
+function unwrapData<T>(response: MaybeData<T>): T {
+  if (response && typeof response === "object" && "data" in response) {
+    return response.data;
+  }
+  return response;
+}
+
+function buildFamilyHistory(input?: HealthSurveyRecord | null): FamilyHistoryItem[] {
+  if (!input) return [];
+
+  const items: FamilyHistoryItem[] = [];
+  if (input.fh_diabetes_father) items.push({ condition: "DIABETES", relation: "FATHER" });
+  if (input.fh_diabetes_mother) items.push({ condition: "DIABETES", relation: "MOTHER" });
+  if (input.fh_diabetes_sibling) items.push({ condition: "DIABETES", relation: "SIBLING" });
+  if (input.fh_hypertension_father) items.push({ condition: "HYPERTENSION", relation: "FATHER" });
+  if (input.fh_hypertension_mother) items.push({ condition: "HYPERTENSION", relation: "MOTHER" });
+  if (input.fh_hypertension_sibling) items.push({ condition: "HYPERTENSION", relation: "SIBLING" });
+  if (input.family_history_ckd) items.push({ condition: "CKD", relation: "" });
+  return items;
+}
+
+function toHealthProfile(user: UserMeResponse, latestSurvey?: HealthSurveyRecord | null): HealthProfile {
   return {
     name: user.name,
     email: user.email,
@@ -58,7 +82,7 @@ function toHealthProfile(user: UserMeResponse): HealthProfile {
     height: user.height,
     weight: user.weight,
     bmi: user.bmi,
-    family_history: [],
+    family_history: buildFamilyHistory(latestSurvey),
     smoking: "미입력",
     alcohol: "미입력",
     profile_image_url: user.profile_image_url,
@@ -74,15 +98,20 @@ function toUserUpdateBody(body: UpdateHealthProfileBody) {
 }
 
 export async function getHealthProfile(token?: string) {
-  const response = await apiRequest<UserMeResponse>("/users/me", { token });
-  return { data: toHealthProfile(response) };
+  const [user, latestSurvey] = await Promise.all([
+    apiRequest<MaybeData<UserMeResponse>>("/users/me", { token }).then(unwrapData),
+    getLatestHealthSurveyInput(token)
+      .then((response) => response.data)
+      .catch(() => null),
+  ]);
+  return { data: toHealthProfile(user, latestSurvey) };
 }
 
 export async function updateHealthProfile(body: UpdateHealthProfileBody, token?: string) {
-  const response = await apiRequest<UserMeResponse>("/users/me", {
+  const response = await apiRequest<MaybeData<UserMeResponse>>("/users/me", {
     method: "PATCH",
     body: JSON.stringify(toUserUpdateBody(body)),
     token,
-  });
+  }).then(unwrapData);
   return { data: toHealthProfile(response) };
 }

@@ -2,10 +2,28 @@ import { useState, useEffect } from "react";
 import type { AppRoute } from "../App";
 import { getStoredAccessToken } from "../api/auth";
 import { createHealthSurveyInput } from "../api/predictions";
+import { getCurrentUser } from "../api/users";
 import { Stepper } from "../components/common/Stepper";
 
 interface HealthSurveyPageProps {
   onNavigate: (route: AppRoute) => void;
+}
+
+const SIGNUP_DRAFT_KEY = "auth.signupDraft";
+const ONBOARDING_PROFILE_KEY = "auth.onboardingProfile";
+
+type HealthSurveySignupDraft = {
+  birth_date?: string;
+  gender?: "MALE" | "FEMALE";
+  managed_diseases?: string[];
+};
+
+function RequiredNotice() {
+  return <span style={{ fontSize: 10, color: "#E24B4A", fontWeight: 600 }}>* 필수 입력</span>;
+}
+
+function RequiredMark() {
+  return <span style={{ color: "#E24B4A", marginLeft: 3 }}>*</span>;
 }
 
 function OptionButton({ label, selected, onClick }: { label: string; selected: boolean; onClick: () => void }) {
@@ -20,18 +38,6 @@ function optionalNumber(value: string): number | null {
   if (!value.trim()) return null;
   const parsed = Number(value);
   return Number.isNaN(parsed) ? null : parsed;
-}
-
-function diseaseCodes(items: string[]) {
-  const map: Record<string, string | null> = {
-    고혈압: "HYPERTENSION",
-    당뇨: "DIABETES",
-    신장질환: "CKD",
-    고지혈증: "DYSLIPIDEMIA",
-    기타: "OTHER",
-    없음: null,
-  };
-  return items.map(item => map[item]).filter((item): item is string => Boolean(item));
 }
 
 function medicationCodes(items: string[]) {
@@ -122,13 +128,13 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
 
   // 기본 정보
   const [birthDate, setBirthDate] = useState("");
+  const [gender, setGender] = useState<"MALE" | "FEMALE" | "">("");
   const [height, setHeight] = useState("170");
   const [weight, setWeight] = useState("65");
   const [waist, setWaist] = useState("");
   const [bmi, setBmi] = useState<number | null>(null);
 
   // 건강 상태
-  const [diseases, setDiseases] = useState<string[]>([]);
   const [medications, setMedications] = useState<string[]>([]);
   const [lastCheckup, setLastCheckup] = useState(""); // 최근 건강검진
   const [systolic, setSystolic] = useState("130");
@@ -162,6 +168,33 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   const [surveyError, setSurveyError] = useState("");
 
   useEffect(() => {
+    const rawDraft = sessionStorage.getItem(ONBOARDING_PROFILE_KEY) ?? sessionStorage.getItem(SIGNUP_DRAFT_KEY);
+
+    if (rawDraft) {
+      try {
+        const draft = JSON.parse(rawDraft) as HealthSurveySignupDraft;
+        if (draft.birth_date) setBirthDate(draft.birth_date);
+        if (draft.gender) setGender(draft.gender);
+        if (draft.birth_date && draft.gender) return;
+      } catch {
+        // 저장된 회원가입 임시 정보가 깨진 경우에는 사용자 정보 API로 보완합니다.
+      }
+    }
+
+    const token = getStoredAccessToken();
+    if (!token) return;
+
+    getCurrentUser(token)
+      .then(user => {
+        setBirthDate(user.birthday);
+        setGender(user.gender);
+      })
+      .catch(() => {
+        // 사용자 정보를 불러오지 못하면 화면의 "회원가입 정보 없음" 상태를 유지합니다.
+      });
+  }, []);
+
+  useEffect(() => {
     const h = parseFloat(height);
     const w = parseFloat(weight);
     if (h > 0 && w > 0) setBmi(w / Math.pow(h / 100, 2));
@@ -179,7 +212,6 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   const bmiStatus = getBmiStatus(bmi);
 
   const SURVEY_STEPS = ["기본 정보", "건강 상태", "생활 습관"];
-  const ONBOARDING_STEPS = ["계정정보", "약관동의", "이메일인증", "건강설문", "완료"];
 
   const PageWrapper = ({ children }: { children: React.ReactNode }) => (
     <div style={{ minHeight: "100vh", background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center", padding: 40, overflowY: "auto" }}>
@@ -189,7 +221,6 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
           <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", margin: "0 0 8px" }}>건강 설문</h2>
           <p style={{ fontSize: 12, color: "#888", margin: 0 }}>정확한 건강 관리를 위한 기본 정보를 입력해주세요</p>
         </div>
-        <Stepper steps={ONBOARDING_STEPS} current={3} />
         <Stepper steps={SURVEY_STEPS} current={Math.min(surveyStep, 2)} />
         {children}
       </div>
@@ -208,18 +239,25 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
     return (
       <PageWrapper>
         <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 24, marginTop: 20 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: "0 0 16px" }}>기본 정보</h3>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>기본 정보</h3>
+            <RequiredNotice />
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
-                <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>생년월일</label>
-                <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)}
-                  style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
+                <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>생년월일<RequiredMark /></label>
+                <div style={{ height: 34, border: "1.5px dashed #ddd", borderRadius: 5, padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafafa" }}>
+                  <span style={{ fontSize: 11, color: birthDate ? "#333" : "#aaa" }}>{birthDate || "회원가입 정보 없음"}</span>
+                  <span style={{ fontSize: 9, color: "#aaa" }}>(회원가입 시 입력)</span>
+                </div>
               </div>
               <div>
-                <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>성별</label>
+                <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>성별<RequiredMark /></label>
                 <div style={{ height: 34, border: "1.5px dashed #ddd", borderRadius: 5, padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                  <span style={{ fontSize: 11, color: "#333" }}>남성</span>
+                  <span style={{ fontSize: 11, color: gender ? "#333" : "#aaa" }}>
+                    {gender === "MALE" ? "남성" : gender === "FEMALE" ? "여성" : "회원가입 정보 없음"}
+                  </span>
                   <span style={{ fontSize: 9, color: "#aaa" }}>(회원가입 시 입력)</span>
                 </div>
               </div>
@@ -227,12 +265,12 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
 
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
-                <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>신장 (cm)</label>
+                <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>신장 (cm)<RequiredMark /></label>
                 <input type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder="170"
                   style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
               </div>
               <div>
-                <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>체중 (kg)</label>
+                <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>체중 (kg)<RequiredMark /></label>
                 <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="65"
                   style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
               </div>
@@ -261,14 +299,6 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
 
   // ── 건강 상태 ──
   if (surveyStep === 1) {
-    const DISEASE_OPTIONS = [
-      { name: "고혈압", color: "#c2185b", bg: "#fce4ec" },
-      { name: "당뇨", color: "#f57f17", bg: "#fff9c4" },
-      { name: "신장질환", color: "#1565c0", bg: "#e3f2fd" },
-      { name: "고지혈증", color: "#4527a0", bg: "#ede7f6" },
-      { name: "기타", color: "#555", bg: "#fafafa" },
-      { name: "없음", color: "#555", bg: "#fafafa" },
-    ];
     const MED_OPTIONS = [
       { name: "고혈압 약", color: "#c2185b", bg: "#fce4ec" },
       { name: "당뇨 약", color: "#f57f17", bg: "#fff9c4" },
@@ -281,21 +311,11 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
     return (
       <PageWrapper>
         <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 20, marginTop: 20 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: "0 0 12px" }}>건강 상태</h3>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>건강 상태</h3>
+            <RequiredNotice />
+          </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            {/* 질병력 */}
-            <div>
-              <label style={{ fontSize: 10, fontWeight: 500, color: "#555", display: "block", marginBottom: 8 }}>질병력 (진단받은 질병)</label>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
-                {DISEASE_OPTIONS.map(d => (
-                  <button key={d.name} onClick={() => toggleItem(diseases, d.name, setDiseases)}
-                    style={{ padding: "11px 6px", border: `1.5px solid ${diseases.includes(d.name) ? d.color : "#ddd"}`, borderRadius: 5, background: diseases.includes(d.name) ? d.color : d.bg, textAlign: "center", fontSize: 10, color: diseases.includes(d.name) ? "#fff" : d.color, cursor: "pointer" }}>
-                    {d.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-
             {/* 현재 복용약 */}
             <div>
               <label style={{ fontSize: 10, fontWeight: 500, color: "#555", display: "block", marginBottom: 8 }}>현재 복용 중인 약</label>
@@ -307,7 +327,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
                   </button>
                 ))}
               </div>
-              <p style={{ fontSize: 9, color: "#aaa", margin: "4px 0 0" }}>※ ML 동일질환 누수 방지용 — LLM 조언 배경정보로 활용</p>
+              <p style={{ fontSize: 9, color: "#aaa", margin: "4px 0 0" }}>※ 현재 복용 중인 약이 없다면 '복용중인 약 없음'을 선택해주세요.</p>
             </div>
 
             {/* 최근 건강검진 */}
@@ -326,7 +346,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
                   </button>
                 ))}
               </div>
-              <p style={{ fontSize: 9, color: "#aaa", margin: "4px 0 0" }}>※ ML 피처 아님 — LLM 정기검진 권유 문구 활용 (last_checkup_period)</p>
+              <p style={{ fontSize: 9, color: "#aaa", margin: "4px 0 0" }}>※ 최근 검진 시기를 기준으로 건강관리 안내에 활용됩니다.</p>
             </div>
 
             {/* 가족력 */}
@@ -404,7 +424,10 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
     return (
       <PageWrapper>
         <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 12, padding: 28, marginTop: 24 }}>
-          <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: "0 0 24px" }}>신체활동 영역</h3>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>신체활동 영역</h3>
+            <RequiredNotice />
+          </div>
           <div style={{ marginBottom: 28 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 12 }}>운동 빈도</label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 10 }}>
@@ -425,7 +448,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
               placeholder="예: 150"
               style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, padding: "0 12px", fontSize: 12, outline: "none", boxSizing: "border-box" }}
             />
-            <p style={{ fontSize: 9, color: "#aaa", margin: "4px 0 0" }}>※ physical_activity_min (optional)</p>
+            <p style={{ fontSize: 9, color: "#aaa", margin: "4px 0 0" }}>※ 선택 입력 항목입니다.</p>
           </div>
           <div style={{ marginBottom: 28 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 12 }}>평균 수면 시간</label>
@@ -434,7 +457,10 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
             </div>
           </div>
           <hr style={{ border: "none", borderTop: "1px solid #eee", margin: "0 0 24px" }} />
-          <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: "0 0 24px" }}>기호습관 영역</h3>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+            <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>기호습관 영역</h3>
+            <RequiredNotice />
+          </div>
           <div style={{ marginBottom: 28 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 14 }}>현재 흡연 중이신가요?</label>
             <div style={{ display: "flex", gap: 24 }}>
@@ -459,7 +485,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
           </div>
           {drinking !== "" && drinking !== "안 마심" && (
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 14 }}>1회 평균 음주량</label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 14 }}>1회 평균 음주량<RequiredMark /></label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
                 {["1~2잔", "3~4잔", "5~6잔", "7~9잔", "10잔 이상"].map(opt => (
                   <OptionButton key={opt} label={opt} selected={drinkingAmount === opt} onClick={() => setDrinkingAmount(opt)} />
@@ -502,7 +528,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
           height: Number(height),
           weight: Number(weight),
           waist_circumference: optionalNumber(waist),
-          diagnosed_diseases: diseaseCodes(diseases),
+          diagnosed_diseases: [],
           medications: medicationCodes(medications),
           last_checkup_period: lastCheckup || null,
           sbp: optionalNumber(systolic),
@@ -528,6 +554,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
         },
         token,
       );
+      sessionStorage.removeItem(ONBOARDING_PROFILE_KEY);
       onNavigate("/onboarding-complete");
     } catch {
       setSurveyError("건강 설문 저장에 실패했습니다. 입력값을 확인해주세요.");
@@ -539,7 +566,10 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   return (
     <PageWrapper>
       <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 12, padding: 28, marginTop: 24 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: "0 0 24px" }}>식습관 영역</h3>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>식습관 영역</h3>
+          <RequiredNotice />
+        </div>
         <div style={{ marginBottom: 28 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 12 }}>식사 패턴</label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -562,7 +592,10 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
       </div>
 
       <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 12, padding: 28, marginTop: 16 }}>
-        <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: "0 0 20px" }}>정신건강 영역</h3>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 20 }}>
+          <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>정신건강 영역</h3>
+          <RequiredNotice />
+        </div>
         <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 16 }}>스트레스 수준</label>
         <div style={{ padding: "24px 20px", background: "#f8f9fa", borderRadius: 8 }}>
           <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 20 }}>

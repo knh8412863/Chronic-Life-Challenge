@@ -1,11 +1,48 @@
-import { useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppRoute } from "../App";
 import { ApiError } from "../api/client";
-import { login, storeAccessToken } from "../api/auth";
+import { googleLogin, login, storeAccessToken } from "../api/auth";
 
 interface LoginPageProps {
   onLogin: () => void;
   onNavigate?: (route: AppRoute) => void;
+}
+
+type GoogleCredentialResponse = {
+  credential?: string;
+};
+
+const GOOGLE_SIGNUP_DRAFT_KEY = "auth.googleSignupDraft";
+
+function decodeGoogleCredential(credential: string): { email?: string; name?: string; picture?: string } {
+  try {
+    const payload = credential.split(".")[1];
+    const normalized = payload.replace(/-/g, "+").replace(/_/g, "/");
+    const decoded = JSON.parse(window.atob(normalized.padEnd(Math.ceil(normalized.length / 4) * 4, "=")));
+    return {
+      email: typeof decoded.email === "string" ? decoded.email : undefined,
+      name: typeof decoded.name === "string" ? decoded.name : undefined,
+      picture: typeof decoded.picture === "string" ? decoded.picture : undefined,
+    };
+  } catch {
+    return {};
+  }
+}
+
+declare global {
+  interface Window {
+    google?: {
+      accounts?: {
+        id?: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: GoogleCredentialResponse) => void;
+          }) => void;
+          renderButton: (parent: HTMLElement, options: Record<string, string | number | boolean>) => void;
+        };
+      };
+    };
+  }
 }
 
 export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
@@ -16,6 +53,9 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
   const [rememberMe, setRememberMe] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID as string | undefined;
 
   const handleLogin = async () => {
     if (!email || !password) return;
@@ -31,13 +71,103 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
         setErrorCount(-1);
         setErrorMessage("짧은 시간 내 로그인 시도가 반복되었습니다. 잠시 후 다시 시도해주세요.");
       } else {
-        setErrorCount(prev => (prev === 0 ? 3 : prev === 3 ? 1 : prev));
+        setErrorCount(prev => (prev === 0 ? 3 : prev === 3 ? 1 : -1));
         setErrorMessage("이메일 또는 비밀번호가 올바르지 않습니다.");
       }
     } finally {
       setIsLoading(false);
     }
   };
+
+  const handleGoogleCredential = useCallback(
+    async (response: GoogleCredentialResponse) => {
+      if (!response.credential) {
+        setErrorMessage("Google 인증 정보를 받지 못했습니다. 다시 시도해 주세요.");
+        return;
+      }
+
+      setIsGoogleLoading(true);
+      setErrorMessage("");
+      try {
+        const loginResponse = await googleLogin({
+          id_token: response.credential,
+          remember_me: rememberMe,
+        });
+        storeAccessToken(loginResponse.access_token, rememberMe);
+        setErrorCount(0);
+        onLogin();
+      } catch (error) {
+        if (error instanceof ApiError) {
+          if (error.status === 404) {
+            const profile = decodeGoogleCredential(response.credential);
+            sessionStorage.setItem(
+              GOOGLE_SIGNUP_DRAFT_KEY,
+              JSON.stringify({
+                id_token: response.credential,
+                email: profile.email ?? "",
+                name: profile.name ?? "",
+                picture: profile.picture ?? "",
+                remember_me: rememberMe,
+              }),
+            );
+            onNavigate?.("/signup");
+            return;
+          }
+          setErrorMessage(error.message || "Google 로그인에 실패했습니다.");
+        } else {
+          setErrorMessage("Google 로그인에 실패했습니다.");
+        }
+      } finally {
+        setIsGoogleLoading(false);
+      }
+    },
+    [onLogin, onNavigate, rememberMe],
+  );
+
+  useEffect(() => {
+    const container = googleButtonRef.current;
+    if (!googleClientId || !container) return;
+
+    const renderGoogleButton = () => {
+      const googleId = window.google?.accounts?.id;
+      if (!googleId || !googleButtonRef.current) return;
+
+      googleButtonRef.current.innerHTML = "";
+      googleId.initialize({
+        client_id: googleClientId,
+        callback: handleGoogleCredential,
+      });
+      googleId.renderButton(googleButtonRef.current, {
+        theme: "outline",
+        size: "large",
+        type: "standard",
+        shape: "rectangular",
+        text: "continue_with",
+        width: 320,
+      });
+    };
+
+    if (window.google?.accounts?.id) {
+      renderGoogleButton();
+      return;
+    }
+
+    const existingScript = document.querySelector<HTMLScriptElement>("script[data-google-identity]");
+    if (existingScript) {
+      existingScript.addEventListener("load", renderGoogleButton, { once: true });
+      return () => existingScript.removeEventListener("load", renderGoogleButton);
+    }
+
+    const script = document.createElement("script");
+    script.src = "https://accounts.google.com/gsi/client";
+    script.async = true;
+    script.defer = true;
+    script.dataset.googleIdentity = "true";
+    script.addEventListener("load", renderGoogleButton, { once: true });
+    document.head.appendChild(script);
+
+    return () => script.removeEventListener("load", renderGoogleButton);
+  }, [googleClientId, handleGoogleCredential]);
 
   const BrandPanel = () => (
     <div style={{
@@ -171,6 +301,37 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
             style={{ width: "100%", height: 36, background: isLoading || !email || !password ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: isLoading || !email || !password ? "not-allowed" : "pointer" }}>
             {isLoading ? "로그인 중..." : "로그인"}
           </button>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0" }}>
+            <span style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+            <span style={{ fontSize: 11, color: "#888" }}>또는</span>
+            <span style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
+          </div>
+
+          {googleClientId ? (
+            <div
+              ref={googleButtonRef}
+              aria-busy={isGoogleLoading}
+              style={{ minHeight: 44, display: "flex", justifyContent: "center" }}
+            />
+          ) : (
+            <button
+              type="button"
+              disabled
+              style={{
+                width: "100%",
+                height: 38,
+                border: "1px solid #d1d5db",
+                borderRadius: 8,
+                background: "#f8fafc",
+                color: "#888",
+                fontSize: 12,
+                cursor: "not-allowed",
+              }}
+            >
+              Google 로그인 설정 필요
+            </button>
+          )}
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>

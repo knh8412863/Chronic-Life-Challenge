@@ -13,6 +13,24 @@ export type LoginResponse = {
   access_token: string;
 };
 
+export type GoogleLoginPayload = {
+  id_token: string;
+  remember_me?: boolean;
+};
+
+export type GoogleSignUpPayload = {
+  id_token: string;
+  name: string;
+  gender: "MALE" | "FEMALE";
+  birth_date: string;
+  phone_number: string;
+  consent_terms_version?: string;
+  consent_privacy_agreed?: boolean;
+  consent_health_data?: boolean;
+  consent_marketing?: boolean;
+  remember_me?: boolean;
+};
+
 export type SignUpPayload = {
   email: string;
   password: string;
@@ -57,6 +75,20 @@ export function login(payload: LoginPayload) {
   });
 }
 
+export function googleLogin(payload: GoogleLoginPayload) {
+  return apiRequest<LoginResponse>("/auth/google-login", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function googleSignup(payload: GoogleSignUpPayload) {
+  return apiRequest<LoginResponse>("/auth/google-registrations", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export function signup(payload: SignUpPayload) {
   return apiRequest<{ detail: string }>("/auth/signup", {
     method: "POST",
@@ -64,9 +96,20 @@ export function signup(payload: SignUpPayload) {
   });
 }
 
+export function checkSignupAvailability(payload: Pick<SignUpPayload, "email" | "phone_number">) {
+  return apiRequest<void>("/auth/signup-availability", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function logout() {
-  await apiRequest<void>("/auth/sessions/current", { method: "DELETE" });
-  clearStoredAccessToken();
+  const token = getStoredAccessToken();
+  try {
+    await apiRequest<void>("/auth/sessions/current", { method: "DELETE", token });
+  } finally {
+    clearStoredAccessToken();
+  }
 }
 
 export function refreshAccessToken() {

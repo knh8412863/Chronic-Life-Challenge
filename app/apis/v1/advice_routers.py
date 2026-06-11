@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import ORJSONResponse as Response
 
 from app.dependencies.security import get_request_user
@@ -8,6 +8,7 @@ from app.dtos.advices import (
     AdviceFeedbackCreateRequest,
     AdviceFeedbackCreateResponse,
     AdviceGenerateRequest,
+    AdviceHistoryItemResponse,
     DailyAdviceResponse,
 )
 from app.dtos.predictions import DataResponse
@@ -42,6 +43,21 @@ async def generate_today_advice(
 ) -> Response:
     result = await service.generate_today(user, request)
     return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_201_CREATED)
+
+
+@advice_router.get(
+    "/daily-advices/history",
+    response_model=DataResponse[list[AdviceHistoryItemResponse]],
+    status_code=status.HTTP_200_OK,
+)
+async def get_advice_history(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[AdviceService, Depends(AdviceService)],
+    sort: Annotated[str, Query(pattern="^(LATEST|OLDEST)$")] = "LATEST",
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> Response:
+    result = await service.get_history(user, sort=sort, limit=limit)
+    return Response({"data": [item.model_dump(mode="json") for item in result]}, status_code=status.HTTP_200_OK)
 
 
 @advice_router.post(

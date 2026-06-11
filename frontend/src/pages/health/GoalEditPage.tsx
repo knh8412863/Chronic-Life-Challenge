@@ -21,7 +21,7 @@ const CDG_ITEMS: { key: CdgKey; label: string; unit: string; step: string; curre
   { key: "target_ldl_cholesterol", label: "LDL 콜레스테롤", unit: "mg/dL", step: "1" },
   { key: "target_hdl_cholesterol", label: "HDL 콜레스테롤", unit: "mg/dL", step: "1" },
   { key: "target_triglycerides", label: "중성지방", unit: "mg/dL", step: "1" },
-  { key: "target_weight_kg", label: "체중 또는 BMI", unit: "kg", step: "0.1" },
+  { key: "target_weight_kg", label: "체중", unit: "kg", step: "0.1" },
   { key: "target_egfr", label: "eGFR", unit: "mL/min", step: "0.1" },
 ];
 
@@ -39,7 +39,7 @@ const CURRENT_LABELS: Partial<Record<CdgKey | LgKey, string>> = {
   target_ldl_cholesterol: "112",
   target_hdl_cholesterol: "52",
   target_triglycerides: "—",
-  target_weight_kg: "72.5 / 23.7",
+  target_weight_kg: "72.5",
   target_egfr: "—",
   target_steps: "8,423",
   target_exercise_minutes: "30",
@@ -79,6 +79,12 @@ function strToNum(s: string): number | null {
   if (!s) return null;
   const n = Number(s);
   return Number.isNaN(n) ? null : n;
+}
+function normalizeNonNegativeInput(value: string): string {
+  if (value === "") return "";
+  const n = Number(value);
+  if (Number.isNaN(n)) return "";
+  return String(Math.max(0, n));
 }
 
 type GoalEditPageProps = {
@@ -163,7 +169,6 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
         <div className="goal-section-header">
           <h2>만성질환 수치 목표</h2>
         </div>
-        <p className="goal-section-note">* 현재값은 최근 7일 평균 기준 (미기구 전까지)</p>
 
         <div className="goal-edit-table">
           <div className="goal-edit-thead">
@@ -183,22 +188,24 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
                     <input
                       type="number"
                       step={step}
+                      min={0}
                       className="goal-edit-input"
                       value={cdgDraft.target_systolic_bp ?? ""}
                       placeholder="수축기"
                       onChange={(e) =>
-                        setCdgDraft((p) => ({ ...p, target_systolic_bp: e.target.value }))
+                        setCdgDraft((p) => ({ ...p, target_systolic_bp: normalizeNonNegativeInput(e.target.value) }))
                       }
                     />
                     <span className="goal-bp-sep">/</span>
                     <input
                       type="number"
                       step={step}
+                      min={0}
                       className="goal-edit-input"
                       value={cdgDraft.target_diastolic_bp ?? ""}
                       placeholder="이완기"
                       onChange={(e) =>
-                        setCdgDraft((p) => ({ ...p, target_diastolic_bp: e.target.value }))
+                        setCdgDraft((p) => ({ ...p, target_diastolic_bp: normalizeNonNegativeInput(e.target.value) }))
                       }
                     />
                   </div>
@@ -206,11 +213,12 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
                   <input
                     type="number"
                     step={step}
+                    min={0}
                     className="goal-edit-input"
                     value={cdgDraft[key] ?? ""}
                     placeholder="미설정"
                     onChange={(e) =>
-                      setCdgDraft((p) => ({ ...p, [key]: e.target.value }))
+                      setCdgDraft((p) => ({ ...p, [key]: normalizeNonNegativeInput(e.target.value) }))
                     }
                   />
                 )}
@@ -242,10 +250,11 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
                 <input
                   type="number"
                   step={step}
+                  min={0}
                   className="goal-edit-input"
                   value={lgDraft[key] ?? ""}
                   placeholder="미설정"
-                  onChange={(e) => setLgDraft((p) => ({ ...p, [key]: e.target.value }))}
+                  onChange={(e) => setLgDraft((p) => ({ ...p, [key]: normalizeNonNegativeInput(e.target.value) }))}
                 />
               </div>
             </div>

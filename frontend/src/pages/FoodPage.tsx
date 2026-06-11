@@ -12,9 +12,11 @@ import {
 import { EmptyState } from "../components/common/EmptyState";
 import { ErrorState } from "../components/common/ErrorState";
 import { LoadingState } from "../components/common/LoadingState";
+import { localDateString, localDaysAgoString } from "../utils/date";
 
 interface FoodPageProps {
   onNavigate: (route: AppRoute) => void;
+  view?: "list" | "input";
 }
 
 type TabType = "list" | "input" | "detail";
@@ -33,13 +35,11 @@ type FoodMeal = MealLog & {
 };
 
 function todayString() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateString();
 }
 
 function daysAgo(days: number) {
-  const date = new Date();
-  date.setDate(date.getDate() - days);
-  return date.toISOString().slice(0, 10);
+  return localDaysAgoString(days);
 }
 
 function mealTimeLabel(createdAt: string) {
@@ -70,8 +70,9 @@ function numberOrNull(value: string) {
   return Number(value);
 }
 
-export function FoodPage({ onNavigate }: FoodPageProps) {
-  const [tab, setTab] = useState<TabType>("list");
+export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
+  const isFixedInput = view === "input";
+  const [tab, setTab] = useState<TabType>(view);
   const [selectedMeal, setSelectedMeal] = useState<FoodMeal | null>(null);
   const [period, setPeriod] = useState<PeriodType>("오늘");
   const [mealTypeFilter, setMealTypeFilter] = useState("전체");
@@ -84,7 +85,7 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
   // 식단 직접 입력 상태
   const [inputMealType, setInputMealType] = useState<MealType>("BREAKFAST");
   const [foodItems, setFoodItems] = useState([{ food: "", amount: "" }]);
-  const [inputDate, setInputDate] = useState(new Date().toISOString().split("T")[0]);
+  const [inputDate, setInputDate] = useState(todayString());
   const [inputTime, setInputTime] = useState("08:00");
   const [calories, setCalories] = useState("");
   const [carbs, setCarbs] = useState("");
@@ -139,6 +140,12 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
     fetchMeals();
   }, [period, mealTypeFilter]);
 
+  useEffect(() => {
+    setTab(view);
+    setSelectedMeal(null);
+    setIsEditMode(false);
+  }, [view]);
+
   const handleSaveInput = async () => {
     const hasFood = foodItems.some(f => f.food.trim());
     if (!hasFood) { setShowValidation(true); return; }
@@ -165,7 +172,11 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
       );
       setShowSaveSuccess(true);
       fetchMeals();
-      setTimeout(() => { setShowSaveSuccess(false); setTab("list"); }, 800);
+      setTimeout(() => {
+        setShowSaveSuccess(false);
+        if (isFixedInput) onNavigate("/food");
+        else setTab("list");
+      }, 800);
     } catch {
       setHasError(true);
     }
@@ -215,30 +226,15 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
     setIsEditMode(false);
   };
 
-  const tabs = ["식단 직접 입력", "식단 기록 목록", "식단 기록 상세/수정"];
-  const tabKeys: TabType[] = ["input", "list", "detail"];
+  const pageTitle = tab === "input" ? "식단 직접 입력" : tab === "detail" ? "식단 기록 상세" : "식단 기록 목록";
 
   return (
     <div className="page-container">
-      <h1 className="page-title">식단 기록</h1>
+      <h1 className="page-title">{pageTitle}</h1>
 
       {hasError && (
         <ErrorState title="식단 데이터를 처리하지 못했습니다." description="로그인 상태와 입력값을 확인한 뒤 다시 시도해 주세요." />
       )}
-
-      {/* 탭 */}
-      <div style={{ display: "flex", borderBottom: "2px solid #e0e0e0", marginBottom: 20 }}>
-        {tabs.map((t, i) => (
-          <button key={t} onClick={() => setTab(tabKeys[i])}
-            style={{ padding: "10px 16px", border: "none", background: "none", cursor: "pointer",
-              fontSize: 13, fontWeight: tab === tabKeys[i] ? 700 : 400,
-              color: tab === tabKeys[i] ? "#1a1a1a" : "#888",
-              borderBottom: tab === tabKeys[i] ? "2px solid #1a1a1a" : "2px solid transparent",
-              marginBottom: -2 }}>
-            {t}
-          </button>
-        ))}
-      </div>
 
       {/* ── 식단 직접 입력 ── */}
       {tab === "input" && (
@@ -258,7 +254,6 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
                   cursor: "pointer", textAlign: "center" }}>
                 <div style={{ fontSize: 28, marginBottom: 6 }}>{MEAL_LABELS[type].icon}</div>
                 <div style={{ fontSize: 12, fontWeight: inputMealType === type ? 700 : 400 }}>{MEAL_LABELS[type].label}</div>
-                <div style={{ fontSize: 9, color: "#aaa", marginTop: 2 }}>{type}</div>
               </button>
             ))}
           </div>
@@ -381,13 +376,9 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
               {["전체", "아침", "점심", "저녁", "간식"].map(t => <option key={t}>{t}</option>)}
             </select>
 
-            <button onClick={() => setTab("input")}
+            <button onClick={() => onNavigate("/food/analyze")}
               style={{ width: "100%", height: 36, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               + 새로운 식단 추가
-            </button>
-            <button onClick={() => onNavigate("/food/analyze")}
-              style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", color: "#333", fontSize: 13, fontWeight: 600, cursor: "pointer", marginTop: 8 }}>
-              식단 분석하기
             </button>
           </div>
 
@@ -412,7 +403,7 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
           ) : filteredMeals.length === 0 ? (
             <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10 }}>
               <EmptyState title="식단 기록이 없습니다." description="새로운 식단을 입력하거나 식단 분석 결과를 저장해 보세요." icon="🍽️" />
-              <button onClick={() => setTab("input")}
+              <button onClick={() => onNavigate("/food/analyze")}
                 style={{ display: "block", margin: "0 auto 24px", padding: "10px 24px", border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, cursor: "pointer" }}>
                 + 새로운 식단 추가
               </button>
@@ -436,7 +427,7 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
                   <div style={{ display: "flex", gap: 8 }}>
                     <button onClick={() => openDetail(meal)}
                       style={{ padding: "6px 12px", border: "1.5px solid #ddd", borderRadius: 6, background: "#fff", fontSize: 11, cursor: "pointer" }}>
-                      ✏️ 상세/수정
+                      상세
                     </button>
                     <button
                       disabled={!meal.isToday}
@@ -454,7 +445,26 @@ export function FoodPage({ onNavigate }: FoodPageProps) {
         </div>
       )}
 
-      {/* ── 식단 기록 상세/수정 ── */}
+      {/* ── 식단 기록 상세 ── */}
+      {tab === "detail" && !selectedMeal && (
+        <div>
+          <EmptyState
+            title="선택된 식단 기록이 없습니다."
+            description="식단 기록 목록에서 수정할 기록을 먼저 선택해 주세요."
+            icon="🍽️"
+          />
+          <div style={{ display: "flex", justifyContent: "center", marginTop: -36 }}>
+            <button
+              type="button"
+              className="green-button"
+              onClick={() => setTab("list")}
+            >
+              식단 기록 목록 보기
+            </button>
+          </div>
+        </div>
+      )}
+
       {tab === "detail" && selectedMeal && (
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>

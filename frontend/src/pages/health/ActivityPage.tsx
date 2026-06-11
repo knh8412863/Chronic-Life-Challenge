@@ -4,9 +4,10 @@ import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
 import { getTodayActivity, saveActivity, type DailyActivity } from "../../api/activity";
 import { LoadingState } from "../../components/common/LoadingState";
+import { localDateString } from "../../utils/date";
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateString();
 }
 
 const fallbackActivity: DailyActivity = {
@@ -171,7 +172,7 @@ export function ActivityPage({ onNavigate: _onNavigate }: ActivityPageProps) {
               value={stressLevel}
               onChange={(e) => setStressLevel(Number(e.target.value))}
             />
-            <p className="goal-section-note">* stress_level: tinyint (1~5 범위)</p>
+            <p className="goal-section-note">* 1에 가까울수록 낮고 5에 가까울수록 높습니다.</p>
           </div>
 
           <div className="act-slider-item">
@@ -187,7 +188,7 @@ export function ActivityPage({ onNavigate: _onNavigate }: ActivityPageProps) {
               value={dietScore}
               onChange={(e) => setDietScore(Number(e.target.value))}
             />
-            <p className="goal-section-note">* diet_score: decimal(3,1) (0~10 범위)</p>
+            <p className="goal-section-note">* 0점은 낮음, 10점은 좋음 기준입니다.</p>
           </div>
         </div>
       </section>

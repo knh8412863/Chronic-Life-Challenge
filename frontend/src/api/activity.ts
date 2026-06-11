@@ -1,4 +1,5 @@
 import { apiRequest } from "./client";
+import { localDateString } from "../utils/date";
 
 export type DailyActivity = {
   id?: number;
@@ -34,12 +35,15 @@ export type SaveActivityBody = {
 };
 
 function todayStr() {
-  return new Date().toISOString().slice(0, 10);
+  return localDateString();
 }
 
 type ActivityLogResponse = {
   activity_log_id: number;
   record_date: string;
+  steps: number | null;
+  exercise_minutes: number | null;
+  water_ml: number | null;
   alcohol_frequency: number | null;
   alcohol_amount: number | null;
   walking_days: number | null;
@@ -59,6 +63,9 @@ function toDailyActivity(log?: ActivityLogResponse): DailyActivity {
     activity_log_id: log.activity_log_id,
     activity_date: log.record_date,
     record_date: log.record_date,
+    steps: log.steps,
+    exercise_minutes: log.exercise_minutes,
+    water_ml: log.water_ml,
     alcohol_frequency: log.alcohol_frequency,
     alcohol_amount: log.alcohol_amount,
     walking_days: log.walking_days,
@@ -92,6 +99,19 @@ export async function getTodayActivity(token?: string) {
     { token },
   );
   return { data: toDailyActivity(response.data.items[0]) };
+}
+
+export async function getActivityLogs(query: { from?: string; to?: string; limit?: number } = {}, token?: string) {
+  const params = new URLSearchParams();
+  if (query.from) params.set("from", query.from);
+  if (query.to) params.set("to", query.to);
+  if (query.limit) params.set("limit", String(query.limit));
+  const qs = params.toString();
+  const response = await apiRequest<{ data: { items: ActivityLogResponse[] } }>(
+    `/health/activity-logs${qs ? `?${qs}` : ""}`,
+    { token },
+  );
+  return { data: response.data.items.map(toDailyActivity) };
 }
 
 export async function saveActivity(body: SaveActivityBody, token?: string) {

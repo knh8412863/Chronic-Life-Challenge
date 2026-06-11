@@ -1,13 +1,32 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { AppRoute } from "../App";
-import type { SignUpPayload } from "../api/auth";
+import { checkSignupAvailability, type SignUpPayload } from "../api/auth";
+import { ApiError } from "../api/client";
 
 interface SignUpPageProps {
   onNavigate: (route: AppRoute) => void;
 }
 
-const DISEASES = ["당뇨", "고혈압", "고지혈증", "비만", "만성신장질환"];
+const NO_MANAGED_DISEASE = "없음";
+const DISEASES = [NO_MANAGED_DISEASE, "당뇨", "고혈압", "고지혈증", "비만", "만성신장질환"];
 const SIGNUP_DRAFT_KEY = "auth.signupDraft";
+const GOOGLE_SIGNUP_DRAFT_KEY = "auth.googleSignupDraft";
+const SIGNUP_ERROR_KEY = "auth.signupError";
+
+type GoogleSignupDraft = {
+  id_token: string;
+  email: string;
+  name?: string;
+  picture?: string;
+  remember_me?: boolean;
+};
+
+type SignupDraft = Partial<SignUpPayload> & {
+  auth_provider?: "GOOGLE";
+  id_token?: string;
+  remember_me?: boolean;
+  managed_diseases?: string[];
+};
 
 function validatePassword(value: string) {
   if (value.length < 8) return "비밀번호는 8자 이상이어야 합니다.";
@@ -40,12 +59,76 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
   const [selectedDiseases, setSelectedDiseases] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [formMessage, setFormMessage] = useState("");
+  const [emailServerError, setEmailServerError] = useState("");
+  const [phoneServerError, setPhoneServerError] = useState("");
+  const [googleDraft, setGoogleDraft] = useState<GoogleSignupDraft | null>(null);
+
+  useEffect(() => {
+    const rawGoogleDraft = sessionStorage.getItem(GOOGLE_SIGNUP_DRAFT_KEY);
+    if (rawGoogleDraft) {
+      try {
+        const draft = JSON.parse(rawGoogleDraft) as GoogleSignupDraft;
+        setGoogleDraft(draft);
+        setName(draft.name ?? "");
+        setEmail(draft.email ?? "");
+        setEmailChecked(Boolean(draft.email));
+      } catch {
+        sessionStorage.removeItem(GOOGLE_SIGNUP_DRAFT_KEY);
+      }
+    }
+
+    const rawDraft = sessionStorage.getItem(SIGNUP_DRAFT_KEY);
+    if (rawDraft) {
+      try {
+        const draft = JSON.parse(rawDraft) as SignupDraft;
+        setName(draft.name ?? "");
+        setGender(draft.gender === "MALE" ? "male" : draft.gender === "FEMALE" ? "female" : "");
+        setBirthDate(draft.birth_date ?? "");
+        setPhoneNumber(draft.phone_number ?? "");
+        setEmail(draft.email ?? "");
+        setPassword(draft.password ?? "");
+        setPasswordConfirm(draft.password ?? "");
+        setSelectedDiseases(draft.managed_diseases?.length ? draft.managed_diseases : []);
+        if (draft.email) setEmailChecked(true);
+        if (draft.auth_provider === "GOOGLE" && draft.id_token) {
+          setGoogleDraft({
+            id_token: draft.id_token,
+            email: draft.email ?? "",
+            name: draft.name,
+            remember_me: draft.remember_me,
+          });
+        }
+      } catch {
+        sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+      }
+    }
+
+    const signupError = sessionStorage.getItem(SIGNUP_ERROR_KEY);
+    if (signupError) {
+      if (signupError.includes("휴대폰")) {
+        setPhoneServerError(signupError);
+      } else if (signupError.includes("이메일")) {
+        setEmailServerError(signupError);
+      } else {
+        setFormMessage(signupError);
+      }
+      sessionStorage.removeItem(SIGNUP_ERROR_KEY);
+    }
+  }, []);
 
   const toggleDisease = (d: string) => {
-    setSelectedDiseases(prev => prev.includes(d) ? prev.filter(x => x !== d) : [...prev, d]);
+    setSelectedDiseases(prev => {
+      if (d === NO_MANAGED_DISEASE) {
+        return prev.includes(NO_MANAGED_DISEASE) ? [] : [NO_MANAGED_DISEASE];
+      }
+      const withoutNone = prev.filter(x => x !== NO_MANAGED_DISEASE);
+      return withoutNone.includes(d) ? withoutNone.filter(x => x !== d) : [...withoutNone, d];
+    });
   };
 
   const handleEmailCheck = () => {
+    if (googleDraft) return;
+    setEmailServerError("");
     if (!validateEmail(email)) {
       setEmailChecked(false);
       setFormMessage("이메일 형식을 확인해주세요.");
@@ -55,8 +138,11 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
     setEmailChecked(true);
   };
 
-  const handleNext = () => {
-    const passwordError = validatePassword(password);
+  const handleNext = async () => {
+    const passwordError = googleDraft ? "" : validatePassword(password);
+    setEmailServerError("");
+    setPhoneServerError("");
+    setFormMessage("");
     if (passwordError) {
       setFormMessage(passwordError);
       return;
@@ -67,22 +153,45 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
     }
 
     setIsLoading(true);
-    const draft: SignUpPayload & { managed_diseases: string[] } = {
-      email,
-      password,
-      name,
-      gender: gender === "male" ? "MALE" : "FEMALE",
-      birth_date: birthDate,
-      phone_number: phoneNumber,
-      managed_diseases: selectedDiseases,
-    };
-    sessionStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify(draft));
-    setIsLoading(false);
-    onNavigate("/terms");
+    try {
+      await checkSignupAvailability({ email, phone_number: phoneNumber });
+
+      const draft: SignupDraft = {
+        email,
+        password: googleDraft ? undefined : password,
+        name,
+        gender: gender === "male" ? "MALE" : "FEMALE",
+        birth_date: birthDate,
+        phone_number: phoneNumber,
+        managed_diseases: selectedDiseases.includes(NO_MANAGED_DISEASE) ? [] : selectedDiseases,
+        auth_provider: googleDraft ? "GOOGLE" : undefined,
+        id_token: googleDraft?.id_token,
+        remember_me: googleDraft?.remember_me,
+      };
+      sessionStorage.setItem(SIGNUP_DRAFT_KEY, JSON.stringify(draft));
+      onNavigate("/terms");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 409) {
+        const message = String(error.detail ?? "이미 사용 중인 이메일 또는 휴대폰 번호입니다.");
+        if (message.includes("휴대폰")) {
+          setPhoneServerError(message);
+        } else if (message.includes("이메일")) {
+          setEmailServerError(message);
+        } else {
+          setFormMessage(message);
+        }
+      } else if (error instanceof ApiError && error.status === 422) {
+        setFormMessage("입력값을 확인해주세요. 이메일 또는 휴대폰 번호 형식이 올바르지 않습니다.");
+      } else {
+        setFormMessage("중복 확인에 실패했습니다. 백엔드 서버 연결 상태를 확인해주세요.");
+      }
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const pwMismatch = passwordConfirm.length > 0 && password !== passwordConfirm;
-  const passwordError = password ? validatePassword(password) : "";
+  const passwordError = googleDraft ? "" : password ? validatePassword(password) : "";
   const phoneError = phoneNumber && !validatePhoneNumber(phoneNumber);
   const isValid =
     name &&
@@ -92,10 +201,10 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
     !phoneError &&
     email &&
     emailChecked &&
-    password &&
+    (googleDraft || password) &&
     !passwordError &&
-    passwordConfirm &&
-    !pwMismatch &&
+    (googleDraft || passwordConfirm) &&
+    (googleDraft || !pwMismatch) &&
     selectedDiseases.length > 0;
 
   return (
@@ -168,9 +277,10 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
             </div>
             <div>
               <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>휴대폰 번호</label>
-              <input value={phoneNumber} onChange={e => setPhoneNumber(e.target.value)} placeholder="01012345678"
-                style={{ width: "100%", height: 34, border: `1.5px solid ${phoneError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
+              <input value={phoneNumber} onChange={e => { setPhoneNumber(e.target.value); setPhoneServerError(""); }} placeholder="01012345678"
+                style={{ width: "100%", height: 34, border: `1.5px solid ${phoneError || phoneServerError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
               {phoneError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>휴대폰 번호 형식을 확인해주세요.</p>}
+              {phoneServerError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>{phoneServerError}</p>}
             </div>
           </div>
 
@@ -178,41 +288,49 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
           <div>
             <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>이메일 (필수)</label>
             <div style={{ display: "flex", gap: 8 }}>
-              <input type="email" value={email} onChange={e => { setEmail(e.target.value); setEmailChecked(false); }} placeholder="example@email.com"
-                style={{ flex: 1, height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
-              <button onClick={handleEmailCheck}
-                style={{ height: 34, minWidth: 70, border: "1.5px solid #ddd", borderRadius: 5, background: "#f5f5f5", fontSize: 10, color: "#555", cursor: "pointer" }}>이메일 확인</button>
+              <input type="email" value={email} disabled={Boolean(googleDraft)} onChange={e => { setEmail(e.target.value); setEmailChecked(false); setEmailServerError(""); }} placeholder="example@email.com"
+                style={{ flex: 1, height: 34, border: `1.5px solid ${emailServerError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none", background: googleDraft ? "#fafafa" : "#fff" }} />
+              {!googleDraft && (
+                <button onClick={handleEmailCheck}
+                  style={{ height: 34, minWidth: 70, border: "1.5px solid #ddd", borderRadius: 5, background: "#f5f5f5", fontSize: 10, color: "#555", cursor: "pointer" }}>이메일 확인</button>
+              )}
             </div>
-            {emailChecked && <p style={{ fontSize: 11, color: "#2e7d32", margin: "4px 0 0" }}>✓ 이메일 형식이 확인되었습니다.</p>}
+            {googleDraft && <p style={{ fontSize: 11, color: "#2e7d32", margin: "4px 0 0" }}>Google 계정 이메일로 가입합니다.</p>}
+            {!googleDraft && emailChecked && <p style={{ fontSize: 11, color: "#2e7d32", margin: "4px 0 0" }}>✓ 이메일 형식이 확인되었습니다.</p>}
+            {emailServerError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>{emailServerError}</p>}
           </div>
 
           {/* 비밀번호 */}
-          <div>
-            <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>비밀번호</label>
-            <div style={{ position: "relative" }}>
-              <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
-                placeholder="영문+숫자+특수문자 조합 8자 이상"
-                style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 36px 0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
-              <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>
-                {showPw ? "🙈" : "👁"}
-              </button>
+          {!googleDraft && (
+            <div>
+              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>비밀번호</label>
+              <div style={{ position: "relative" }}>
+                <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
+                  placeholder="영문+숫자+특수문자 조합 8자 이상"
+                  style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 36px 0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
+                <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>
+                  {showPw ? "🙈" : "👁"}
+                </button>
+              </div>
+              {passwordError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>{passwordError}</p>}
             </div>
-            {passwordError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>{passwordError}</p>}
-          </div>
+          )}
 
           {/* 비밀번호 확인 */}
-          <div>
-            <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>비밀번호 확인</label>
-            <div style={{ position: "relative" }}>
-              <input type={showPwConfirm ? "text" : "password"} value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)}
-                placeholder="동일하게 입력"
-                style={{ width: "100%", height: 34, border: `1.5px solid ${pwMismatch ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
-              <button onClick={() => setShowPwConfirm(!showPwConfirm)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>
-                {showPwConfirm ? "🙈" : "👁"}
-              </button>
+          {!googleDraft && (
+            <div>
+              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>비밀번호 확인</label>
+              <div style={{ position: "relative" }}>
+                <input type={showPwConfirm ? "text" : "password"} value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)}
+                  placeholder="동일하게 입력"
+                  style={{ width: "100%", height: 34, border: `1.5px solid ${pwMismatch ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
+                <button onClick={() => setShowPwConfirm(!showPwConfirm)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>
+                  {showPwConfirm ? "🙈" : "👁"}
+                </button>
+              </div>
+              {pwMismatch && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>비밀번호가 일치하지 않습니다.</p>}
             </div>
-            {pwMismatch && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>비밀번호가 일치하지 않습니다.</p>}
-          </div>
+          )}
 
           {/* 관리 질환 선택 */}
           <div>

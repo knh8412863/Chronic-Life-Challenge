@@ -7,6 +7,7 @@ import {
   updateHealthProfile,
   type HealthProfile,
 } from "../../api/healthProfile";
+import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingState } from "../../components/common/LoadingState";
 
 const fallbackProfile: HealthProfile = {
@@ -29,14 +30,49 @@ const fallbackProfile: HealthProfile = {
 
 const DISEASE_COLORS: Record<string, string> = {
   당뇨: "pill-yellow",
+  DIABETES: "pill-yellow",
   고혈압: "pill-pink",
+  HYPERTENSION: "pill-pink",
   이상지질혈증: "pill-blue",
+  고지혈증: "pill-blue",
+  DYSLIPIDEMIA: "pill-blue",
   비만: "pill-green",
+  OBESITY: "pill-green",
   만성신장질환: "pill-violet",
+  CKD: "pill-violet",
+};
+
+const DISEASE_LABELS: Record<string, string> = {
+  DIABETES: "당뇨",
+  HYPERTENSION: "고혈압",
+  DYSLIPIDEMIA: "고지혈증",
+  OBESITY: "비만",
+  CKD: "만성신장질환",
+};
+
+const FAMILY_CONDITION_LABELS: Record<string, string> = {
+  diabetes: "당뇨",
+  DIABETES: "당뇨",
+  hypertension: "고혈압",
+  HYPERTENSION: "고혈압",
+  dyslipidemia: "고지혈증",
+  DYSLIPIDEMIA: "고지혈증",
+  ckd: "만성신장질환",
+  CKD: "만성신장질환",
+};
+
+const FAMILY_RELATION_LABELS: Record<string, string> = {
+  father: "아버지",
+  FATHER: "아버지",
+  mother: "어머니",
+  MOTHER: "어머니",
+  sibling: "형제/자매",
+  SIBLING: "형제/자매",
+  부: "아버지",
+  모: "어머니",
 };
 
 type Draft = {
-  name: string;
   height_cm: string;
   weight_kg: string;
   smoking: string;
@@ -59,8 +95,8 @@ export function HealthProfilePage({ onNavigate }: HealthProfilePageProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
   const [draft, setDraft] = useState<Draft>({
-    name: "",
     height_cm: "",
     weight_kg: "",
     smoking: "",
@@ -79,7 +115,6 @@ export function HealthProfilePage({ onNavigate }: HealthProfilePageProps) {
 
   function handleEditStart() {
     setDraft({
-      name: profile.name,
       height_cm: String(profile.height_cm ?? ""),
       weight_kg: String(profile.weight_kg ?? ""),
       smoking: profile.smoking,
@@ -95,10 +130,10 @@ export function HealthProfilePage({ onNavigate }: HealthProfilePageProps) {
   async function handleSave() {
     const token = getStoredAccessToken();
     setIsSaving(true);
+    setErrorMessage("");
     try {
-      await updateHealthProfile(
+      const response = await updateHealthProfile(
         {
-          name: draft.name || undefined,
           height_cm: draft.height_cm ? Number(draft.height_cm) : undefined,
           weight_kg: draft.weight_kg ? Number(draft.weight_kg) : undefined,
           smoking: draft.smoking || undefined,
@@ -106,33 +141,10 @@ export function HealthProfilePage({ onNavigate }: HealthProfilePageProps) {
         },
         token ?? undefined,
       );
-      // 백엔드 없는 환경: 로컬 상태만 업데이트
-      setProfile((prev) => ({
-        ...prev,
-        name: draft.name || prev.name,
-        height_cm: draft.height_cm ? Number(draft.height_cm) : prev.height_cm,
-        weight_kg: draft.weight_kg ? Number(draft.weight_kg) : prev.weight_kg,
-        bmi: draft.height_cm && draft.weight_kg
-          ? Number(calcBmi(draft.height_cm, draft.weight_kg))
-          : prev.bmi,
-        smoking: draft.smoking || prev.smoking,
-        alcohol: draft.alcohol || prev.alcohol,
-      }));
+      setProfile(response.data);
       setIsEditing(false);
     } catch {
-      // API 실패 시에도 로컬 상태 반영
-      setProfile((prev) => ({
-        ...prev,
-        name: draft.name || prev.name,
-        height_cm: draft.height_cm ? Number(draft.height_cm) : prev.height_cm,
-        weight_kg: draft.weight_kg ? Number(draft.weight_kg) : prev.weight_kg,
-        bmi: draft.height_cm && draft.weight_kg
-          ? Number(calcBmi(draft.height_cm, draft.weight_kg))
-          : prev.bmi,
-        smoking: draft.smoking || prev.smoking,
-        alcohol: draft.alcohol || prev.alcohol,
-      }));
-      setIsEditing(false);
+      setErrorMessage("건강 프로필 저장에 실패했습니다. 로그인 상태와 서버 연결을 확인해 주세요.");
     } finally {
       setIsSaving(false);
     }
@@ -160,9 +172,14 @@ export function HealthProfilePage({ onNavigate }: HealthProfilePageProps) {
             <button type="button" className="green-button" onClick={handleEditStart}>
               프로필 수정
             </button>
+            <button type="button" className="wide-subtle-button" onClick={() => onNavigate?.("/health/goal")}>
+              건강 목표 설정
+            </button>
           </div>
         )}
       </section>
+
+      {errorMessage && <ErrorState title={errorMessage} />}
 
       {/* 기본 정보 */}
       <section className="dashboard-card hp-section">
@@ -170,16 +187,7 @@ export function HealthProfilePage({ onNavigate }: HealthProfilePageProps) {
         <div className="hp-info-grid">
           <div className="hp-info-item">
             <span className="field-label">이름</span>
-            {isEditing ? (
-              <input
-                type="text"
-                className="hp-edit-input"
-                value={draft.name}
-                onChange={(e) => set("name", e.target.value)}
-              />
-            ) : (
-              <span className="hp-info-val">{profile.name}</span>
-            )}
+            <span className="hp-info-val hp-readonly">{profile.name}</span>
           </div>
           <div className="hp-info-item">
             <span className="field-label">이메일</span>
@@ -199,10 +207,11 @@ export function HealthProfilePage({ onNavigate }: HealthProfilePageProps) {
       {/* 관리 중인 만성질환 */}
       <section className="dashboard-card hp-section">
         <h2>관리 중인 만성질환</h2>
-        <p className="goal-section-note">* managed_diseases 배열 기반 표시</p>
         <div className="hp-disease-row">
           {profile.managed_diseases.map((d) => (
-            <span key={d} className={`pill ${DISEASE_COLORS[d] ?? "pill-green"}`}>{d}</span>
+            <span key={d} className={`pill ${DISEASE_COLORS[d] ?? "pill-green"}`}>
+              {DISEASE_LABELS[d] ?? d}
+            </span>
           ))}
           {profile.managed_diseases.length === 0 && (
             <span className="field-label">등록된 만성질환 없음</span>
@@ -213,7 +222,6 @@ export function HealthProfilePage({ onNavigate }: HealthProfilePageProps) {
       {/* 신체 정보 */}
       <section className="dashboard-card hp-section">
         <h2>신체 정보</h2>
-        <p className="goal-section-note">* user_profiles 테이블 기준</p>
         <div className="hp-body-grid">
           <div className="hp-body-item">
             <span className="field-label">신장</span>
@@ -269,16 +277,14 @@ export function HealthProfilePage({ onNavigate }: HealthProfilePageProps) {
       {/* 가족력 */}
       <section className="dashboard-card hp-section">
         <h2>가족력</h2>
-        <p className="goal-section-note">
-          * chronic_health_inputs 테이블 기준 (diabetes/hypertension/dyslipidemia/ckd)
-        </p>
         {profile.family_history.length === 0 ? (
-          <p className="field-label">가족력이 없으면 모두 비활성화 상태로 표시</p>
+          <p className="field-label">등록된 가족력 없음</p>
         ) : (
           <div className="hp-family-grid">
             {profile.family_history.map((fh, i) => (
               <div key={i} className="hp-family-item">
-                {fh.condition}{fh.relation ? ` (${fh.relation})` : ""}
+                {FAMILY_CONDITION_LABELS[fh.condition] ?? fh.condition}
+                {fh.relation ? ` (${FAMILY_RELATION_LABELS[fh.relation] ?? fh.relation})` : ""}
               </div>
             ))}
           </div>

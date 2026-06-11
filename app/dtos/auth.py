@@ -29,6 +29,14 @@ class SignUpRequest(BaseModel):
         return self
 
 
+class SignUpAvailabilityRequest(BaseModel):
+    email: Annotated[
+        EmailStr,
+        Field(None, max_length=40),
+    ]
+    phone_number: Annotated[str, AfterValidator(validate_phone_number)]
+
+
 class LoginRequest(BaseModel):
     email: EmailStr
     password: Annotated[str, Field(min_length=8)]
@@ -40,6 +48,30 @@ class LoginResponse(BaseModel):
 
 
 class TokenRefreshResponse(LoginResponse): ...
+
+
+class GoogleLoginRequest(BaseModel):
+    id_token: str
+    remember_me: bool = False
+
+
+class GoogleRegistrationRequest(BaseModel):
+    id_token: str
+    name: Annotated[str, Field(max_length=20)]
+    gender: Gender
+    birth_date: Annotated[date, AfterValidator(validate_birthday)]
+    phone_number: Annotated[str, AfterValidator(validate_phone_number)]
+    consent_terms_version: str = "v1.0"
+    consent_privacy_agreed: bool = True
+    consent_health_data: bool = True
+    consent_marketing: bool = False
+    remember_me: bool = False
+
+    @model_validator(mode="after")
+    def validate_required_consents(self):
+        if not self.consent_privacy_agreed or not self.consent_health_data:
+            raise ValueError("필수 약관 동의가 필요합니다.")
+        return self
 
 
 class PasswordResetRequest(BaseModel):

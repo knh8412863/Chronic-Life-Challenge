@@ -151,16 +151,6 @@ export default function ReportListPage({ onNavigate }: Props) {
 
       {reports.length > 0 && (
         <>
-          <div style={{ marginBottom: 20 }}>
-            <button
-              type="button"
-              onClick={() => handleExport(current?.report?.report_id)}
-              style={{ padding: "8px 16px", border: "1.5px solid #ccc", borderRadius: 6, background: "#fff", fontSize: 13, cursor: "pointer", color: "#333" }}
-            >
-              내보내기
-            </button>
-          </div>
-
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
             {reports.map((report) => (
               <div key={report.report_id} style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 16, boxShadow: "0 1px 4px rgba(0,0,0,0.05)" }}>

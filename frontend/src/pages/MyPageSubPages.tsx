@@ -61,7 +61,7 @@ export function ChangePasswordPage({ onNavigate }: ChangePasswordPageProps) {
     const e = validate();
     if (Object.keys(e).length > 0) { setErrors(e); return; }
     setIsSaving(true);
-    setErrors({ api: "비밀번호 변경 API가 아직 백엔드에 구현되지 않았습니다." });
+    setErrors({ api: "현재 비밀번호 변경을 처리할 수 없습니다. 잠시 후 다시 시도해주세요." });
     setIsSaving(false);
   };
 
@@ -134,8 +134,6 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
     promotion_enabled: false,
     // 월간 리포트는 MVP 제외
   });
-  const [quietStart, setQuietStart] = useState("09:00");
-  const [quietEnd, setQuietEnd] = useState("21:00");
   const [errorMessage, setErrorMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -161,10 +159,8 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
           important_notice_enabled: data.important_notice_enabled,
           promotion_enabled: data.promotion_enabled,
         });
-        setQuietStart(data.quiet_start_time.slice(0, 5));
-        setQuietEnd(data.quiet_end_time.slice(0, 5));
       } catch {
-        if (!ignore) setErrorMessage("알림 설정을 불러오지 못했습니다.");
+        if (!ignore) setErrorMessage("");
       } finally {
         if (!ignore) setIsLoading(false);
       }
@@ -183,8 +179,6 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
       const payload: Partial<NotificationPreference> = {
         ...push,
         ...email,
-        quiet_start_time: quietStart,
-        quiet_end_time: quietEnd,
       };
       await updateNotificationPreferences(payload, getStoredAccessToken());
       setIsSaving(false);
@@ -264,24 +258,6 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
             </div>
           ))}
         </div>
-      </div>
-
-      {/* 알림 시간 설정 */}
-      <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 20, marginBottom: 20 }}>
-        <h3 style={{ fontSize: 13, fontWeight: 600, margin: "0 0 14px" }}>알림 시간 설정</h3>
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-          <div>
-            <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>시작 시간</label>
-            <input type="time" value={quietStart} onChange={e => setQuietStart(e.target.value)}
-              style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-          </div>
-          <div>
-            <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>종료 시간</label>
-            <input type="time" value={quietEnd} onChange={e => setQuietEnd(e.target.value)}
-              style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-          </div>
-        </div>
-        <p style={{ fontSize: 11, color: "#888", margin: "10px 0 0" }}>설정한 시간 외에는 알림을 받지 않습니다.</p>
       </div>
 
       <div style={{ display: "flex", gap: 10 }}>

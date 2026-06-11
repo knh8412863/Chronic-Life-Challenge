@@ -8,10 +8,13 @@ from app.core import config
 from app.core.config import Env
 from app.dependencies.security import get_request_user
 from app.dtos.auth import (
+    GoogleLoginRequest,
+    GoogleRegistrationRequest,
     LoginRequest,
     LoginResponse,
     PasswordResetConfirmRequest,
     PasswordResetRequest,
+    SignUpAvailabilityRequest,
     SignUpRequest,
     TokenRefreshResponse,
 )
@@ -20,6 +23,40 @@ from app.services.auth import AuthService
 from app.services.jwt import JwtService
 
 auth_router = APIRouter(prefix="/auth", tags=["auth"])
+
+
+def set_refresh_token_cookie(resp: JSONResponse, refresh_token: str, remember_me: bool) -> None:
+    cookie_options = {
+        "key": "refresh_token",
+        "value": refresh_token,
+        "httponly": True,
+        "secure": config.ENV == Env.PROD,
+        "domain": config.COOKIE_DOMAIN or None,
+        "samesite": "lax",
+        "path": "/",
+    }
+    if remember_me:
+        cookie_options["max_age"] = config.REFRESH_TOKEN_EXPIRE_MINUTES * 60
+
+    resp.set_cookie(**cookie_options)
+
+
+@auth_router.post("/signup-availability", status_code=status.HTTP_204_NO_CONTENT)
+async def check_signup_availability(
+    request: SignUpAvailabilityRequest,
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> Response:
+    await auth_service.check_signup_availability(request)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@auth_router.get("/email-availability", status_code=status.HTTP_204_NO_CONTENT)
+async def check_email_availability(
+    email: str,
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> Response:
+    await auth_service.check_email_exists(email)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @auth_router.post("/signup", status_code=status.HTTP_201_CREATED)
@@ -31,6 +68,14 @@ async def signup(
     return JSONResponse(
         content={"detail": "회원가입이 성공적으로 완료되었습니다."}, status_code=status.HTTP_201_CREATED
     )
+
+
+@auth_router.post("/registrations", status_code=status.HTTP_201_CREATED)
+async def register(
+    request: SignUpRequest,
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> JSONResponse:
+    return await signup(request, auth_service)
 
 
 @auth_router.post("/login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
@@ -45,20 +90,59 @@ async def login(
     resp = JSONResponse(
         content=LoginResponse(access_token=str(tokens["access_token"])).model_dump(), status_code=status.HTTP_200_OK
     )
-    cookie_options = {
-        "key": "refresh_token",
-        "value": str(tokens["refresh_token"]),
-        "httponly": True,
-        "secure": config.ENV == Env.PROD,
-        "domain": config.COOKIE_DOMAIN or None,
-        "samesite": "lax",
-        "path": "/",
-    }
-    if request.remember_me:
-        cookie_options["max_age"] = config.REFRESH_TOKEN_EXPIRE_MINUTES * 60
-
-    resp.set_cookie(**cookie_options)
+    set_refresh_token_cookie(resp, str(tokens["refresh_token"]), request.remember_me)
     return resp
+
+
+@auth_router.post("/sessions", response_model=LoginResponse, status_code=status.HTTP_200_OK)
+async def create_session(
+    request: LoginRequest,
+    http_request: Request,
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> JSONResponse:
+    return await login(request, http_request, auth_service)
+
+
+@auth_router.post("/google-login", response_model=LoginResponse, status_code=status.HTTP_200_OK)
+async def google_login(
+    request: GoogleLoginRequest,
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> JSONResponse:
+    user = await auth_service.authenticate_google(request.id_token)
+    tokens = await auth_service.login(user)
+    resp = JSONResponse(
+        content=LoginResponse(access_token=str(tokens["access_token"])).model_dump(), status_code=status.HTTP_200_OK
+    )
+    set_refresh_token_cookie(resp, str(tokens["refresh_token"]), request.remember_me)
+    return resp
+
+
+@auth_router.post("/oauth-sessions/google", response_model=LoginResponse, status_code=status.HTTP_200_OK)
+async def create_google_session(
+    request: GoogleLoginRequest,
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> JSONResponse:
+    return await google_login(request, auth_service)
+
+
+@auth_router.post("/google-registrations", response_model=LoginResponse, status_code=status.HTTP_201_CREATED)
+async def google_registration(
+    request: GoogleRegistrationRequest,
+    auth_service: Annotated[AuthService, Depends(AuthService)],
+) -> JSONResponse:
+    user = await auth_service.signup_google(request)
+    tokens = await auth_service.login(user)
+    resp = JSONResponse(
+        content=LoginResponse(access_token=str(tokens["access_token"])).model_dump(),
+        status_code=status.HTTP_201_CREATED,
+    )
+    set_refresh_token_cookie(resp, str(tokens["refresh_token"]), request.remember_me)
+    return resp
+
+
+@auth_router.post("/sessions/current", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_current_session_alias() -> Response:
+    return await logout()
 
 
 @auth_router.delete("/sessions/current", status_code=status.HTTP_204_NO_CONTENT)
@@ -122,3 +206,11 @@ async def token_refresh(
     return JSONResponse(
         content=TokenRefreshResponse(access_token=str(access_token)).model_dump(), status_code=status.HTTP_200_OK
     )
+
+
+@auth_router.post("/access-tokens", response_model=TokenRefreshResponse, status_code=status.HTTP_200_OK)
+async def create_access_token(
+    jwt_service: Annotated[JwtService, Depends(JwtService)],
+    refresh_token: Annotated[str | None, Cookie()] = None,
+) -> JSONResponse:
+    return await token_refresh(jwt_service, refresh_token)

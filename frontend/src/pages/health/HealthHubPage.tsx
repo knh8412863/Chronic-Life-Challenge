@@ -27,7 +27,7 @@ const HUB_ITEMS: HubItem[] = [
     icon: "💉",
   },
   {
-    title: "혈압/혈당 입력",
+    title: "건강 수치 기록",
     description: "혈압·혈당·지질·신장 수치를 새로 기록합니다.",
     route: "/health/vitals/input",
     icon: "📝",

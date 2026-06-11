@@ -43,6 +43,7 @@ export type Challenge = {
   goal_description?: string;
   how_to_join?: string[];
   icon_emoji?: string;
+  is_joined?: boolean;
 };
 
 export type MyChallenge = {
@@ -281,6 +282,7 @@ function mapChallenge(summary: ApiChallengeSummary | ApiChallengeDetail): Challe
     goal_description: `${targetMetricLabel(summary.target_metric)} 목표 ${summary.goal_value}을 ${summary.duration_days}일 동안 실천합니다.`,
     how_to_join: detail.how_to_join,
     icon_emoji: categoryIcon(summary.category),
+    is_joined: summary.is_joined,
   };
 }
 

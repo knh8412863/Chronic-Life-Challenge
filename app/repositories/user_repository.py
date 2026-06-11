@@ -6,7 +6,7 @@ from pydantic import EmailStr
 from app.core import config
 from app.models.users import Gender, User
 
-ALLOWED_UPDATE_FIELDS = ["name", "phone_number", "gender", "birthday"]
+ALLOWED_UPDATE_FIELDS = ["name", "phone_number", "gender", "birthday", "profile_image_url"]
 UPDATED_AT_FIELD = "updated_at"
 
 
@@ -31,6 +31,10 @@ class UserRepository:
         *,
         is_active: bool = True,
         is_admin: bool = False,
+        is_email_verified: bool = False,
+        auth_provider: str = "LOCAL",
+        google_sub: str | None = None,
+        profile_image_url: str | None = None,
     ) -> User:
         return await self._model.create(
             email=email,
@@ -41,10 +45,17 @@ class UserRepository:
             birthday=birthday,
             is_active=is_active,
             is_admin=is_admin,
+            is_email_verified=is_email_verified,
+            auth_provider=auth_provider,
+            google_sub=google_sub,
+            profile_image_url=profile_image_url,
         )
 
     async def get_user_by_email(self, email: str) -> User | None:
         return await self._model.get_or_none(email=email)
+
+    async def get_user_by_google_sub(self, google_sub: str) -> User | None:
+        return await self._model.get_or_none(google_sub=google_sub)
 
     async def exists_by_email(self, email: str) -> bool:
         return await self._model.filter(email=email).exists()
@@ -65,6 +76,28 @@ class UserRepository:
         await self._model.filter(id=user_id).update(
             is_email_verified=True,
             updated_at=datetime.now(config.TIMEZONE),
+        )
+
+    async def link_google_account(
+        self,
+        user: User,
+        google_sub: str,
+        profile_image_url: str | None = None,
+    ) -> None:
+        user.auth_provider = "GOOGLE"
+        user.google_sub = google_sub
+        user.is_email_verified = True
+        if profile_image_url and not user.profile_image_url:
+            user.profile_image_url = profile_image_url
+        user.updated_at = datetime.now(config.TIMEZONE)
+        await user.save(
+            update_fields=[
+                "auth_provider",
+                "google_sub",
+                "is_email_verified",
+                "profile_image_url",
+                "updated_at",
+            ]
         )
 
     async def update_instance(self, user: User, data: dict[str, Any]) -> None:

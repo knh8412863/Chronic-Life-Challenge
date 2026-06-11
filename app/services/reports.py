@@ -1,3 +1,7 @@
+import base64
+import csv
+import io
+import json
 from datetime import date, datetime, time, timedelta
 
 from fastapi import HTTPException, status
@@ -6,6 +10,7 @@ from app.core import config, default_logger
 from app.dtos.reports import (
     CurrentWeeklyReportResponse,
     WeeklyReportChallengeSummaryResponse,
+    WeeklyReportExportResponse,
     WeeklyReportGenerateRequest,
     WeeklyReportListItemResponse,
     WeeklyReportMetricSummaryResponse,
@@ -27,6 +32,7 @@ from app.models.predictions import (
 )
 from app.models.reports import WeeklyReport
 from app.models.users import User
+from app.services.email import EmailService
 from app.services.llm_advice import OPENAI_PROVIDER
 from app.services.llm_report import OpenAIReportClient, ReportLLMError, ReportLLMResult
 
@@ -103,6 +109,52 @@ class WeeklyReportService:
     async def get_reports(self, user: User, limit: int = 20) -> list[WeeklyReportListItemResponse]:
         reports = await WeeklyReport.filter(user_id=user.id).order_by("-week_start_date").limit(limit)
         return [self._to_list_item(report) for report in reports]
+
+    async def export_report(
+        self,
+        user: User,
+        report_id: int,
+        export_format: str,
+        send_email: bool = False,
+    ) -> WeeklyReportExportResponse:
+        report = await WeeklyReport.get_or_none(id=report_id, user_id=user.id)
+        if report is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="주간 리포트를 찾을 수 없습니다.")
+
+        normalized_format = export_format.upper()
+        content_encoding = "TEXT"
+        if normalized_format == "CSV":
+            content = self._to_csv_content(report)
+            content_type = "text/csv;charset=utf-8"
+            extension = "csv"
+        elif normalized_format == "JSON":
+            content = json.dumps(self._export_payload(report), ensure_ascii=False, indent=2, default=str)
+            content_type = "application/json;charset=utf-8"
+            extension = "json"
+        elif normalized_format == "PDF":
+            content = base64.b64encode(self._to_pdf_content(report)).decode("ascii")
+            content_type = "application/pdf"
+            content_encoding = "BASE64"
+            extension = "pdf"
+        else:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="지원하지 않는 내보내기 형식입니다."
+            )
+
+        file_name = f"weekly_report_{report.week_start_date}_{report.id}.{extension}"
+        emailed = False
+        if send_email:
+            await EmailService().send_report_export(user.email, file_name, content, content_type, content_encoding)
+            emailed = True
+
+        return WeeklyReportExportResponse(
+            report_id=report.id,
+            file_name=file_name,
+            content_type=content_type,
+            content=content,
+            content_encoding=content_encoding,
+            emailed=emailed,
+        )
 
     @staticmethod
     async def _build_source_summary(user_id: int, week_start: date, week_end: date) -> dict[str, int]:
@@ -419,6 +471,120 @@ class WeeklyReportService:
             overall_status=WeeklyReportService._overall_status(report.summary_cards),
             created_at=report.created_at,
         )
+
+    @staticmethod
+    def _export_payload(report: WeeklyReport) -> dict:
+        return {
+            "report_id": report.id,
+            "week_start_date": report.week_start_date,
+            "week_end_date": report.week_end_date,
+            "status": report.status,
+            "report_text": report.report_text,
+            "source_summary": report.source_summary,
+            "summary_cards": report.summary_cards,
+            "metric_summaries": report.metric_summaries,
+            "trend_summary": report.trend_summary,
+            "challenge_summary": report.challenge_summary,
+            "provider": report.provider,
+            "model_name": report.model_name,
+            "created_at": report.created_at,
+        }
+
+    @staticmethod
+    def _to_csv_content(report: WeeklyReport) -> str:
+        buffer = io.StringIO()
+        writer = csv.writer(buffer)
+        writer.writerow(["항목", "값"])
+        writer.writerow(["리포트 ID", report.id])
+        writer.writerow(["기간", f"{report.week_start_date} ~ {report.week_end_date}"])
+        writer.writerow(["상태", report.status])
+        writer.writerow(["생성 방식", report.provider])
+        writer.writerow(["모델", report.model_name])
+        writer.writerow(["리포트 본문", report.report_text])
+        writer.writerow([])
+        writer.writerow(["요약 카드", "값", "상태", "설명"])
+        for card in report.summary_cards:
+            writer.writerow([card.get("label"), card.get("value"), card.get("status"), card.get("description")])
+        writer.writerow([])
+        writer.writerow(["지표", "값", "단위", "상태", "설명"])
+        for metric in report.metric_summaries:
+            writer.writerow(
+                [
+                    metric.get("label"),
+                    metric.get("value"),
+                    metric.get("unit"),
+                    metric.get("status"),
+                    metric.get("description"),
+                ]
+            )
+        return buffer.getvalue()
+
+    @staticmethod
+    def _to_pdf_content(report: WeeklyReport) -> bytes:
+        lines = [
+            "All4Health Weekly Report",
+            f"Report ID: {report.id}",
+            f"Period: {report.week_start_date} ~ {report.week_end_date}",
+            f"Status: {report.status}",
+            f"Provider: {report.provider}",
+            "",
+            "Report Text",
+            report.report_text,
+            "",
+            "Summary Cards",
+            *[f"- {card.get('label')}: {card.get('value')} ({card.get('status')})" for card in report.summary_cards],
+            "",
+            "Metric Summaries",
+            *[
+                f"- {metric.get('label')}: {metric.get('value')}{metric.get('unit') or ''} ({metric.get('status')})"
+                for metric in report.metric_summaries
+            ],
+        ]
+        return WeeklyReportService._simple_pdf(lines)
+
+    @staticmethod
+    def _simple_pdf(lines: list[str]) -> bytes:
+        def to_hex_text(value: str) -> str:
+            return value.encode("utf-16-be", errors="replace").hex().upper()
+
+        text_commands = ["BT", "/F1 11 Tf", "50 790 Td", "14 TL"]
+        for line in lines[:46]:
+            text_commands.append(f"<{to_hex_text(line)}> Tj")
+            text_commands.append("T*")
+        text_commands.append("ET")
+        stream = "\n".join(text_commands).encode("ascii")
+
+        objects = [
+            b"<< /Type /Catalog /Pages 2 0 R >>",
+            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] "
+            b"/Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>",
+            b"<< /Type /Font /Subtype /Type0 /BaseFont /HYGoThic-Medium /Encoding /UniKS-UCS2-H "
+            b"/DescendantFonts [5 0 R] >>",
+            b"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HYGoThic-Medium "
+            b"/CIDSystemInfo << /Registry (Adobe) /Ordering (Korea1) /Supplement 2 >> "
+            b"/FontDescriptor 6 0 R >>",
+            b"<< /Type /FontDescriptor /FontName /HYGoThic-Medium /Flags 4 /FontBBox [0 -200 1000 900] "
+            b"/ItalicAngle 0 /Ascent 900 /Descent -200 /CapHeight 700 /StemV 80 >>",
+            b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
+        ]
+
+        output = bytearray(b"%PDF-1.4\n")
+        offsets = [0]
+        for index, obj in enumerate(objects, start=1):
+            offsets.append(len(output))
+            output.extend(f"{index} 0 obj\n".encode("ascii"))
+            output.extend(obj)
+            output.extend(b"\nendobj\n")
+        xref_offset = len(output)
+        output.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
+        output.extend(b"0000000000 65535 f \n")
+        for offset in offsets[1:]:
+            output.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
+        output.extend(
+            f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+        )
+        return bytes(output)
 
     @staticmethod
     def _summary_text(report_text: str, max_length: int = 80) -> str:
