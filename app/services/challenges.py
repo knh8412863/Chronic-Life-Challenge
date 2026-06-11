@@ -22,7 +22,7 @@ from app.dtos.challenges import (
     ChallengeWeeklyLeaderboardResponse,
     MyChallengeResponse,
 )
-from app.models.challenges import Challenge, ChallengeCheckin, ChallengeParticipation
+from app.models.challenges import Challenge, ChallengeCheckin, ChallengeLeaderboard, ChallengeParticipation, UserBadge
 from app.models.users import User
 
 DEFAULT_CHALLENGES = [
@@ -57,6 +57,27 @@ DEFAULT_CHALLENGES = [
         "target_metric": "EXERCISE",
         "goal_value": 30,
         "duration_days": 21,
+    },
+]
+
+BADGE_DEFINITIONS = [
+    {
+        "badge_type": "STREAK_3",
+        "badge_name": "3일 연속 성공",
+        "target_streak": 3,
+        "bonus_points": 3,
+    },
+    {
+        "badge_type": "STREAK_7",
+        "badge_name": "7일 연속 성공",
+        "target_streak": 7,
+        "bonus_points": 5,
+    },
+    {
+        "badge_type": "STREAK_30",
+        "badge_name": "30일 연속 성공",
+        "target_streak": 30,
+        "bonus_points": 10,
     },
 ]
 
@@ -188,12 +209,14 @@ class ChallengeService:
             .order_by("-created_at")
             .prefetch_related("challenge", "checkins")
         )
+        earned_badge_count = await UserBadge.filter(user_id=user.id).count()
 
-        return self._build_dashboard_summary(participations, today, week_start, week_end)
+        return self._build_dashboard_summary(participations, today, week_start, week_end, earned_badge_count)
 
     async def get_badges(self, user: User, badge_filter: str = "ALL") -> ChallengeBadgeListResponse:
         checkins = await ChallengeCheckin.filter(user_id=user.id).order_by("-checkin_date", "-created_at")
-        return self._build_badge_list(checkins, date.today(), badge_filter)
+        badges = await UserBadge.filter(user_id=user.id).order_by("-earned_at").all()
+        return self._build_badge_list(checkins, date.today(), badge_filter, badges)
 
     async def get_weekly_leaderboard(
         self,
@@ -203,17 +226,19 @@ class ChallengeService:
     ) -> ChallengeWeeklyLeaderboardResponse:
         target_week_start = week_start or self._current_week_start(date.today())
         week_end = target_week_start + timedelta(days=6)
-        checkins = (
-            await ChallengeCheckin.filter(checkin_date__gte=target_week_start, checkin_date__lte=week_end)
-            .prefetch_related("user")
-            .all()
+        await self._rebuild_weekly_leaderboard(target_week_start)
+        entries = (
+            await ChallengeLeaderboard.filter(week_start_date=target_week_start)
+            .order_by("rank_no", "-total_points", "user_id")
+            .limit(limit)
         )
+        my_entry = await ChallengeLeaderboard.get_or_none(user_id=user.id, week_start_date=target_week_start)
         return self._build_weekly_leaderboard(
-            checkins=checkins,
+            entries=entries,
+            my_entry=my_entry,
             current_user_id=user.id,
             week_start=target_week_start,
             week_end=week_end,
-            limit=limit,
         )
 
     async def checkin_today(
@@ -251,6 +276,9 @@ class ChallengeService:
                 participation.status = ChallengeParticipationStatus.COMPLETED.value
                 participation.completed_at = checkin.created_at
             await participation.save(update_fields=["progress_count", "status", "completed_at", "updated_at"])
+            current_streak = await self._current_user_streak(user.id, today)
+            await self._award_streak_badges(user=user, challenge=participation.challenge, current_streak=current_streak)
+            await self._upsert_weekly_leaderboard(user=user, week_start=self._current_week_start(today))
 
         return self._to_checkin_response(checkin, participation)
 
@@ -362,6 +390,7 @@ class ChallengeService:
         today: date,
         week_start: date,
         week_end: date,
+        earned_badge_count: int = 0,
     ) -> ChallengeDashboardSummaryResponse:
         active_participations = [
             item for item in participations if item.status == ChallengeParticipationStatus.JOINED.value
@@ -386,6 +415,7 @@ class ChallengeService:
             weekly_completion_rate=weekly_completion_rate,
             current_streak_days=ChallengeService._current_streak_days(checkin_dates, today),
             completed_mission_count=completed_mission_count,
+            earned_badge_count=earned_badge_count,
             today_missions=ChallengeService._build_today_missions(active_participations, today),
             weekly_activity=weekly_activity,
         )
@@ -556,35 +586,19 @@ class ChallengeService:
         checkins: list[ChallengeCheckin],
         today: date,
         badge_filter: str,
+        earned_badges: list[UserBadge] | None = None,
     ) -> ChallengeBadgeListResponse:
         checkin_dates = {checkin.checkin_date for checkin in checkins}
         current_streak = ChallengeService._current_streak_days(checkin_dates, today)
-        latest_by_date = {}
-        for checkin in checkins:
-            latest_by_date.setdefault(checkin.checkin_date, checkin.created_at)
+        earned_by_type = {badge.badge_type: badge for badge in earned_badges or []}
 
         items = [
             ChallengeService._build_badge_item(
-                badge_type="STREAK_3",
-                badge_name="3일 연속 성공",
-                target_streak=3,
+                definition=definition,
                 current_streak=current_streak,
-                earned_at=latest_by_date.get(today) if current_streak >= 3 else None,
-            ),
-            ChallengeService._build_badge_item(
-                badge_type="STREAK_7",
-                badge_name="7일 연속 성공",
-                target_streak=7,
-                current_streak=current_streak,
-                earned_at=latest_by_date.get(today) if current_streak >= 7 else None,
-            ),
-            ChallengeService._build_badge_item(
-                badge_type="STREAK_30",
-                badge_name="30일 연속 성공",
-                target_streak=30,
-                current_streak=current_streak,
-                earned_at=latest_by_date.get(today) if current_streak >= 30 else None,
-            ),
+                earned_badge=earned_by_type.get(definition["badge_type"]),
+            )
+            for definition in BADGE_DEFINITIONS
         ]
 
         filtered_items = ChallengeService._filter_badges(items, badge_filter)
@@ -598,21 +612,20 @@ class ChallengeService:
 
     @staticmethod
     def _build_badge_item(
-        badge_type: str,
-        badge_name: str,
-        target_streak: int,
+        definition: dict,
         current_streak: int,
-        earned_at: object | None,
+        earned_badge: UserBadge | None,
     ) -> ChallengeBadgeItemResponse:
+        target_streak = definition["target_streak"]
         return ChallengeBadgeItemResponse(
-            badge_id=badge_type.lower(),
-            badge_name=badge_name,
-            badge_type=badge_type,
-            is_earned=current_streak >= target_streak,
+            badge_id=definition["badge_type"].lower(),
+            badge_name=definition["badge_name"],
+            badge_type=definition["badge_type"],
+            is_earned=earned_badge is not None,
             current_streak=current_streak,
             target_streak=target_streak,
             progress_rate=round(min(current_streak / target_streak, 1.0) * 100, 1),
-            earned_at=earned_at,
+            earned_at=earned_badge.earned_at if earned_badge else None,
         )
 
     @staticmethod
@@ -626,31 +639,16 @@ class ChallengeService:
 
     @staticmethod
     def _build_weekly_leaderboard(
-        checkins: list[ChallengeCheckin],
+        entries: list[ChallengeLeaderboard],
+        my_entry: ChallengeLeaderboard | None,
         current_user_id: int,
         week_start: date,
         week_end: date,
-        limit: int,
     ) -> ChallengeWeeklyLeaderboardResponse:
-        stats = {}
-        for checkin in checkins:
-            user_id = checkin.user.id
-            if user_id not in stats:
-                stats[user_id] = {
-                    "user_id": user_id,
-                    "name": checkin.user.name,
-                    "completed_mission_count": 0,
-                }
-            stats[user_id]["completed_mission_count"] += 1
-
-        ranked = sorted(
-            stats.values(),
-            key=lambda item: (-item["completed_mission_count"], item["user_id"]),
-        )
-        items = [
-            ChallengeService._build_leaderboard_item(rank=rank, item=item) for rank, item in enumerate(ranked, start=1)
-        ]
+        items = [ChallengeService._build_leaderboard_item(entry) for entry in entries]
         my_item = next((item for item in items if item.user_id == current_user_id), None)
+        if my_item is None and my_entry is not None:
+            my_item = ChallengeService._build_leaderboard_item(my_entry)
 
         return ChallengeWeeklyLeaderboardResponse(
             week_start=week_start,
@@ -661,18 +659,17 @@ class ChallengeService:
                 score=my_item.score if my_item else 0,
                 completed_mission_count=my_item.completed_mission_count if my_item else 0,
             ),
-            items=items[:limit],
+            items=items,
         )
 
     @staticmethod
-    def _build_leaderboard_item(rank: int, item: dict) -> ChallengeLeaderboardItemResponse:
-        completed_mission_count = item["completed_mission_count"]
+    def _build_leaderboard_item(entry: ChallengeLeaderboard) -> ChallengeLeaderboardItemResponse:
         return ChallengeLeaderboardItemResponse(
-            rank=rank,
-            user_id=item["user_id"],
-            nickname_masked=ChallengeService._mask_name(item["name"]),
-            score=completed_mission_count * 10,
-            completed_mission_count=completed_mission_count,
+            rank=entry.rank_no or 0,
+            user_id=entry.user_id,
+            nickname_masked=entry.nickname_masked,
+            score=entry.total_points,
+            completed_mission_count=entry.completed_mission_count,
         )
 
     @staticmethod
@@ -688,6 +685,57 @@ class ChallengeService:
     @staticmethod
     def _current_week_start(today: date) -> date:
         return today - timedelta(days=today.weekday())
+
+    @staticmethod
+    async def _current_user_streak(user_id: int, today: date) -> int:
+        checkins = await ChallengeCheckin.filter(user_id=user_id, checkin_date__lte=today).values("checkin_date")
+        return ChallengeService._current_streak_days({row["checkin_date"] for row in checkins}, today)
+
+    @staticmethod
+    async def _award_streak_badges(user: User, challenge: Challenge, current_streak: int) -> None:
+        for definition in BADGE_DEFINITIONS:
+            if current_streak < definition["target_streak"]:
+                continue
+            await UserBadge.get_or_create(
+                user_id=user.id,
+                challenge_id=challenge.id,
+                badge_type=definition["badge_type"],
+                defaults={
+                    "badge_name": definition["badge_name"],
+                    "badge_description": f"{definition['target_streak']}일 연속 챌린지 미션 달성",
+                    "target_streak": definition["target_streak"],
+                    "bonus_points": definition["bonus_points"],
+                },
+            )
+
+    @staticmethod
+    async def _upsert_weekly_leaderboard(user: User, week_start: date) -> None:
+        week_end = week_start + timedelta(days=6)
+        completed_mission_count = await ChallengeCheckin.filter(
+            user_id=user.id,
+            checkin_date__gte=week_start,
+            checkin_date__lte=week_end,
+        ).count()
+        await ChallengeLeaderboard.update_or_create(
+            defaults={
+                "nickname_masked": ChallengeService._mask_name(user.name),
+                "total_points": completed_mission_count * 10,
+                "completed_mission_count": completed_mission_count,
+            },
+            user_id=user.id,
+            week_start_date=week_start,
+        )
+        await ChallengeService._rebuild_weekly_leaderboard(week_start)
+
+    @staticmethod
+    async def _rebuild_weekly_leaderboard(week_start: date) -> None:
+        entries = await ChallengeLeaderboard.filter(week_start_date=week_start).order_by(
+            "-total_points", "-completed_mission_count", "user_id"
+        )
+        for rank, entry in enumerate(entries, start=1):
+            if entry.rank_no != rank:
+                entry.rank_no = rank
+                await entry.save(update_fields=["rank_no", "updated_at"])
 
     @staticmethod
     def _completion_rate(progress_count: int, duration_days: int) -> float:

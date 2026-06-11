@@ -48,3 +48,39 @@ class ChallengeCheckin(models.Model):
     class Meta:
         table = "challenge_checkins"
         unique_together = (("participation", "checkin_date"),)
+
+
+class UserBadge(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="challenge_badges", on_delete=fields.CASCADE)
+    challenge = fields.ForeignKeyField(
+        "models.Challenge",
+        related_name="earned_badges",
+        on_delete=fields.CASCADE,
+        null=True,
+    )
+    badge_name = fields.CharField(max_length=100)
+    badge_description = fields.CharField(max_length=255, null=True)
+    badge_type = fields.CharField(max_length=20)
+    target_streak = fields.IntField()
+    bonus_points = fields.IntField()
+    earned_at = fields.DatetimeField(auto_now_add=True)
+
+    class Meta:
+        table = "user_badges"
+        unique_together = (("user", "badge_type", "challenge"),)
+
+
+class ChallengeLeaderboard(models.Model):
+    id = fields.BigIntField(primary_key=True)
+    user = fields.ForeignKeyField("models.User", related_name="challenge_leaderboards", on_delete=fields.CASCADE)
+    week_start_date = fields.DateField()
+    nickname_masked = fields.CharField(max_length=50)
+    total_points = fields.IntField(default=0)
+    completed_mission_count = fields.IntField(default=0)
+    rank_no = fields.IntField(null=True)
+    updated_at = fields.DatetimeField(auto_now=True)
+
+    class Meta:
+        table = "challenge_leaderboards"
+        unique_together = (("user", "week_start_date"),)

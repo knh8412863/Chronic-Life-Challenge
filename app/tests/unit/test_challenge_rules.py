@@ -160,8 +160,11 @@ def test_challenge_badges_use_current_streak_progress():
         SimpleNamespace(checkin_date=date(2026, 6, 4), created_at=datetime(2026, 6, 4, 9, 0)),
         SimpleNamespace(checkin_date=date(2026, 6, 3), created_at=datetime(2026, 6, 3, 9, 0)),
     ]
+    earned_badges = [
+        SimpleNamespace(badge_type="STREAK_3", earned_at=datetime(2026, 6, 5, 9, 0)),
+    ]
 
-    result = ChallengeService._build_badge_list(checkins, today, "ALL")
+    result = ChallengeService._build_badge_list(checkins, today, "ALL", earned_badges)
 
     assert result.earned_count == 1
     assert result.total_completion_rate == 33.3
@@ -186,19 +189,18 @@ def test_challenge_badges_can_be_filtered_by_badge_type():
 
 
 def test_challenge_weekly_leaderboard_ranks_users_and_masks_names():
-    checkins = [
-        SimpleNamespace(user=SimpleNamespace(id=2, name="김나현")),
-        SimpleNamespace(user=SimpleNamespace(id=2, name="김나현")),
-        SimpleNamespace(user=SimpleNamespace(id=1, name="이준")),
-        SimpleNamespace(user=SimpleNamespace(id=3, name="박")),
+    entries = [
+        SimpleNamespace(rank_no=1, user_id=2, nickname_masked="김*현", total_points=20, completed_mission_count=2),
+        SimpleNamespace(rank_no=2, user_id=1, nickname_masked="이*", total_points=10, completed_mission_count=1),
+        SimpleNamespace(rank_no=3, user_id=3, nickname_masked="*", total_points=10, completed_mission_count=1),
     ]
 
     result = ChallengeService._build_weekly_leaderboard(
-        checkins=checkins,
+        entries=entries,
+        my_entry=entries[1],
         current_user_id=1,
         week_start=date(2026, 6, 1),
         week_end=date(2026, 6, 7),
-        limit=10,
     )
 
     assert [item.user_id for item in result.items] == [2, 1, 3]
