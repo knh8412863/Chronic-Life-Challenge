@@ -24,6 +24,7 @@ const SIGNUP_DRAFT_KEY = "auth.signupDraft";
 const GOOGLE_SIGNUP_DRAFT_KEY = "auth.googleSignupDraft";
 const SIGNUP_ERROR_KEY = "auth.signupError";
 const ONBOARDING_PROFILE_KEY = "auth.onboardingProfile";
+const EMAIL_VERIFY_ADDRESS_KEY = "auth.emailVerifyAddress";
 
 type SignupDraft = Partial<SignUpPayload> & {
   auth_provider?: "GOOGLE";
@@ -165,6 +166,7 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
       }
 
       storeAccessToken(loginResponse.access_token);
+      sessionStorage.setItem(EMAIL_VERIFY_ADDRESS_KEY, payload.email);
       sessionStorage.setItem(
         ONBOARDING_PROFILE_KEY,
         JSON.stringify({
@@ -284,8 +286,13 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
   const [resendCooldown, setResendCooldown] = useState(0);
   const [message, setMessage] = useState("");
   const [verifyStatus, setVerifyStatus] = useState<"IDLE" | "VERIFYING" | "SUCCESS" | "FAILED">("IDLE");
+  const [targetEmail, setTargetEmail] = useState("");
   const verificationToken = new URLSearchParams(window.location.search).get("token");
   const isLocalDev = import.meta.env.DEV;
+
+  useEffect(() => {
+    setTargetEmail(sessionStorage.getItem(EMAIL_VERIFY_ADDRESS_KEY) ?? "");
+  }, []);
 
   useEffect(() => {
     if (!verificationToken) return;
@@ -294,6 +301,7 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
       .then(() => {
         setVerifyStatus("SUCCESS");
         setMessage("이메일 인증이 완료되었습니다.");
+        sessionStorage.removeItem(EMAIL_VERIFY_ADDRESS_KEY);
       })
       .catch(() => {
         setVerifyStatus("FAILED");
@@ -335,7 +343,7 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
         </div>
         <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", margin: "0 0 12px" }}>이메일로 인증<br />링크를 보냈습니다</h2>
         <p style={{ fontSize: 15, color: "#555", lineHeight: 1.6, margin: "0 0 24px" }}>
-          example@email.com 으로 인증 메일을 발송했습니다.<br />메일함을 확인하고 인증 링크를 클릭해주세요.
+          {targetEmail || "가입한 이메일"} 으로 인증 메일을 발송했습니다.<br />메일함을 확인하고 인증 링크를 클릭해주세요.
         </p>
         <hr style={{ border: "none", borderTop: "1px solid #ddd", margin: "0 0 20px" }} />
         {[
@@ -393,7 +401,7 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
         {isLocalDev && verifyStatus !== "SUCCESS" && (
           <div style={{ border: "1px solid #f0d58c", background: "#fff8e1", borderRadius: 8, padding: 12, marginBottom: 10 }}>
             <p style={{ fontSize: 17, color: "#6d5400", lineHeight: 1.6, margin: "0 0 8px" }}>
-              로컬 개발 환경에서는 실제 이메일 발송이 연결되지 않아 인증 링크를 받을 수 없습니다. 화면 흐름 확인을 위해 건강 설문으로 이동할 수 있습니다.
+              로컬 개발 환경에서 SMTP를 설정하지 않은 경우 인증 메일을 받을 수 없습니다. 화면 흐름 확인이 필요할 때만 건강 설문으로 이동하세요.
             </p>
             <button
               type="button"
