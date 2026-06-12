@@ -1,6 +1,6 @@
 from typing import Annotated
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Query, status
+from fastapi import APIRouter, Depends, Query, status
 from fastapi.responses import ORJSONResponse as Response
 
 from app.dependencies.security import get_request_user
@@ -27,12 +27,10 @@ prediction_router = APIRouter(tags=["predictions"])
 )
 async def create_prediction_task(
     request: PredictionTaskCreateRequest,
-    background_tasks: BackgroundTasks,
     user: Annotated[User, Depends(get_request_user)],
     service: Annotated[PredictionService, Depends(PredictionService)],
 ) -> Response:
     task = await service.create_task(user, request)
-    background_tasks.add_task(service.process_task, task.task_uuid, user.id)
     return Response({"data": task.model_dump(mode="json")}, status_code=status.HTTP_202_ACCEPTED)
 
 

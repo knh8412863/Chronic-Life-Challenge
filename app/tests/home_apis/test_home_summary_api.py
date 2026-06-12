@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 from starlette import status
 from tortoise.contrib.test import TestCase
 
+from ai_worker.main import PredictionWorker
 from app.main import app
 from app.services.predictions import PredictionService
 
@@ -102,12 +103,14 @@ class TestHomeSummaryAPI(TestCase):
                     json={"health_input_id": survey_response.json()["data"]["health_input_id"]},
                     headers=headers,
                 )
+                task_processed = await PredictionWorker().process_once()
 
             task_uuid = task_response.json()["data"]["task_uuid"]
             await client.get(f"/api/v1/prediction-tasks/{task_uuid}/status", headers=headers)
             response = await client.get("/api/v1/home/summary", headers=headers)
 
         assert response.status_code == status.HTTP_200_OK
+        assert task_processed is True
         result = response.json()["data"]
         assert result["today_score"]["score"] is not None
         assert result["recent_prediction"]["overall_risk_level"] == "HIGH"

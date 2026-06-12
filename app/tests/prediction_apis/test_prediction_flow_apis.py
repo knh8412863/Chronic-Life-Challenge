@@ -5,6 +5,7 @@ from httpx import ASGITransport, AsyncClient
 from starlette import status
 from tortoise.contrib.test import TestCase
 
+from ai_worker.main import PredictionWorker
 from app.main import app
 from app.models.predictions import ModelVersion, PredictionResultItem
 from app.services.predictions import PredictionService
@@ -71,6 +72,7 @@ class TestPredictionFlowAPIs(TestCase):
                     json={"health_input_id": survey_response.json()["data"]["health_input_id"]},
                     headers=headers,
                 )
+                task_processed = await PredictionWorker().process_once()
 
             task_uuid = task_response.json()["data"]["task_uuid"]
             status_response = await client.get(f"/api/v1/prediction-tasks/{task_uuid}/status", headers=headers)
@@ -100,6 +102,7 @@ class TestPredictionFlowAPIs(TestCase):
         assert survey_response.status_code == status.HTTP_201_CREATED
         assert task_response.status_code == status.HTTP_202_ACCEPTED
         assert task_response.json()["data"]["status"] == "PENDING"
+        assert task_processed is True
         assert status_response.json()["data"]["status"] == "SUCCESS"
         assert status_response.json()["data"]["progress_percent"] == 100
         assert status_response.json()["data"]["current_step"] == "예측 완료"
