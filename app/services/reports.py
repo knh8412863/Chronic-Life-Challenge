@@ -777,8 +777,9 @@ class WeeklyReportService:
             c.drawString(margin, 20, "All4Health © 2026")
             c.drawRightString(page_width - margin, 20, f"페이지 {page}/2")
 
-        source = report.source_summary
-        challenge = report.challenge_summary or {}
+        source = getattr(report, "source_summary", None) or {}
+        challenge = getattr(report, "challenge_summary", None) or {}
+        trend = getattr(report, "trend_summary", None) or {}
         total_health_records = WeeklyReportService._total_health_records(source)
         score = min(
             100,
@@ -917,7 +918,7 @@ class WeeklyReportService:
         c.drawString(margin, y, "잘한 점")
         y -= 18
         y = draw_wrapped(
-            f"{report.challenge_summary.get('message', '이번 주 생활습관 실천 내용을 확인했습니다.')} {report.trend_summary.get('message', '다음 리포트에서 추이를 비교할 수 있습니다.')}",
+            f"{challenge.get('message', '이번 주 생활습관 실천 내용을 확인했습니다.')} {trend.get('message', '다음 리포트에서 추이를 비교할 수 있습니다.')}",
             margin,
             y,
             page_width - margin * 2,

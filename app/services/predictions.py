@@ -896,9 +896,9 @@ class HealthInputService:
         return ActivityLogResponse(
             activity_log_id=record.id,
             record_date=record.record_date,
-            steps=record.steps,
-            exercise_minutes=record.exercise_minutes,
-            water_ml=record.water_ml,
+            steps=getattr(record, "steps", None),
+            exercise_minutes=getattr(record, "exercise_minutes", None),
+            water_ml=getattr(record, "water_ml", None),
             alcohol_frequency=record.alcohol_frequency,
             alcohol_amount=record.alcohol_amount,
             walking_days=record.walking_days,

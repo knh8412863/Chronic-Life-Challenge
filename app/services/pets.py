@@ -24,6 +24,7 @@ from app.models.predictions import ActivityLog, ExerciseLog, VitalRecord
 from app.models.users import User
 
 DATE_KEY_FORMAT = "%Y%m%d"
+_CURRENT_PET_TYPE_UNSET = object()
 
 BASE_REWARD_TASKS = [
     ("VITAL_BP", "혈압 측정", 30),
@@ -308,11 +309,13 @@ class VirtualPetService:
     def _to_catalog_item(
         item: dict,
         current_streak_days: int,
-        current_pet_type: PetType | None,
+        current_pet_type: PetType | None | object = _CURRENT_PET_TYPE_UNSET,
     ) -> PetCatalogItemResponse:
         required_streak_days = item["required_streak_days"]
         is_selected_pet = item["pet_type"] == current_pet_type
-        if required_streak_days <= 0:
+        if current_pet_type is _CURRENT_PET_TYPE_UNSET:
+            is_unlocked = current_streak_days >= required_streak_days
+        elif required_streak_days <= 0:
             is_unlocked = is_selected_pet
         else:
             is_unlocked = is_selected_pet or current_streak_days >= required_streak_days
