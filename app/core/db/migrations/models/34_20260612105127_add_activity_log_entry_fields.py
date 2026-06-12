@@ -11,7 +11,9 @@ async def upgrade(db: BaseDBAsyncClient) -> str:
 
     statements: list[str] = []
     if "idx_activity_logs_user_record_date_multi" not in index_names:
-        statements.append("ALTER TABLE `activity_logs` ADD INDEX `idx_activity_logs_user_record_date_multi` (`user_id`, `record_date`);")
+        statements.append(
+            "ALTER TABLE `activity_logs` ADD INDEX `idx_activity_logs_user_record_date_multi` (`user_id`, `record_date`);"
+        )
     for index_name in ("uid_activity_lo_user_id_a5f7f7", "uid_activity_logs_user_date"):
         if index_name in index_names:
             statements.append(f"ALTER TABLE `activity_logs` DROP INDEX `{index_name}`;")
