@@ -45,10 +45,11 @@ class Config(BaseSettings):
 
     SECURITY_CSP: str = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://accounts.google.com; "
         "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
-        "img-src 'self' data:; "
-        "connect-src 'self'; "
+        "img-src 'self' data: https://lh3.googleusercontent.com; "
+        "connect-src 'self' https://accounts.google.com https://www.googleapis.com; "
+        "frame-src https://accounts.google.com; "
         "frame-ancestors 'none'; "
         "object-src 'none'; "
         "base-uri 'self'"
