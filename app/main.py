@@ -14,7 +14,7 @@ DOCS_CSP = (
     "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
     "style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; "
     "img-src 'self' data: https://fastapi.tiangolo.com; "
-    "connect-src 'self'; "
+    "connect-src 'self' https://cdn.jsdelivr.net; "
     "frame-ancestors 'none'; "
     "object-src 'none'; "
     "base-uri 'self'"
