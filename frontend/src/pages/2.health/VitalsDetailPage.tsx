@@ -40,6 +40,9 @@ type VitalsDetailPageProps = {
 export function VitalsDetailPage({ onNavigate }: VitalsDetailPageProps) {
   const [detail, setDetail] = useState<VitalDetail>(fallbackDetail);
   const [isLoading, setIsLoading] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     const storedData = sessionStorage.getItem("selectedVitalData");
@@ -74,14 +77,17 @@ export function VitalsDetailPage({ onNavigate }: VitalsDetailPageProps) {
   }
 
   async function handleDelete() {
-    if (!window.confirm("이 기록을 삭제하시겠습니까?")) return;
     if (!canModify) return;
     const token = getStoredAccessToken();
+    setIsDeleting(true);
+    setDeleteError("");
     try {
       await deleteVital(detail.id, token ?? undefined);
       onNavigate?.("/health/vitals");
     } catch {
-      alert("삭제에 실패했습니다.");
+      setDeleteError("삭제에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -101,7 +107,7 @@ export function VitalsDetailPage({ onNavigate }: VitalsDetailPageProps) {
           >
             수정
           </button>
-          <button type="button" className="vl-action-btn vl-delete-btn" onClick={handleDelete} disabled={!canModify}>
+          <button type="button" className="vl-action-btn vl-delete-btn" onClick={() => setShowDeleteModal(true)} disabled={!canModify}>
             삭제
           </button>
         </div>
@@ -202,6 +208,39 @@ export function VitalsDetailPage({ onNavigate }: VitalsDetailPageProps) {
           )}
         </section>
       </div>
+
+      {showDeleteModal && (
+        <div className="app-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="app-modal-card">
+            <h2>건강 기록 삭제</h2>
+            <p>선택한 혈압/혈당 기록을 삭제하시겠습니까?</p>
+            <p style={{ color: "#888", fontSize: 13 }}>
+              삭제한 기록은 복구할 수 없습니다.
+            </p>
+            {deleteError && <p style={{ color: "#c62828", fontSize: 13 }}>{deleteError}</p>}
+            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+              <button
+                type="button"
+                className="wide-subtle-button"
+                onClick={() => { setShowDeleteModal(false); setDeleteError(""); }}
+                disabled={isDeleting}
+                style={{ flex: 1 }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="vl-action-btn vl-delete-btn"
+                onClick={() => void handleDelete()}
+                disabled={isDeleting}
+                style={{ flex: 1, height: 40 }}
+              >
+                {isDeleting ? "삭제 중..." : "삭제"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

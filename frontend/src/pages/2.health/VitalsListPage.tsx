@@ -72,6 +72,9 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
   const [hasApiError, setHasApiError] = useState(false);
   const [period, setPeriod] = useState<Period>("30D");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
+  const [deleteTarget, setDeleteTarget] = useState<VitalRecord | null>(null);
+  const [deleteError, setDeleteError] = useState("");
+  const [isDeleting, setIsDeleting] = useState(false);
 
   function fetchData(_q?: VitalsQuery) {
     const token = getStoredAccessToken();
@@ -169,13 +172,17 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
   }, [period, typeFilter]);
 
   async function handleDelete(id: number) {
-    if (!window.confirm("이 기록을 삭제하시겠습니까?")) return;
     const token = getStoredAccessToken();
+    setIsDeleting(true);
+    setDeleteError("");
     try {
       await deleteVital(id, token ?? undefined);
+      setDeleteTarget(null);
       fetchData({ period });
     } catch {
-      alert("삭제에 실패했습니다.");
+      setDeleteError("삭제에 실패했습니다. 잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsDeleting(false);
     }
   }
 
@@ -336,7 +343,7 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
                             <button
                               type="button"
                               className="vl-action-btn vl-delete-btn"
-                              onClick={(e) => { e.stopPropagation(); canDelete && row.vital && handleDelete(row.vital.id); }}
+                              onClick={(e) => { e.stopPropagation(); canDelete && row.vital && setDeleteTarget(row.vital); }}
                               disabled={!canDelete}
                             >
                               삭제
@@ -352,6 +359,38 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
           </table>
         </div>
       </section>
+      {deleteTarget && (
+        <div className="app-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="app-modal-card">
+            <h2>건강 기록 삭제</h2>
+            <p>선택한 혈압/혈당 기록을 삭제하시겠습니까?</p>
+            <p style={{ color: "#888", fontSize: 13 }}>
+              삭제한 기록은 복구할 수 없습니다.
+            </p>
+            {deleteError && <p style={{ color: "#c62828", fontSize: 13 }}>{deleteError}</p>}
+            <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
+              <button
+                type="button"
+                className="wide-subtle-button"
+                onClick={() => { setDeleteTarget(null); setDeleteError(""); }}
+                disabled={isDeleting}
+                style={{ flex: 1 }}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="vl-action-btn vl-delete-btn"
+                onClick={() => void handleDelete(deleteTarget.id)}
+                disabled={isDeleting}
+                style={{ flex: 1, height: 40 }}
+              >
+                {isDeleting ? "삭제 중..." : "삭제"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
