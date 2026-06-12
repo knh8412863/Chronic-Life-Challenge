@@ -329,8 +329,9 @@ export function TermsManagementPage({ onNavigate }: TermsManagementPageProps) {
     }
   };
 
-  const requiredConsents = consents.filter(consent => consent.is_required);
-  const optionalConsents = consents.filter(consent => !consent.is_required);
+  const displayConsents = consents.filter(consent => consent.consent_type !== "LOCATION");
+  const requiredConsents = displayConsents.filter(consent => consent.is_required);
+  const optionalConsents = displayConsents.filter(consent => !consent.is_required);
 
   return (
     <div className="page-container">
@@ -365,19 +366,28 @@ export function TermsManagementPage({ onNavigate }: TermsManagementPageProps) {
               <div>
                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
                   <p style={{ fontSize: 12, fontWeight: 600, margin: 0 }}>{consent.title}</p>
-                  <span style={{ padding: "2px 8px", background: consent.is_agreed ? "#e8f5e9" : "#fafafa", border: `1px solid ${consent.is_agreed ? "#a5d6a7" : "#e0e0e0"}`, borderRadius: 20, fontSize: 10, color: consent.is_agreed ? "#2e7d32" : "#aaa" }}>
-                    {consent.is_agreed ? "동의" : "미동의"}
-                  </span>
+                  {consent.is_agreed && (
+                    <span style={{ padding: "2px 8px", background: "#e8f5e9", border: "1px solid #a5d6a7", borderRadius: 20, fontSize: 10, color: "#2e7d32" }}>
+                      동의
+                    </span>
+                  )}
                 </div>
-                <p style={{ fontSize: 10, color: "#aaa", margin: 0 }}>
-                  {consent.agreed_at ? `${consent.agreed_at} 동의` : "미동의"}
-                </p>
+                {consent.agreed_at && (
+                  <p style={{ fontSize: 10, color: "#aaa", margin: 0 }}>
+                    {consent.agreed_at.split("T")[0]} 동의
+                  </p>
+                )}
               </div>
-              {/* 동의 상태에 따라 단독 버튼만 표시 (REQ-AUTH-014) */}
-              <button onClick={() => handleToggleConsent(consent)}
-                style={{ padding: "6px 12px", border: `1.5px solid ${consent.is_agreed ? "#ddd" : "#1a1a1a"}`, borderRadius: 6, background: consent.is_agreed ? "#fff" : "#1a1a1a", color: consent.is_agreed ? "#555" : "#fff", fontSize: 11, cursor: "pointer" }}>
-                {consent.is_agreed ? "철회" : "동의"}
-              </button>
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => openPolicy(consent.consent_type, consent.policy_version)}
+                  style={{ padding: "6px 12px", border: "1.5px solid #ddd", borderRadius: 6, background: "#fff", fontSize: 11, cursor: "pointer" }}>
+                  약관 보기
+                </button>
+                <button onClick={() => handleToggleConsent(consent)}
+                  style={{ padding: "6px 12px", border: `1.5px solid ${consent.is_agreed ? "#ddd" : "#1a1a1a"}`, borderRadius: 6, background: consent.is_agreed ? "#fff" : "#1a1a1a", color: consent.is_agreed ? "#555" : "#fff", fontSize: 11, cursor: "pointer" }}>
+                  {consent.is_agreed ? "철회" : "동의"}
+                </button>
+              </div>
             </div>
           ))}
         </div>
@@ -387,7 +397,7 @@ export function TermsManagementPage({ onNavigate }: TermsManagementPageProps) {
       <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 20 }}>
         <h3 style={{ fontSize: 13, fontWeight: 600, margin: "0 0 14px" }}>최근 약관 변경 내역</h3>
         <div style={{ display: "flex", flexDirection: "column", gap: 0 }}>
-          {recentChanges.map((change, i) => (
+          {recentChanges.filter((change) => change.policy_type !== "LOCATION").map((change, i) => (
             <div key={`${change.policy_type}-${change.policy_version}`} style={{ display: "flex", alignItems: "center", padding: "10px 0", borderBottom: i < recentChanges.length - 1 ? "1px solid #f0f0f0" : "none" }}>
               <div style={{ flex: 1 }}>
                 <p style={{ fontSize: 12, margin: "0 0 2px" }}>{change.title}</p>

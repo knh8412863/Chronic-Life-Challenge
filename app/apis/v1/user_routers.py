@@ -12,6 +12,7 @@ from app.dtos.users import (
     UserConsentItemResponse,
     UserConsentListResponse,
     UserInfoResponse,
+    UserPasswordVerificationRequest,
     UserUpdateRequest,
     UserWithdrawalRequest,
 )
@@ -39,6 +40,16 @@ async def update_user_me_info(
 ) -> Response:
     result = await user_manage_service.update_user_info(user=user, data=update_data)
     return Response(result.model_dump(mode="json"), status_code=status.HTTP_200_OK)
+
+
+@user_router.post("/me/password-verification", status_code=status.HTTP_204_NO_CONTENT)
+async def verify_user_me_password(
+    request: UserPasswordVerificationRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    user_manage_service: Annotated[UserManageService, Depends(UserManageService)],
+) -> EmptyResponse:
+    await user_manage_service.verify_current_password(user=user, data=request)
+    return EmptyResponse(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @user_router.patch("/me/password", status_code=status.HTTP_204_NO_CONTENT)

@@ -191,6 +191,9 @@ class VitalRecordUpdateRequest(BaseModel):
 
 class ActivityLogCreateRequest(BaseModel):
     record_date: date
+    steps: Annotated[int | None, Field(default=None, ge=0, le=100000)]
+    exercise_minutes: Annotated[int | None, Field(default=None, ge=0, le=1440)]
+    water_ml: Annotated[int | None, Field(default=None, ge=0, le=10000)]
     alcohol_frequency: Literal[0, 1, 3] | None = None
     alcohol_amount: Annotated[int | None, Field(default=None, ge=1, le=5)]
     walking_days: Annotated[int | None, Field(default=None, ge=0, le=7)]
@@ -205,6 +208,9 @@ class ActivityLogCreateRequest(BaseModel):
         fields = [
             self.alcohol_frequency,
             self.walking_days,
+            self.steps,
+            self.exercise_minutes,
+            self.water_ml,
             self.sedentary_hours,
             self.sleep_hours,
             self.stress_level,
@@ -220,6 +226,9 @@ class ActivityLogCreateRequest(BaseModel):
 
 
 class ActivityLogUpdateRequest(BaseModel):
+    steps: Annotated[int | None, Field(default=None, ge=0, le=100000)]
+    exercise_minutes: Annotated[int | None, Field(default=None, ge=0, le=1440)]
+    water_ml: Annotated[int | None, Field(default=None, ge=0, le=10000)]
     alcohol_frequency: Literal[0, 1, 3] | None = None
     alcohol_amount: Annotated[int | None, Field(default=None, ge=1, le=5)]
     walking_days: Annotated[int | None, Field(default=None, ge=0, le=7)]
@@ -431,6 +440,9 @@ class VitalRecordDetailResponse(BaseModel):
 class ActivityLogResponse(BaseModel):
     activity_log_id: int
     record_date: date
+    steps: int | None = None
+    exercise_minutes: int | None = None
+    water_ml: int | None = None
     alcohol_frequency: int | None = None
     alcohol_amount: int | None = None
     walking_days: int | None = None

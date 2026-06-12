@@ -26,7 +26,14 @@ const menuItems: MenuItem[] = [
       { label: "내 조언 이력", route: "/advices/history" },
     ],
   },
-  { label: "질환 예측", route: "/prediction/request" },
+  {
+    label: "질환 예측",
+    route: "/prediction/request",
+    children: [
+      { label: "예측 요청하기", route: "/prediction/request" },
+      { label: "예측 이력", route: "/prediction/history" },
+    ],
+  },
   {
     label: "건강 관리",
     route: "/health/profile",

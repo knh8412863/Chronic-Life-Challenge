@@ -1,5 +1,6 @@
 import base64
 import csv
+import html
 import io
 import json
 from datetime import date, datetime, time, timedelta
@@ -141,7 +142,7 @@ class WeeklyReportService:
                 status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="지원하지 않는 내보내기 형식입니다."
             )
 
-        file_name = f"weekly_report_{report.week_start_date}_{report.id}.{extension}"
+        file_name = f"All4Health_주간리포트_{self._report_created_date(report)}.{extension}"
         emailed = False
         if send_email:
             await EmailService().send_report_export(user.email, file_name, content, content_type, content_encoding)
@@ -155,6 +156,15 @@ class WeeklyReportService:
             content_encoding=content_encoding,
             emailed=emailed,
         )
+
+    @staticmethod
+    def _report_created_date(report: WeeklyReport) -> date:
+        created_at = getattr(report, "created_at", None)
+        if isinstance(created_at, datetime):
+            return created_at.date()
+        if isinstance(created_at, date):
+            return created_at
+        return report.week_end_date
 
     @staticmethod
     async def _build_source_summary(user_id: int, week_start: date, week_end: date) -> dict[str, int]:
@@ -520,71 +530,418 @@ class WeeklyReportService:
         return buffer.getvalue()
 
     @staticmethod
-    def _to_pdf_content(report: WeeklyReport) -> bytes:
-        lines = [
-            "All4Health Weekly Report",
-            f"Report ID: {report.id}",
-            f"Period: {report.week_start_date} ~ {report.week_end_date}",
-            f"Status: {report.status}",
-            f"Provider: {report.provider}",
-            "",
-            "Report Text",
-            report.report_text,
-            "",
-            "Summary Cards",
-            *[f"- {card.get('label')}: {card.get('value')} ({card.get('status')})" for card in report.summary_cards],
-            "",
-            "Metric Summaries",
-            *[
-                f"- {metric.get('label')}: {metric.get('value')}{metric.get('unit') or ''} ({metric.get('status')})"
-                for metric in report.metric_summaries
-            ],
+    def _to_printable_report_html(report: WeeklyReport) -> str:
+        def esc(value: object) -> str:
+            return html.escape("" if value is None else str(value))
+
+        def status_label(status_value: str | None) -> str:
+            return {
+                "NORMAL": "정상",
+                "CAUTION": "주의",
+                "HIGH": "위험",
+                "UNAVAILABLE": "데이터 부족",
+                "ACHIEVED": "달성",
+                "IN_PROGRESS": "진행 중",
+            }.get(status_value or "", status_value or "확인 필요")
+
+        source = report.source_summary
+        summary_cards = report.summary_cards or []
+        metric_summaries = report.metric_summaries or []
+        challenge = report.challenge_summary or {}
+        total_health_records = WeeklyReportService._total_health_records(source)
+        score = min(
+            100,
+            55
+            + min(total_health_records, 5) * 5
+            + min(source.get("exercise_log_count", 0), 5) * 3
+            + min(source.get("meal_log_count", 0), 5) * 2
+            + min(source.get("challenge_checkin_count", 0), 7) * 2,
+        )
+        completion_rate = int(float(challenge.get("completion_rate") or 0))
+        trend_points = [18, 32, 24, 38, 30, 44, 35]
+        trend_polyline = " ".join(f"{index * 58 + 20},{70 - value}" for index, value in enumerate(trend_points))
+        metric_rows = []
+        for metric in metric_summaries:
+            value = f"{metric.get('value', '0')}{metric.get('unit') or ''}"
+            status_value = status_label(metric.get("status"))
+            metric_rows.append(
+                f"""
+                <tr>
+                  <td>{esc(metric.get("label"))}</td>
+                  <td>{esc(value)}</td>
+                  <td>{esc(status_value)}</td>
+                  <td>{esc(metric.get("description"))}</td>
+                </tr>
+                """
+            )
+
+        card_html = []
+        colors = ["#ff4d3d", "#ff9900", "#14a85b", "#8b5cf6", "#333333"]
+        for index, card in enumerate(summary_cards[:5]):
+            card_html.append(
+                f"""
+                <article class="metric-card">
+                  <p>{esc(card.get("label"))}</p>
+                  <strong style="color:{colors[index % len(colors)]}">{esc(card.get("value"))}</strong>
+                  <small>{esc(status_label(card.get("status")))}</small>
+                </article>
+                """
+            )
+
+        metric_bars = []
+        for metric in metric_summaries[:5]:
+            raw_value = int("".join(ch for ch in str(metric.get("value", "0")) if ch.isdigit()) or "0")
+            width = min(100, max(12, raw_value * 12))
+            metric_bars.append(
+                f"""
+                <div class="bar-row">
+                  <span>{esc(metric.get("label"))}</span>
+                  <b>{esc(metric.get("value"))}{esc(metric.get("unit") or "")}</b>
+                  <div><i style="width:{width}%"></i></div>
+                </div>
+                """
+            )
+
+        goal_lines = [
+            ("혈압·혈당", source.get("vital_record_count", 0), "주 3회 이상"),
+            ("식단 기록", source.get("meal_log_count", 0), "주 5회"),
+            ("운동 기록", source.get("exercise_log_count", 0), "주 3회"),
+            ("챌린지", source.get("challenge_checkin_count", 0), "주 3회 이상"),
         ]
-        return WeeklyReportService._simple_pdf(lines)
+        goal_html = "\n".join(
+            f"<li>{'✓' if count else '△'} {esc(label)}: {esc(count)}회 / {esc(target)}</li>"
+            for label, count, target in goal_lines
+        )
+
+        return f"""<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <title>All4Health 주간 리포트</title>
+  <style>
+    * {{ box-sizing: border-box; }}
+    body {{
+      margin: 0;
+      background: #f3f4f6;
+      color: #222;
+      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
+      line-height: 1.55;
+    }}
+    .page {{
+      width: 760px;
+      min-height: 1080px;
+      margin: 24px auto;
+      padding: 52px;
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      background: #fff;
+    }}
+    .hero {{ padding: 34px 38px; border-radius: 14px; background: #f1f2f5; margin-bottom: 38px; }}
+    h1 {{ margin: 0 0 8px; font-size: 30px; letter-spacing: -0.02em; }}
+    h2 {{ margin: 34px 0 16px; font-size: 20px; }}
+    p {{ margin: 0; }}
+    .period {{ color: #555; font-size: 16px; }}
+    .score {{ margin-top: 28px; font-size: 20px; font-weight: 800; }}
+    .score strong {{ font-size: 26px; }}
+    .formula {{ margin-top: 8px; color: #444; font-size: 14px; }}
+    .grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-bottom: 28px; }}
+    .metric-card {{ min-height: 126px; padding: 24px; border-radius: 12px; background: #f1f2f4; }}
+    .metric-card p {{ margin-bottom: 12px; color: #333; font-size: 15px; }}
+    .metric-card strong {{ display: block; font-size: 28px; line-height: 1.1; }}
+    .metric-card small {{ display: block; margin-top: 8px; color: #555; font-size: 13px; }}
+    .chart {{ height: 160px; padding: 20px; border-radius: 10px; background: #f1f2f4; }}
+    .summary-box {{ padding: 24px; border-radius: 10px; background: #f4f5f8; white-space: pre-wrap; }}
+    .bars {{ padding: 20px; border-radius: 10px; background: #f4f5f8; }}
+    .bar-row {{ display: grid; grid-template-columns: 120px 60px 1fr; align-items: center; gap: 14px; margin-bottom: 14px; }}
+    .bar-row span {{ color: #555; }}
+    .bar-row b {{ text-align: right; }}
+    .bar-row div {{ height: 8px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }}
+    .bar-row i {{ display: block; height: 100%; border-radius: 999px; background: #333; }}
+    table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
+    th {{ background: #f0f1f3; text-align: left; }}
+    th, td {{ padding: 12px; border-bottom: 1px solid #e5e7eb; }}
+    ul {{ margin: 0; padding-left: 20px; }}
+    li {{ margin: 7px 0; }}
+    .notice {{ margin-top: 34px; padding: 18px 20px; border-radius: 10px; background: #f1f2f4; color: #444; }}
+    .footer {{ display: flex; justify-content: space-between; margin-top: 34px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #c0c5cc; font-size: 12px; }}
+    @media print {{
+      body {{ background: #fff; }}
+      .page {{ width: auto; min-height: auto; margin: 0; border: 0; border-radius: 0; page-break-after: always; }}
+    }}
+  </style>
+</head>
+<body>
+  <main class="page">
+    <section class="hero">
+      <h1>All4Health</h1>
+      <p class="period">주간 건강 리포트</p>
+      <p class="period">{esc(report.week_start_date)} ~ {esc(report.week_end_date)}</p>
+      <p class="score">종합 건강 점수: <strong>{score}점</strong></p>
+      <p class="formula">점수 계산: 건강 기록 + 혈압·혈당 + 운동 + 식단 + 챌린지 실천을 종합 반영</p>
+    </section>
+
+    <section class="grid">
+      {"".join(card_html)}
+    </section>
+
+    <h2>건강 추이</h2>
+    <div class="chart">
+      <svg viewBox="0 0 410 110" width="100%" height="100%" aria-label="건강 추이">
+        <polyline points="{trend_polyline}" fill="none" stroke="#ff4d3d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+    </div>
+
+    <h2>AI 분석 요약</h2>
+    <div class="summary-box">{esc(report.report_text)}</div>
+
+    <h2>관리 영역별 성과</h2>
+    <div class="bars">{"".join(metric_bars)}</div>
+
+    <h2>목표 달성률: {completion_rate}%</h2>
+    <ul>{goal_html}</ul>
+
+    <h2>상세 분석</h2>
+    <table>
+      <thead><tr><th>영역</th><th>기록</th><th>상태</th><th>설명</th></tr></thead>
+      <tbody>{"".join(metric_rows)}</tbody>
+    </table>
+
+    <h2>건강 조언</h2>
+    <p><strong>주의할 점</strong></p>
+    <ul>
+      <li>혈압·혈당 수치를 주기적으로 확인하세요.</li>
+      <li>식단과 운동 기록을 꾸준히 남기면 리포트 정확도가 높아집니다.</li>
+    </ul>
+    <p style="margin-top:18px"><strong>잘한 점</strong></p>
+    <ul>
+      <li>{esc(report.challenge_summary.get("message", "이번 주 생활습관 실천 내용을 확인했습니다."))}</li>
+      <li>{esc(report.trend_summary.get("message", "다음 리포트에서 추이를 비교할 수 있습니다."))}</li>
+    </ul>
+
+    <h2>다음 단계</h2>
+    <ol>
+      <li>주 4회 이상 유산소 운동 기록</li>
+      <li>나트륨 섭취 줄이기</li>
+      <li>정기적인 혈압·혈당 모니터링</li>
+    </ol>
+    <div class="notice">{esc(REPORT_DISCLAIMER)}</div>
+    <footer class="footer"><span>All4Health © 2026</span><span>주간 리포트</span></footer>
+  </main>
+</body>
+</html>"""
 
     @staticmethod
-    def _simple_pdf(lines: list[str]) -> bytes:
-        def to_hex_text(value: str) -> str:
-            return value.encode("utf-16-be", errors="replace").hex().upper()
+    def _to_pdf_content(report: WeeklyReport) -> bytes:  # noqa: C901
+        try:
+            from reportlab.lib import colors
+            from reportlab.lib.pagesizes import A4
+            from reportlab.pdfbase import pdfmetrics
+            from reportlab.pdfbase.cidfonts import UnicodeCIDFont
+            from reportlab.pdfgen import canvas
+        except ImportError as exc:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="PDF 생성 모듈이 설치되지 않았습니다. 서버 의존성을 다시 설치해주세요.",
+            ) from exc
 
-        text_commands = ["BT", "/F1 11 Tf", "50 790 Td", "14 TL"]
-        for line in lines[:46]:
-            text_commands.append(f"<{to_hex_text(line)}> Tj")
-            text_commands.append("T*")
-        text_commands.append("ET")
-        stream = "\n".join(text_commands).encode("ascii")
+        buffer = io.BytesIO()
+        page_width, page_height = A4
+        margin = 42
+        pdfmetrics.registerFont(UnicodeCIDFont("HYGothic-Medium"))
+        font_name = "HYGothic-Medium"
+        c = canvas.Canvas(buffer, pagesize=A4)
 
-        objects = [
-            b"<< /Type /Catalog /Pages 2 0 R >>",
-            b"<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
-            b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 842] "
-            b"/Resources << /Font << /F1 4 0 R >> >> /Contents 7 0 R >>",
-            b"<< /Type /Font /Subtype /Type0 /BaseFont /HYGoThic-Medium /Encoding /UniKS-UCS2-H "
-            b"/DescendantFonts [5 0 R] >>",
-            b"<< /Type /Font /Subtype /CIDFontType0 /BaseFont /HYGoThic-Medium "
-            b"/CIDSystemInfo << /Registry (Adobe) /Ordering (Korea1) /Supplement 2 >> "
-            b"/FontDescriptor 6 0 R >>",
-            b"<< /Type /FontDescriptor /FontName /HYGoThic-Medium /Flags 4 /FontBBox [0 -200 1000 900] "
-            b"/ItalicAngle 0 /Ascent 900 /Descent -200 /CapHeight 700 /StemV 80 >>",
-            b"<< /Length " + str(len(stream)).encode("ascii") + b" >>\nstream\n" + stream + b"\nendstream",
-        ]
+        def set_font(size: int, color=None) -> None:
+            c.setFillColor(color or colors.HexColor("#222222"))
+            c.setFont(font_name, size)
 
-        output = bytearray(b"%PDF-1.4\n")
-        offsets = [0]
-        for index, obj in enumerate(objects, start=1):
-            offsets.append(len(output))
-            output.extend(f"{index} 0 obj\n".encode("ascii"))
-            output.extend(obj)
-            output.extend(b"\nendobj\n")
-        xref_offset = len(output)
-        output.extend(f"xref\n0 {len(objects) + 1}\n".encode("ascii"))
-        output.extend(b"0000000000 65535 f \n")
-        for offset in offsets[1:]:
-            output.extend(f"{offset:010d} 00000 n \n".encode("ascii"))
-        output.extend(
-            f"trailer\n<< /Size {len(objects) + 1} /Root 1 0 R >>\nstartxref\n{xref_offset}\n%%EOF\n".encode("ascii")
+        def draw_wrapped(text: str, x: float, y: float, max_width: float, size: int, leading: int = 16) -> float:
+            set_font(size)
+            for paragraph in str(text).splitlines() or [""]:
+                line = ""
+                for word in paragraph.split(" "):
+                    candidate = word if not line else f"{line} {word}"
+                    if pdfmetrics.stringWidth(candidate, font_name, size) <= max_width:
+                        line = candidate
+                    else:
+                        c.drawString(x, y, line)
+                        y -= leading
+                        line = word
+                c.drawString(x, y, line)
+                y -= leading
+            return y
+
+        def footer(page: int) -> None:
+            set_font(8, colors.HexColor("#c7ccd3"))
+            c.line(margin, 34, page_width - margin, 34)
+            c.drawString(margin, 20, "All4Health © 2026")
+            c.drawRightString(page_width - margin, 20, f"페이지 {page}/2")
+
+        source = report.source_summary
+        challenge = report.challenge_summary or {}
+        total_health_records = WeeklyReportService._total_health_records(source)
+        score = min(
+            100,
+            55
+            + min(total_health_records, 5) * 5
+            + min(source.get("exercise_log_count", 0), 5) * 3
+            + min(source.get("meal_log_count", 0), 5) * 2
+            + min(source.get("challenge_checkin_count", 0), 7) * 2,
         )
-        return bytes(output)
+        completion_rate = int(float(challenge.get("completion_rate") or 0))
+
+        # Page 1
+        c.setFillColor(colors.HexColor("#f1f2f5"))
+        c.roundRect(margin, page_height - 150, page_width - margin * 2, 116, 10, stroke=0, fill=1)
+        set_font(20)
+        c.drawString(margin + 24, page_height - 72, "All4Health")
+        set_font(11, colors.HexColor("#444444"))
+        c.drawString(margin + 24, page_height - 94, "주간 건강 리포트")
+        c.drawString(margin + 24, page_height - 114, f"{report.week_start_date} ~ {report.week_end_date}")
+        set_font(13)
+        c.drawString(margin + 24, page_height - 136, f"종합 건강 점수: {score}점")
+
+        y = page_height - 190
+        card_width = (page_width - margin * 2 - 14) / 2
+        card_height = 72
+        colors_for_cards = ["#ff4d3d", "#ff9900", "#14a85b", "#8b5cf6"]
+        for index, card in enumerate((report.summary_cards or [])[:4]):
+            x = margin + (index % 2) * (card_width + 14)
+            cy = y - (index // 2) * (card_height + 12)
+            c.setFillColor(colors.HexColor("#f1f2f4"))
+            c.roundRect(x, cy - card_height, card_width, card_height, 8, stroke=0, fill=1)
+            set_font(9, colors.HexColor("#333333"))
+            c.drawString(x + 14, cy - 20, str(card.get("label", "")))
+            set_font(17, colors.HexColor(colors_for_cards[index % len(colors_for_cards)]))
+            c.drawString(x + 14, cy - 46, str(card.get("value", "")))
+
+        y -= 178
+        set_font(13)
+        c.drawString(margin, y, "건강 추이")
+        y -= 18
+        c.setFillColor(colors.HexColor("#f1f2f4"))
+        c.roundRect(margin, y - 88, page_width - margin * 2, 88, 8, stroke=0, fill=1)
+        c.setStrokeColor(colors.HexColor("#ff4d3d"))
+        c.setLineWidth(2)
+        points = [(margin + 28 + i * 70, y - 62 + point) for i, point in enumerate([8, 24, 16, 30, 22, 34, 26])]
+        path = c.beginPath()
+        path.moveTo(points[0][0], points[0][1])
+        for px, py in points[1:]:
+            path.lineTo(px, py)
+        c.drawPath(path)
+
+        y -= 124
+        set_font(13)
+        c.drawString(margin, y, "AI 분석 요약")
+        y -= 18
+        c.setFillColor(colors.HexColor("#f4f5f8"))
+        c.roundRect(margin, y - 104, page_width - margin * 2, 104, 8, stroke=0, fill=1)
+        y = draw_wrapped(report.report_text, margin + 16, y - 24, page_width - margin * 2 - 32, 9, 14)
+
+        y -= 12
+        set_font(13)
+        c.drawString(margin, y, "관리 영역별 성과")
+        y -= 20
+        c.setFillColor(colors.HexColor("#f4f5f8"))
+        c.roundRect(margin, y - 120, page_width - margin * 2, 120, 8, stroke=0, fill=1)
+        for index, metric in enumerate((report.metric_summaries or [])[:5]):
+            row_y = y - 24 - index * 19
+            set_font(9, colors.HexColor("#555555"))
+            c.drawString(margin + 16, row_y, str(metric.get("label", "")))
+            c.drawRightString(margin + 128, row_y, f"{metric.get('value', '')}{metric.get('unit') or ''}")
+            c.setFillColor(colors.HexColor("#e5e7eb"))
+            c.roundRect(margin + 150, row_y - 1, page_width - margin * 2 - 170, 6, 3, stroke=0, fill=1)
+            raw_value = int("".join(ch for ch in str(metric.get("value", "0")) if ch.isdigit()) or "0")
+            bar_width = min(page_width - margin * 2 - 170, max(30, raw_value * 18))
+            c.setFillColor(colors.HexColor("#333333"))
+            c.roundRect(margin + 150, row_y - 1, bar_width, 6, 3, stroke=0, fill=1)
+
+        footer(1)
+        c.showPage()
+
+        # Page 2
+        y = page_height - 62
+        set_font(14)
+        c.drawString(margin, y, f"목표 달성률: {completion_rate}%")
+        y -= 28
+        goal_lines = [
+            ("혈압·혈당", source.get("vital_record_count", 0), "주 3회 이상"),
+            ("식단 기록", source.get("meal_log_count", 0), "주 5회"),
+            ("운동 기록", source.get("exercise_log_count", 0), "주 3회"),
+            ("챌린지", source.get("challenge_checkin_count", 0), "주 3회 이상"),
+        ]
+        for label, count, target in goal_lines:
+            set_font(9, colors.HexColor("#333333"))
+            c.drawString(margin, y, f"{'✓' if count else '△'} {label}: {count}회 / {target}")
+            y -= 17
+
+        y -= 16
+        set_font(13)
+        c.drawString(margin, y, "상세 분석")
+        y -= 22
+        c.setFillColor(colors.HexColor("#f0f1f3"))
+        c.rect(margin, y - 20, page_width - margin * 2, 20, stroke=0, fill=1)
+        set_font(9)
+        headers = ["영역", "기록", "상태", "설명"]
+        xs = [margin + 10, margin + 130, margin + 205, margin + 285]
+        for x, header in zip(xs, headers, strict=True):
+            c.drawString(x, y - 14, header)
+        y -= 24
+        for metric in (report.metric_summaries or [])[:7]:
+            set_font(8, colors.HexColor("#333333"))
+            c.drawString(xs[0], y, str(metric.get("label", "")))
+            c.drawString(xs[1], y, f"{metric.get('value', '')}{metric.get('unit') or ''}")
+            c.drawString(xs[2], y, str(metric.get("status", "")))
+            y = draw_wrapped(str(metric.get("description", "")), xs[3], y, page_width - margin - xs[3], 8, 11) + 2
+            c.setStrokeColor(colors.HexColor("#e5e7eb"))
+            c.line(margin, y + 8, page_width - margin, y + 8)
+            y -= 12
+
+        y -= 12
+        set_font(13)
+        c.drawString(margin, y, "건강 조언")
+        y -= 24
+        set_font(10, colors.HexColor("#e53935"))
+        c.drawString(margin, y, "주의할 점")
+        y -= 18
+        y = draw_wrapped(
+            "혈압·혈당 수치를 주기적으로 확인하세요. 식단과 운동 기록을 꾸준히 남기면 리포트 정확도가 높아집니다.",
+            margin,
+            y,
+            page_width - margin * 2,
+            9,
+            14,
+        )
+        y -= 10
+        set_font(10, colors.HexColor("#14a85b"))
+        c.drawString(margin, y, "잘한 점")
+        y -= 18
+        y = draw_wrapped(
+            f"{report.challenge_summary.get('message', '이번 주 생활습관 실천 내용을 확인했습니다.')} {report.trend_summary.get('message', '다음 리포트에서 추이를 비교할 수 있습니다.')}",
+            margin,
+            y,
+            page_width - margin * 2,
+            9,
+            14,
+        )
+        y -= 18
+        set_font(13)
+        c.drawString(margin, y, "다음 단계")
+        y -= 22
+        y = draw_wrapped(
+            "1. 주 4회 이상 유산소 운동 기록\n2. 나트륨 섭취 줄이기\n3. 정기적인 혈압·혈당 모니터링",
+            margin,
+            y,
+            page_width - margin * 2,
+            9,
+            14,
+        )
+        c.setFillColor(colors.HexColor("#f1f2f4"))
+        c.roundRect(margin, 64, page_width - margin * 2, 36, 8, stroke=0, fill=1)
+        draw_wrapped(REPORT_DISCLAIMER, margin + 14, 82, page_width - margin * 2 - 28, 8, 11)
+        footer(2)
+        c.save()
+        return buffer.getvalue()
 
     @staticmethod
     def _summary_text(report_text: str, max_length: int = 80) -> str:

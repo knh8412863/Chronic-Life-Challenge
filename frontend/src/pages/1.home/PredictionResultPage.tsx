@@ -35,6 +35,13 @@ function toPercent(risk: DiseaseRisk) {
   return Math.round(risk.probability * 1000) / 10;
 }
 
+function normalizeRiskFactorText(value: string) {
+  return value
+    .replace(/\s*[,.，]\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim() + ".";
+}
+
 export function PredictionResultPage({ onNavigate }: PredictionResultPageProps) {
   const resultId = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
@@ -144,7 +151,15 @@ export function PredictionResultPage({ onNavigate }: PredictionResultPageProps) 
               <progress max="100" value={Number(percent)} />
               <strong>{percent}%</strong>
               <p>주요 위험 요인</p>
-              <span>{risk.risk_factors.length > 0 ? risk.risk_factors.join(", ") : "현재 응답 기준 주요 위험 요인 없음"}</span>
+              {risk.risk_factors.length > 0 ? (
+                <div className="risk-factor-list">
+                  {risk.risk_factors.map((factor) => (
+                    <span key={factor}>{normalizeRiskFactorText(factor)}</span>
+                  ))}
+                </div>
+              ) : (
+                <span>현재 응답 기준 주요 위험 요인 없음</span>
+              )}
               <p>{risk.message}</p>
             </article>
           );

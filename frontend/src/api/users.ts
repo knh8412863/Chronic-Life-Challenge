@@ -202,6 +202,14 @@ export async function withdrawCurrentUser(payload: WithdrawalPayload, token?: st
   });
 }
 
+export async function verifyCurrentUserPassword(password: string, token?: string) {
+  return apiRequest<void>("/users/me/password-verification", {
+    method: "POST",
+    body: JSON.stringify({ password }),
+    token,
+  });
+}
+
 export async function getUserConsents(token?: string) {
   try {
     const response = await apiRequest<MaybeData<ConsentList>>("/users/me/consents", { token });

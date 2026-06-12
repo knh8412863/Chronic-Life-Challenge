@@ -12,13 +12,12 @@ function todayStr() {
 
 const fallbackActivity: DailyActivity = {
   activity_date: todayStr(),
-  steps: 8423,
-  exercise_minutes: 30,
-  sleep_hours: 7.5,
-  water_ml: 1800,
+  steps: null,
+  exercise_minutes: null,
+  sleep_hours: null,
+  water_ml: null,
   stress_level: 3,
-  diet_score: 7.0,
-  exists: true,
+  exists: false,
 };
 
 type ActivityPageProps = {
@@ -35,7 +34,6 @@ export function ActivityPage({ onNavigate: _onNavigate }: ActivityPageProps) {
   const [sleepHours, setSleepHours] = useState(String(fallbackActivity.sleep_hours ?? ""));
   const [waterMl, setWaterMl] = useState(String(fallbackActivity.water_ml ?? ""));
   const [stressLevel, setStressLevel] = useState(fallbackActivity.stress_level ?? 3);
-  const [dietScore, setDietScore] = useState(fallbackActivity.diet_score ?? 7.0);
 
   useEffect(() => {
     const token = getStoredAccessToken();
@@ -49,7 +47,6 @@ export function ActivityPage({ onNavigate: _onNavigate }: ActivityPageProps) {
         setSleepHours(String(res.data.sleep_hours ?? ""));
         setWaterMl(String(res.data.water_ml ?? ""));
         setStressLevel(res.data.stress_level ?? 3);
-        setDietScore(res.data.diet_score ?? 7.0);
       })
       .catch(() => {})
       .finally(() => setIsLoading(false));
@@ -66,7 +63,6 @@ export function ActivityPage({ onNavigate: _onNavigate }: ActivityPageProps) {
           sleep_hours: sleepHours ? Number(sleepHours) : undefined,
           water_ml: waterMl ? Number(waterMl) : undefined,
           stress_level: stressLevel,
-          diet_score: dietScore,
         },
         token ?? undefined,
       );
@@ -91,7 +87,7 @@ export function ActivityPage({ onNavigate: _onNavigate }: ActivityPageProps) {
 
       {activity.exists && (
         <div className="act-notice">
-          ℹ️ 오늘 기록이 이미 있습니다. 저장하면 기존 기록이 업데이트됩니다.
+          오늘 입력한 활동 기록이 있습니다. 건강 기록은 하루 최대 3회까지 추가 입력할 수 있습니다.
         </div>
       )}
 
@@ -159,7 +155,7 @@ export function ActivityPage({ onNavigate: _onNavigate }: ActivityPageProps) {
         <h2>컨디션</h2>
 
         <div className="act-slider-row">
-          <div className="act-slider-item">
+          <div className="act-slider-item" style={{ flex: 1 }}>
             <label className="field-label">
               스트레스 수준 {stressLevel} / 5
             </label>
@@ -173,22 +169,6 @@ export function ActivityPage({ onNavigate: _onNavigate }: ActivityPageProps) {
               onChange={(e) => setStressLevel(Number(e.target.value))}
             />
             <p className="goal-section-note">* 1에 가까울수록 낮고 5에 가까울수록 높습니다.</p>
-          </div>
-
-          <div className="act-slider-item">
-            <label className="field-label">
-              식단 점수 {dietScore.toFixed(1)} / 10
-            </label>
-            <input
-              type="range"
-              className="act-slider"
-              min={0}
-              max={10}
-              step={0.1}
-              value={dietScore}
-              onChange={(e) => setDietScore(Number(e.target.value))}
-            />
-            <p className="goal-section-note">* 0점은 낮음, 10점은 좋음 기준입니다.</p>
           </div>
         </div>
       </section>

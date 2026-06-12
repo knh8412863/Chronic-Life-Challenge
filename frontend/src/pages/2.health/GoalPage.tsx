@@ -1,11 +1,17 @@
 import { useEffect, useState } from "react";
 
 import type { AppRoute } from "../../App";
+import { getTodayActivity } from "../../api/activity";
 import { getStoredAccessToken } from "../../api/auth";
+import { getExerciseLogs } from "../../api/exercise";
 import { getHealthGoals, type HealthGoals } from "../../api/goal";
+import { getKidneyRecords } from "../../api/kidney";
+import { getLipidRecords } from "../../api/lipid";
 import { getScoreHistory, type ScoreHistory } from "../../api/stats";
+import { getVitals } from "../../api/vitals";
 import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingState } from "../../components/common/LoadingState";
+import { localDateString } from "../../utils/date";
 
 type CurrentValues = {
   systolic_bp: number | null;
@@ -26,44 +32,44 @@ type CurrentValues = {
 
 const fallbackGoals: HealthGoals = {
   chronic_disease_goal: {
-    target_systolic_bp: 120,
-    target_diastolic_bp: 80,
-    target_fasting_glucose: 100,
-    target_postprandial_glucose: 140,
+    target_systolic_bp: null,
+    target_diastolic_bp: null,
+    target_fasting_glucose: null,
+    target_postprandial_glucose: null,
     target_hba1c: null,
-    target_ldl_cholesterol: 100,
-    target_hdl_cholesterol: 60,
-    target_triglycerides: 150,
-    target_bmi: 22,
-    target_weight_kg: 68,
-    target_egfr: 60,
-    updated_at: "2026-06-05T08:00:00",
+    target_ldl_cholesterol: null,
+    target_hdl_cholesterol: null,
+    target_triglycerides: null,
+    target_bmi: null,
+    target_weight_kg: null,
+    target_egfr: null,
+    updated_at: "",
   },
   lifestyle_goal: {
-    target_steps: 10000,
-    target_water_ml: 2000,
-    target_exercise_minutes: 45,
-    target_sleep_hours: 7.5,
+    target_steps: null,
+    target_water_ml: null,
+    target_exercise_minutes: null,
+    target_sleep_hours: null,
     target_diet_score: null,
-    updated_at: "2026-06-05T08:00:00",
+    updated_at: "",
   },
 };
 
 const fallbackCurrent: CurrentValues = {
-  systolic_bp: 125,
-  diastolic_bp: 82,
-  fasting_glucose: 98,
+  systolic_bp: null,
+  diastolic_bp: null,
+  fasting_glucose: null,
   postprandial_glucose: null,
-  ldl_cholesterol: 112,
-  hdl_cholesterol: 52,
+  ldl_cholesterol: null,
+  hdl_cholesterol: null,
   triglycerides: null,
-  weight_kg: 72.5,
-  bmi: 23.7,
+  weight_kg: null,
+  bmi: null,
   egfr: null,
-  steps: 8423,
-  exercise_minutes: 30,
-  water_ml: 1800,
-  sleep_hours: 6.5,
+  steps: null,
+  exercise_minutes: null,
+  water_ml: null,
+  sleep_hours: null,
 };
 
 const fallbackHistory: ScoreHistory = {
@@ -118,20 +124,60 @@ type GoalPageProps = {
 export function GoalPage({ onNavigate }: GoalPageProps) {
   const [goals, setGoals] = useState<HealthGoals>(fallbackGoals);
   const [history, setHistory] = useState<ScoreHistory>(fallbackHistory);
+  const [current, setCurrent] = useState<CurrentValues>(fallbackCurrent);
   const [isLoading, setIsLoading] = useState(false);
   const [hasApiError, setHasApiError] = useState(false);
-  const current = fallbackCurrent;
 
   useEffect(() => {
     const token = getStoredAccessToken();
     if (!token) return;
 
     setIsLoading(true);
-    Promise.all([getHealthGoals(token), getScoreHistory("30D", token)])
-      .then(([goalsRes, historyRes]) => {
-        setGoals(goalsRes.data);
-        setHistory(historyRes.data);
-        setHasApiError(false);
+    const today = localDateString();
+    Promise.allSettled([
+      getHealthGoals(token),
+      getScoreHistory("30D", token),
+      getVitals({ limit: 20 }, token),
+      getLipidRecords({ limit: 1 }, token),
+      getKidneyRecords({ limit: 1 }, token),
+      getTodayActivity(token),
+      getExerciseLogs({ from: today, to: today, limit: 20 }, token),
+    ])
+      .then(([goalsRes, historyRes, vitalsRes, lipidRes, kidneyRes, activityRes, exerciseRes]) => {
+        if (goalsRes.status === "fulfilled") {
+          setGoals(goalsRes.value.data);
+        }
+        if (historyRes.status === "fulfilled") {
+          setHistory(historyRes.value.data);
+        }
+        const vitals = vitalsRes.status === "fulfilled" ? vitalsRes.value.data.items : [];
+        const latestBp = vitals.find((item) => item.measure_type.startsWith("BP_"));
+        const latestFasting = vitals.find((item) => item.measure_type === "GLUCOSE_FASTING");
+        const latestPostprandial = vitals.find((item) => item.measure_type === "GLUCOSE_POSTPRANDIAL");
+        const lipid = lipidRes.status === "fulfilled" ? lipidRes.value.data[0] : null;
+        const kidney = kidneyRes.status === "fulfilled" ? kidneyRes.value.data[0] : null;
+        const activity = activityRes.status === "fulfilled" ? activityRes.value.data : null;
+        const exerciseMinutes =
+          exerciseRes.status === "fulfilled"
+            ? exerciseRes.value.data.items.reduce((sum, item) => sum + item.duration_minutes, 0)
+            : null;
+        setCurrent({
+          systolic_bp: latestBp?.sbp ?? latestBp?.systolic ?? null,
+          diastolic_bp: latestBp?.dbp ?? latestBp?.diastolic ?? null,
+          fasting_glucose: latestFasting?.glucose ?? latestFasting?.glucose_value ?? null,
+          postprandial_glucose: latestPostprandial?.glucose ?? latestPostprandial?.glucose_value ?? null,
+          ldl_cholesterol: lipid?.ldl_cholesterol ?? lipid?.ldl ?? null,
+          hdl_cholesterol: lipid?.hdl_cholesterol ?? lipid?.hdl ?? null,
+          triglycerides: lipid?.triglycerides ?? null,
+          weight_kg: lipid?.weight ?? null,
+          bmi: lipid?.bmi ?? null,
+          egfr: kidney?.egfr ?? null,
+          steps: activity?.steps ?? null,
+          exercise_minutes: exerciseMinutes,
+          water_ml: activity?.water_ml ?? null,
+          sleep_hours: activity?.sleep_hours ?? null,
+        });
+        setHasApiError(goalsRes.status === "rejected" || historyRes.status === "rejected");
       })
       .catch(() => setHasApiError(true))
       .finally(() => setIsLoading(false));

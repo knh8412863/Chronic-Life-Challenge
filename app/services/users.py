@@ -15,6 +15,7 @@ from app.dtos.users import (
     UserConsentItemResponse,
     UserConsentListResponse,
     UserInfoResponse,
+    UserPasswordVerificationRequest,
     UserUpdateRequest,
     UserWithdrawalRequest,
 )
@@ -94,6 +95,10 @@ class UserManageService:
     async def update_user_info(self, user: User, data: UserUpdateRequest) -> UserInfoResponse:
         updated_user = await self.update_user(user=user, data=data)
         return await self.get_user_info(updated_user)
+
+    async def verify_current_password(self, user: User, data: UserPasswordVerificationRequest) -> None:
+        if not verify_password(data.password, user.hashed_password):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="비밀번호가 올바르지 않습니다.")
 
     async def get_consents(self, user: User) -> UserConsentListResponse:
         consent_rows = await UserConsent.filter(user_id=user.id)

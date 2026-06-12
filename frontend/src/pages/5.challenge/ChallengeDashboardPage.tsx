@@ -66,6 +66,16 @@ function categoryClass(cat: string) {
   return map[cat] ?? "walk";
 }
 
+function readableMission(description: string) {
+  return description
+    .replace("물 섭취 8 달성하기", "물 8잔 또는 약 2L 마시기")
+    .replace("물 섭취 8", "물 8잔 또는 약 2L")
+    .replace("걸음수 8000 달성하기", "8,000보 걷기")
+    .replace("운동 30 달성하기", "30분 이상 운동하기")
+    .replace("식단 1 달성하기", "저염 식단 1회 실천하기")
+    .replace("수면 7 달성하기", "7시간 이상 수면하기");
+}
+
 type Props = { onNavigate?: (route: AppRoute) => void };
 
 export function ChallengeDashboardPage({ onNavigate }: Props) {
@@ -143,7 +153,7 @@ export function ChallengeDashboardPage({ onNavigate }: Props) {
                     {m.completed && <span style={{ fontSize: 13 }}>✓</span>}
                   </div>
                   <span style={{ color: m.completed ? "var(--muted-foreground)" : "inherit", textDecoration: m.completed ? "line-through" : "none" }}>
-                    {m.description}
+                    {readableMission(m.description)}
                   </span>
                 </div>
               ))}
@@ -175,17 +185,6 @@ export function ChallengeDashboardPage({ onNavigate }: Props) {
                   <p className="streak-sub" style={{ margin: 0 }}>{d.streak_days}일 연속 미션 완료!</p>
                 </div>
               </div>
-            </div>
-          </section>
-
-          {/* 빠른 이동 */}
-          <section className="dashboard-card">
-            <h2 style={{ padding: "20px 20px 12px", margin: 0, fontSize: "15px", fontWeight: 700 }}>빠른 이동</h2>
-            <div className="challenge-quick-nav">
-              <button className="challenge-quick-btn" onClick={() => onNavigate?.("/challenges/list")}>챌린지 목록 보기</button>
-              <button className="challenge-quick-btn" onClick={() => onNavigate?.("/challenges/leaderboard")}>리더보드 보기</button>
-              <button className="challenge-quick-btn" onClick={() => onNavigate?.("/challenges/my")}>내 챌린지 현황</button>
-              <button className="challenge-quick-btn" onClick={() => onNavigate?.("/challenges/badges")}>뱃지 목록 보기</button>
             </div>
           </section>
 

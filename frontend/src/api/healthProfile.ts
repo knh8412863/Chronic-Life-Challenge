@@ -69,7 +69,24 @@ function buildFamilyHistory(input?: HealthSurveyRecord | null): FamilyHistoryIte
   return items;
 }
 
+function smokingLabel(value?: number | null) {
+  if (value === 0) return "비흡연";
+  if (value === 1) return "과거 흡연";
+  if (value === 2) return "현재 흡연";
+  return "미입력";
+}
+
+function alcoholLabel(frequency?: number | null, amount?: number | null) {
+  const frequencyLabel =
+    frequency === 0 ? "음주 안함" : frequency === 1 ? "월 1회 미만" : frequency === 3 ? "주 1회 이상" : "미입력";
+  if (!amount || frequency === 0 || frequency == null) return frequencyLabel;
+  return `${frequencyLabel}, 소주 기준 ${amount}잔`;
+}
+
 function toHealthProfile(user: UserMeResponse, latestSurvey?: HealthSurveyRecord | null): HealthProfile {
+  const height = latestSurvey?.height ?? user.height;
+  const weight = latestSurvey?.weight ?? user.weight;
+  const bmi = latestSurvey?.bmi ?? user.bmi;
   return {
     name: user.name,
     email: user.email,
@@ -77,14 +94,14 @@ function toHealthProfile(user: UserMeResponse, latestSurvey?: HealthSurveyRecord
     birthday: user.birthday,
     gender: user.gender,
     managed_diseases: user.managed_diseases,
-    height_cm: user.height,
-    weight_kg: user.weight,
-    height: user.height,
-    weight: user.weight,
-    bmi: user.bmi,
+    height_cm: height,
+    weight_kg: weight,
+    height,
+    weight,
+    bmi,
     family_history: buildFamilyHistory(latestSurvey),
-    smoking: "미입력",
-    alcohol: "미입력",
+    smoking: smokingLabel(latestSurvey?.smoking_status),
+    alcohol: alcoholLabel(latestSurvey?.alcohol_frequency, latestSurvey?.alcohol_amount),
     profile_image_url: user.profile_image_url,
   };
 }

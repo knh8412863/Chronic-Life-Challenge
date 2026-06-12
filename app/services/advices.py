@@ -14,7 +14,7 @@ from app.dtos.advices import (
     DailyAdviceResponse,
 )
 from app.models.advices import AdviceFeedback, LLMAdvice
-from app.models.predictions import ChronicHealthInput, PredictionResult
+from app.models.predictions import ActivityLog, ChronicHealthInput, ExerciseLog, MealLog, PredictionResult, VitalRecord
 from app.models.users import User
 from app.services.llm_advice import OPENAI_PROVIDER, AdviceLLMError, AdviceLLMResult, OpenAIAdviceClient
 from app.services.predictions import HealthInputService
@@ -129,6 +129,11 @@ class AdviceService:
             await PredictionResult.filter(user_id=user.id).order_by("-created_at").prefetch_related("items").first()
         )
         metric_assessment = await HealthInputService().get_metric_assessments(user)
+        today = date.today()
+        today_vitals = await VitalRecord.filter(user_id=user.id, record_date=today).order_by("-measured_at", "-id")
+        today_activity = await ActivityLog.filter(user_id=user.id, record_date=today).order_by("-created_at", "-id")
+        today_exercises = await ExerciseLog.filter(user_id=user.id, exercise_date=today).order_by("-created_at", "-id")
+        today_meals = await MealLog.filter(user_id=user.id, meal_date=today).order_by("-created_at", "-id")
 
         at_risk_diseases = []
         disease_risks = {}
@@ -151,6 +156,38 @@ class AdviceService:
                 "dyslipidemia": metric_assessment.dyslipidemia.model_dump(),
                 "obesity": metric_assessment.obesity.model_dump(),
             },
+            "today_records": {
+                "vitals": [
+                    {
+                        "measure_type": item.measure_type,
+                        "sbp": item.sbp,
+                        "dbp": item.dbp,
+                        "glucose": item.glucose,
+                    }
+                    for item in today_vitals
+                ],
+                "activity": [
+                    {
+                        "steps": item.steps,
+                        "exercise_minutes": item.exercise_minutes,
+                        "water_ml": item.water_ml,
+                        "sleep_hours": float(item.sleep_hours) if item.sleep_hours is not None else None,
+                        "stress_level": item.stress_level,
+                    }
+                    for item in today_activity
+                ],
+                "exercise_minutes": sum(item.duration_minutes for item in today_exercises),
+                "meals": [
+                    {
+                        "meal_type": item.meal_type,
+                        "food_name": item.food_name,
+                        "calories": item.calories,
+                        "sodium_mg": float(item.sodium_mg) if item.sodium_mg is not None else None,
+                        "sugar_g": float(item.sugar_g) if item.sugar_g is not None else None,
+                    }
+                    for item in today_meals
+                ],
+            },
             "generated_at_timezone": str(config.TIMEZONE),
         }
 
@@ -170,6 +207,14 @@ class AdviceService:
             parts.append("체중 관리를 위해 야식과 단 음료를 줄이고 식후 10분 걷기를 권장합니다.")
         if metric.get("dyslipidemia", {}).get("status") in {"CAUTION", "HIGH"}:
             parts.append("지질 수치 관리를 위해 튀김·가공식품 섭취를 줄여보세요.")
+
+        today_records = context.get("today_records", {})
+        if not today_records.get("vitals"):
+            parts.append("오늘 혈압 또는 혈당 기록을 입력하면 조언 정확도가 높아집니다.")
+        if today_records.get("exercise_minutes", 0) < 30:
+            parts.append("오늘은 30분 걷기나 가벼운 운동을 우선 목표로 잡아보세요.")
+        if today_records.get("meals"):
+            parts.append("오늘 식단 기록을 기준으로 저염·저당 선택을 이어가 보세요.")
 
         shingles = AdviceService._shingles_vaccination_advice(context)
         if shingles:

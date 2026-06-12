@@ -203,7 +203,7 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
       <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.35, margin: "0 0 12px" }}>
         건강한 내일을<br />지금 시작하세요
       </h2>
-      <p style={{ fontSize: 12, color: "#555", lineHeight: 1.6, margin: "0 0 24px" }}>
+      <p style={{ fontSize: 15, color: "#555", lineHeight: 1.6, margin: "0 0 24px" }}>
         AI 기반 만성질환 관리와 생활습관 챌린지로<br />더 건강한 삶을 만들어 드립니다.
       </p>
       <hr style={{ border: "none", borderTop: "1px solid #ddd", margin: "0 0 20px" }} />
@@ -218,8 +218,8 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
               <img src={item.icon} alt="" aria-hidden="true" style={{ width: 24, height: 24, objectFit: "contain" }} />
             </div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 500, color: "#1a1a1a", marginBottom: 3 }}>{item.title}</div>
-              <div style={{ fontSize: 10, color: "#888", lineHeight: 1.5 }}>{item.desc}</div>
+              <div style={{ fontSize: 17, fontWeight: 500, color: "#1a1a1a", marginBottom: 3 }}>{item.title}</div>
+              <div style={{ fontSize: 16, color: "#888", lineHeight: 1.5 }}>{item.desc}</div>
             </div>
           </div>
         ))}
@@ -233,26 +233,26 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
       <div style={{ display: "flex", height: "100vh" }}>
         <BrandPanel />
         <div style={{ flex: 1, padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center", background: "#fff", overflowY: "auto" }}>
-          <div style={{ fontSize: 11, fontWeight: 500, color: "#888", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>로그인</div>
+          <div style={{ fontSize: 17, fontWeight: 500, color: "#888", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>로그인</div>
           <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "16px 0" }} />
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
-              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>이메일</label>
-              <input disabled value={email} style={{ width: "100%", height: 34, border: "0.5px solid #e0e0e0", borderRadius: 5, padding: "0 10px", fontSize: 11, opacity: 0.6, background: "#fafafa", boxSizing: "border-box" }} />
+              <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>이메일</label>
+              <input disabled value={email} style={{ width: "100%", height: 34, border: "0.5px solid #e0e0e0", borderRadius: 5, padding: "0 10px", fontSize: 17, opacity: 0.6, background: "#fafafa", boxSizing: "border-box" }} />
             </div>
             <div>
-              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>비밀번호</label>
-              <input disabled type="password" style={{ width: "100%", height: 34, border: "0.5px solid #e0e0e0", borderRadius: 5, padding: "0 10px", fontSize: 11, opacity: 0.6, background: "#fafafa", boxSizing: "border-box" }} />
+              <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>비밀번호</label>
+              <input disabled type="password" style={{ width: "100%", height: 34, border: "0.5px solid #e0e0e0", borderRadius: 5, padding: "0 10px", fontSize: 17, opacity: 0.6, background: "#fafafa", boxSizing: "border-box" }} />
             </div>
             <div style={{ background: "#fff8f7", border: "0.5px solid #f5b7b1", borderRadius: 12, padding: "16px 18px" }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10, marginBottom: 12 }}>
                 <span style={{ fontSize: 18, color: "#e87b72" }}>⏱</span>
                 <div>
-                  <div style={{ fontSize: 14, fontWeight: 500, color: "#c0392b" }}>로그인 요청이 잠시 제한되었습니다</div>
-                  <div style={{ fontSize: 12, color: "#c0392b", marginTop: 4, lineHeight: 1.6 }}>짧은 시간 내 로그인 시도가 반복되었습니다. 잠시 후 다시 시도해주세요.</div>
+                  <div style={{ fontSize: 17, fontWeight: 500, color: "#c0392b" }}>로그인 요청이 잠시 제한되었습니다</div>
+                  <div style={{ fontSize: 15, color: "#c0392b", marginTop: 4, lineHeight: 1.6 }}>짧은 시간 내 로그인 시도가 반복되었습니다. 잠시 후 다시 시도해주세요.</div>
                 </div>
               </div>
-              <button onClick={() => onNavigate?.("/password-reset")} style={{ width: "100%", height: 34, border: "0.5px solid #e87b72", borderRadius: 8, background: "#fff", color: "#c0392b", fontSize: 11, cursor: "pointer", marginBottom: 8 }}>비밀번호 재설정</button>
+              <button onClick={() => onNavigate?.("/password-reset")} style={{ width: "100%", height: 34, border: "0.5px solid #e87b72", borderRadius: 8, background: "#fff", color: "#c0392b", fontSize: 17, cursor: "pointer", marginBottom: 8 }}>비밀번호 재설정</button>
             </div>
           </div>
         </div>
@@ -264,50 +264,50 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
     <div style={{ display: "flex", height: "100vh" }}>
       <BrandPanel />
       <div style={{ flex: 1, padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center", background: "#fff", overflowY: "auto" }}>
-        <div style={{ fontSize: 11, fontWeight: 500, color: "#888", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>로그인</div>
-        <div style={{ fontSize: 12, color: "#555", marginBottom: 20 }}>계정에 로그인하여 건강 관리를 시작하세요</div>
+        <div style={{ fontSize: 17, fontWeight: 500, color: "#888", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>로그인</div>
+        <div style={{ fontSize: 15, color: "#555", marginBottom: 20 }}>계정에 로그인하여 건강 관리를 시작하세요</div>
         <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "0 0 16px" }} />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <div>
-            <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>이메일</label>
+            <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>이메일</label>
             <input
               type="email" value={email} onChange={e => setEmail(e.target.value)}
               placeholder="example@email.com"
-              style={{ width: "100%", height: 34, border: `1.5px solid ${errorCount > 0 ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }}
+              style={{ width: "100%", height: 34, border: `1.5px solid ${errorCount > 0 ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }}
             />
           </div>
           <div>
-            <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>비밀번호</label>
+            <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>비밀번호</label>
             <div style={{ position: "relative" }}>
               <input
                 type={showPassword ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
                 placeholder="비밀번호 입력"
-                style={{ width: "100%", height: 34, border: `1.5px solid ${errorCount > 0 ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }}
+                style={{ width: "100%", height: 34, border: `1.5px solid ${errorCount > 0 ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }}
               />
               <button onClick={() => setShowPassword(!showPassword)}
-                style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "#888" }}>
+                style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "#888" }}>
                 {showPassword ? "🙈" : "👁"}
               </button>
             </div>
             {errorMessage && errorCount !== 1 && (
-              <p style={{ fontSize: 12, color: "#E24B4A", margin: "4px 0 0" }}>{errorMessage}</p>
+              <p style={{ fontSize: 15, color: "#E24B4A", margin: "4px 0 0" }}>{errorMessage}</p>
             )}
           </div>
 
           {errorCount === 1 && (
             <div style={{ background: "#FFF8E1", border: "1.5px solid #F39C12", borderRadius: 6, padding: "12px 14px" }}>
               <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#F39C12", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, flexShrink: 0 }}>!</div>
+                <div style={{ width: 18, height: 18, borderRadius: "50%", background: "#F39C12", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, flexShrink: 0 }}>!</div>
                 <div>
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#D68910", marginBottom: 4 }}>계정 잠금까지 1회 남았습니다</div>
-                  <div style={{ fontSize: 11, color: "#856404", lineHeight: 1.5 }}>한 번 더 실패하면 계정이 일시적으로 잠깁니다.</div>
+                  <div style={{ fontSize: 15, fontWeight: 600, color: "#D68910", marginBottom: 4 }}>계정 잠금까지 1회 남았습니다</div>
+                  <div style={{ fontSize: 17, color: "#856404", lineHeight: 1.5 }}>한 번 더 실패하면 계정이 일시적으로 잠깁니다.</div>
                 </div>
               </div>
             </div>
           )}
 
-          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "#555", cursor: "pointer" }}>
+          <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 17, color: "#555", cursor: "pointer" }}>
             <input
               type="checkbox"
               checked={rememberMe}
@@ -319,13 +319,13 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
 
           <button
             onClick={handleLogin} disabled={isLoading || !email || !password}
-            style={{ width: "100%", height: 36, background: isLoading || !email || !password ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: isLoading || !email || !password ? "not-allowed" : "pointer" }}>
+            style={{ width: "100%", height: 36, background: isLoading || !email || !password ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: isLoading || !email || !password ? "not-allowed" : "pointer" }}>
             {isLoading ? "로그인 중..." : "로그인"}
           </button>
 
           <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "4px 0" }}>
             <span style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
-            <span style={{ fontSize: 11, color: "#888" }}>또는</span>
+            <span style={{ fontSize: 17, color: "#888" }}>또는</span>
             <span style={{ flex: 1, height: 1, background: "#e5e7eb" }} />
           </div>
 
@@ -346,7 +346,7 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
                 borderRadius: 8,
                 background: "#f8fafc",
                 color: "#888",
-                fontSize: 12,
+                fontSize: 15,
                 cursor: "not-allowed",
               }}
             >
@@ -356,8 +356,8 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
         </div>
 
         <div style={{ display: "flex", justifyContent: "space-between", marginTop: 16 }}>
-          <button onClick={() => onNavigate?.("/password-reset")} style={{ background: "none", border: "none", fontSize: 11, color: "#888", cursor: "pointer" }}>비밀번호를 잊으셨나요?</button>
-          <button onClick={() => onNavigate?.("/signup")} style={{ background: "none", border: "none", fontSize: 11, color: "#888", cursor: "pointer" }}>회원가입</button>
+          <button onClick={() => onNavigate?.("/password-reset")} style={{ background: "none", border: "none", fontSize: 17, color: "#888", cursor: "pointer" }}>비밀번호를 잊으셨나요?</button>
+          <button onClick={() => onNavigate?.("/signup")} style={{ background: "none", border: "none", fontSize: 17, color: "#888", cursor: "pointer" }}>회원가입</button>
         </div>
       </div>
     </div>

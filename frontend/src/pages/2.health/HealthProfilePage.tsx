@@ -11,21 +11,17 @@ import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingState } from "../../components/common/LoadingState";
 
 const fallbackProfile: HealthProfile = {
-  name: "홍길동",
-  email: "hong@example.com",
-  birth_date: "1985-03-15",
-  gender: "남성",
-  managed_diseases: ["당뇨", "고혈압"],
-  height_cm: 175,
-  weight_kg: 72.5,
-  bmi: 23.7,
-  family_history: [
-    { condition: "고혈압", relation: "부" },
-    { condition: "당뇨", relation: "모" },
-    { condition: "만성신장질환", relation: "" },
-  ],
-  smoking: "비흡연",
-  alcohol: "월 2~3회",
+  name: "",
+  email: "",
+  birth_date: "",
+  gender: "",
+  managed_diseases: [],
+  height_cm: null,
+  weight_kg: null,
+  bmi: null,
+  family_history: [],
+  smoking: "미입력",
+  alcohol: "미입력",
 };
 
 const DISEASE_COLORS: Record<string, string> = {

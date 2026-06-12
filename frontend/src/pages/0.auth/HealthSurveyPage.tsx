@@ -18,6 +18,8 @@ type HealthSurveySignupDraft = {
   managed_diseases?: string[];
 };
 
+const SURVEY_STEPS = ["기본 정보", "건강 상태", "생활 습관"];
+
 function RequiredNotice() {
   return <span style={{ fontSize: 10, color: "#E24B4A", fontWeight: 600 }}>* 필수 입력</span>;
 }
@@ -31,6 +33,47 @@ function OptionButton({ label, selected, onClick }: { label: string; selected: b
     <button onClick={onClick} style={{ padding: "10px 14px", border: `1.5px solid ${selected ? "#1a1a1a" : "#ddd"}`, borderRadius: 8, background: selected ? "#1a1a1a" : "#fff", fontSize: 12, fontWeight: selected ? 600 : 400, color: selected ? "#fff" : "#555", cursor: "pointer", height: 40, display: "flex", alignItems: "center", justifyContent: "center", width: "100%" }}>
       {label}
     </button>
+  );
+}
+
+function SurveyPageWrapper({
+  children,
+  surveyStep,
+}: {
+  children: React.ReactNode;
+  surveyStep: number;
+}) {
+  return (
+    <div style={{ minHeight: "100vh", background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center", padding: 40, overflowY: "auto" }}>
+      <div style={{ width: "100%", maxWidth: surveyStep >= 2 ? 720 : 680 }}>
+        <div style={{ textAlign: "center", marginBottom: 24 }}>
+          <img src="/logo.png" alt="All4Health" style={{ height: 36, margin: "0 auto 16px", display: "block" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
+          <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", margin: "0 0 8px" }}>건강 설문</h2>
+          <p style={{ fontSize: 12, color: "#888", margin: 0 }}>정확한 건강 관리를 위한 기본 정보를 입력해주세요</p>
+        </div>
+        <Stepper steps={SURVEY_STEPS} current={Math.min(surveyStep, 2)} />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function SurveyNavButtons({
+  onPrev,
+  onNext,
+  nextLabel = "다음",
+  nextDisabled = false,
+}: {
+  onPrev: () => void;
+  onNext: () => void;
+  nextLabel?: string;
+  nextDisabled?: boolean;
+}) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20, gap: 12 }}>
+      <button onClick={onPrev} style={{ padding: "8px 20px", border: "1.5px solid #ddd", borderRadius: 8, fontSize: 13, color: "#555", cursor: "pointer", background: "#fff", height: 36 }}>이전</button>
+      <button onClick={onNext} disabled={nextDisabled} style={{ padding: "8px 20px", border: "none", borderRadius: 8, fontSize: 13, color: "#fff", cursor: nextDisabled ? "not-allowed" : "pointer", background: nextDisabled ? "#ccc" : "#1a1a1a", height: 36, fontWeight: 600 }}>{nextLabel}</button>
+    </div>
   );
 }
 
@@ -74,10 +117,10 @@ function alcoholAmountCode(value: string): number | null {
 
 function walkingDaysValue(value: string): number | null {
   const map: Record<string, number> = {
-    "0일": 0,
-    "1~2일": 2,
-    "3~4일": 4,
-    "5~6일": 6,
+    "주 0일": 0,
+    "주 1~2일": 2,
+    "주 3~4일": 4,
+    "주 5~6일": 6,
     "매일": 7,
   };
   return map[value] ?? null;
@@ -113,14 +156,18 @@ function sedentaryHoursValue(value: string): number | null {
   return map[value] ?? null;
 }
 
-function dietScoreValue(mealPattern: string, foodPreference: string): number | null {
-  if (!mealPattern && !foodPreference) return null;
+function dietScoreValue(mealPatterns: string[], foodPreferences: string[]): number | null {
+  if (mealPatterns.length === 0 && foodPreferences.length === 0) return null;
   let score = 6;
-  if (mealPattern === "규칙적인 식사") score += 2;
-  if (mealPattern === "야식 자주 섭취" || mealPattern === "끼니를 거르는 편") score -= 2;
-  if (foodPreference === "채소 섭취가 많은 편") score += 2;
-  if (["단 음식 선호", "짠 음식 선호", "기름진 음식 선호"].includes(foodPreference)) score -= 2;
+  if (mealPatterns.includes("규칙적인 식사")) score += 2;
+  if (mealPatterns.some(item => ["야식 자주 섭취", "끼니를 거르는 편"].includes(item))) score -= 2;
+  if (foodPreferences.includes("채소 섭취가 많은 편")) score += 2;
+  if (foodPreferences.some(item => ["단 음식 선호", "짠 음식 선호", "기름진 음식 선호"].includes(item))) score -= 2;
   return Math.max(0, Math.min(10, score));
+}
+
+function toggleSelection(items: string[], item: string) {
+  return items.includes(item) ? items.filter(value => value !== item) : [...items, item];
 }
 
 export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
@@ -160,8 +207,8 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   const [drinkingAmount, setDrinkingAmount] = useState(""); // 1회 평균 음주량
 
   // 생활습관2
-  const [mealPattern, setMealPattern] = useState("");
-  const [foodPreference, setFoodPreference] = useState("");
+  const [mealPatterns, setMealPatterns] = useState<string[]>([]);
+  const [foodPreferences, setFoodPreferences] = useState<string[]>([]);
   const [sittingTime, setSittingTime] = useState("");
   const [stressLevel, setStressLevel] = useState(2);
   const [isSavingSurvey, setIsSavingSurvey] = useState(false);
@@ -211,33 +258,10 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
 
   const bmiStatus = getBmiStatus(bmi);
 
-  const SURVEY_STEPS = ["기본 정보", "건강 상태", "생활 습관"];
-
-  const PageWrapper = ({ children }: { children: React.ReactNode }) => (
-    <div style={{ minHeight: "100vh", background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center", padding: 40, overflowY: "auto" }}>
-      <div style={{ width: "100%", maxWidth: surveyStep >= 2 ? 720 : 680 }}>
-        <div style={{ textAlign: "center", marginBottom: 24 }}>
-          <img src="/logo.png" alt="All4Health" style={{ height: 36, margin: "0 auto 16px", display: "block" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
-          <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", margin: "0 0 8px" }}>건강 설문</h2>
-          <p style={{ fontSize: 12, color: "#888", margin: 0 }}>정확한 건강 관리를 위한 기본 정보를 입력해주세요</p>
-        </div>
-        <Stepper steps={SURVEY_STEPS} current={Math.min(surveyStep, 2)} />
-        {children}
-      </div>
-    </div>
-  );
-
-  const NavButtons = ({ onPrev, onNext, nextLabel = "다음", nextDisabled = false }: { onPrev?: () => void; onNext: () => void; nextLabel?: string; nextDisabled?: boolean }) => (
-    <div style={{ display: "flex", justifyContent: "space-between", marginTop: 20, gap: 12 }}>
-      <button onClick={onPrev || (() => setSurveyStep(s => s - 1))} style={{ padding: "8px 20px", border: "1.5px solid #ddd", borderRadius: 8, fontSize: 13, color: "#555", cursor: "pointer", background: "#fff", height: 36 }}>이전</button>
-      <button onClick={onNext} disabled={nextDisabled} style={{ padding: "8px 20px", border: "none", borderRadius: 8, fontSize: 13, color: "#fff", cursor: nextDisabled ? "not-allowed" : "pointer", background: nextDisabled ? "#ccc" : "#1a1a1a", height: 36, fontWeight: 600 }}>{nextLabel}</button>
-    </div>
-  );
-
   // ── 기본 정보 ──
   if (surveyStep === 0) {
     return (
-      <PageWrapper>
+      <SurveyPageWrapper surveyStep={surveyStep}>
         <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 24, marginTop: 20 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
             <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>기본 정보</h3>
@@ -292,8 +316,8 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
             </div>
           </div>
         </div>
-        <NavButtons onPrev={() => onNavigate("/email-verify")} onNext={() => setSurveyStep(1)} />
-      </PageWrapper>
+        <SurveyNavButtons onPrev={() => onNavigate("/email-verify")} onNext={() => setSurveyStep(1)} />
+      </SurveyPageWrapper>
     );
   }
 
@@ -309,7 +333,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
     };
 
     return (
-      <PageWrapper>
+      <SurveyPageWrapper surveyStep={surveyStep}>
         <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 20, marginTop: 20 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
             <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>건강 상태</h3>
@@ -353,20 +377,6 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
             <div>
               <label style={{ fontSize: 10, fontWeight: 500, color: "#555", display: "block", marginBottom: 8 }}>가족력</label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
-                {/* 당뇨 가족력 */}
-                <div style={{ background: "#fff9c4", border: "1px solid #f57f17", borderRadius: 6, padding: "8px 10px" }}>
-                  <p style={{ fontSize: 10, fontWeight: 600, color: "#f57f17", margin: "0 0 6px" }}>당뇨</p>
-                  {[
-                    { label: "아버지", state: fhDiabetesFather, setState: setFhDiabetesFather },
-                    { label: "어머니", state: fhDiabetesMother, setState: setFhDiabetesMother },
-                    { label: "형제/자매", state: fhDiabetesSibling, setState: setFhDiabetesSibling },
-                  ].map(item => (
-                    <label key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, cursor: "pointer" }}>
-                      <input type="checkbox" checked={item.state} onChange={e => item.setState(e.target.checked)} style={{ width: 12, height: 12 }} />
-                      <span style={{ fontSize: 11, color: "#333" }}>{item.label}</span>
-                    </label>
-                  ))}
-                </div>
                 {/* 고혈압 가족력 */}
                 <div style={{ background: "#fce4ec", border: "1px solid #c2185b", borderRadius: 6, padding: "8px 10px" }}>
                   <p style={{ fontSize: 10, fontWeight: 600, color: "#c2185b", margin: "0 0 6px" }}>고혈압</p>
@@ -374,6 +384,20 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
                     { label: "아버지", state: fhHypertensionFather, setState: setFhHypertensionFather },
                     { label: "어머니", state: fhHypertensionMother, setState: setFhHypertensionMother },
                     { label: "형제/자매", state: fhHypertensionSibling, setState: setFhHypertensionSibling },
+                  ].map(item => (
+                    <label key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, cursor: "pointer" }}>
+                      <input type="checkbox" checked={item.state} onChange={e => item.setState(e.target.checked)} style={{ width: 12, height: 12 }} />
+                      <span style={{ fontSize: 11, color: "#333" }}>{item.label}</span>
+                    </label>
+                  ))}
+                </div>
+                {/* 당뇨 가족력 */}
+                <div style={{ background: "#fff9c4", border: "1px solid #f57f17", borderRadius: 6, padding: "8px 10px" }}>
+                  <p style={{ fontSize: 10, fontWeight: 600, color: "#f57f17", margin: "0 0 6px" }}>당뇨</p>
+                  {[
+                    { label: "아버지", state: fhDiabetesFather, setState: setFhDiabetesFather },
+                    { label: "어머니", state: fhDiabetesMother, setState: setFhDiabetesMother },
+                    { label: "형제/자매", state: fhDiabetesSibling, setState: setFhDiabetesSibling },
                   ].map(item => (
                     <label key={item.label} style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 4, cursor: "pointer" }}>
                       <input type="checkbox" checked={item.state} onChange={e => item.setState(e.target.checked)} style={{ width: 12, height: 12 }} />
@@ -414,15 +438,15 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
             </div>
           </div>
         </div>
-        <NavButtons onPrev={() => setSurveyStep(0)} onNext={() => setSurveyStep(2)} />
-      </PageWrapper>
+        <SurveyNavButtons onPrev={() => setSurveyStep(0)} onNext={() => setSurveyStep(2)} />
+      </SurveyPageWrapper>
     );
   }
 
   // ── 생활습관 1 ──
   if (surveyStep === 2) {
     return (
-      <PageWrapper>
+      <SurveyPageWrapper surveyStep={surveyStep}>
         <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 12, padding: 28, marginTop: 24 }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
             <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>신체활동 영역</h3>
@@ -437,7 +461,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
           <div style={{ marginBottom: 28 }}>
             <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 12 }}>걷기 일수</label>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
-              {["0일", "1~2일", "3~4일", "5~6일", "매일"].map(d => <OptionButton key={d} label={d} selected={walkingDays === d} onClick={() => setWalkingDays(d)} />)}
+              {["주 0일", "주 1~2일", "주 3~4일", "주 5~6일", "매일"].map(d => <OptionButton key={d} label={d} selected={walkingDays === d} onClick={() => setWalkingDays(d)} />)}
             </div>
           </div>
           <div style={{ marginBottom: 28 }}>
@@ -485,7 +509,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
           </div>
           {drinking !== "" && drinking !== "안 마심" && (
             <div>
-              <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 14 }}>1회 평균 음주량<RequiredMark /></label>
+              <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 14 }}>1회 평균 음주량 <span style={{ fontSize: 11, color: "#888", fontWeight: 400 }}>(소주 기준)</span><RequiredMark /></label>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
                 {["1~2잔", "3~4잔", "5~6잔", "7~9잔", "10잔 이상"].map(opt => (
                   <OptionButton key={opt} label={opt} selected={drinkingAmount === opt} onClick={() => setDrinkingAmount(opt)} />
@@ -495,8 +519,8 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
             </div>
           )}
         </div>
-        <NavButtons onPrev={() => setSurveyStep(1)} onNext={() => setSurveyStep(3)} />
-      </PageWrapper>
+        <SurveyNavButtons onPrev={() => setSurveyStep(1)} onNext={() => setSurveyStep(3)} />
+      </SurveyPageWrapper>
     );
   }
 
@@ -550,7 +574,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
           physical_activity_min: optionalNumber(physicalActivityMin),
           sleep_hours: sleepHoursValue(sleepTime),
           stress_level: stressLevel + 1,
-          diet_score: dietScoreValue(mealPattern, foodPreference),
+          diet_score: dietScoreValue(mealPatterns, foodPreferences),
         },
         token,
       );
@@ -564,7 +588,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   };
 
   return (
-    <PageWrapper>
+    <SurveyPageWrapper surveyStep={surveyStep}>
       <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 12, padding: 28, marginTop: 24 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24 }}>
           <h3 style={{ fontSize: 15, fontWeight: 600, color: "#1a1a1a", margin: 0 }}>식습관 영역</h3>
@@ -573,13 +597,13 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
         <div style={{ marginBottom: 28 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 12 }}>식사 패턴</label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            {["규칙적인 식사", "아침 식사 자주 생략", "야식 자주 섭취", "끼니를 거르는 편"].map(d => <OptionButton key={d} label={d} selected={mealPattern === d} onClick={() => setMealPattern(d)} />)}
+            {["규칙적인 식사", "아침 식사 자주 생략", "야식 자주 섭취", "끼니를 거르는 편"].map(d => <OptionButton key={d} label={d} selected={mealPatterns.includes(d)} onClick={() => setMealPatterns(prev => toggleSelection(prev, d))} />)}
           </div>
         </div>
         <div style={{ marginBottom: 28 }}>
           <label style={{ fontSize: 12, fontWeight: 600, color: "#1a1a1a", display: "block", marginBottom: 12 }}>음식 성향</label>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-            {["채소 섭취가 많은 편", "단 음식 선호", "짠 음식 선호", "기름진 음식 선호"].map(d => <OptionButton key={d} label={d} selected={foodPreference === d} onClick={() => setFoodPreference(d)} />)}
+            {["채소 섭취가 많은 편", "단 음식 선호", "짠 음식 선호", "기름진 음식 선호"].map(d => <OptionButton key={d} label={d} selected={foodPreferences.includes(d)} onClick={() => setFoodPreferences(prev => toggleSelection(prev, d))} />)}
           </div>
         </div>
         <div style={{ marginBottom: 28 }}>
@@ -614,12 +638,12 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
       {surveyError && (
         <p style={{ fontSize: 12, color: "#E24B4A", margin: "12px 0 0", textAlign: "right" }}>{surveyError}</p>
       )}
-      <NavButtons
+      <SurveyNavButtons
         onPrev={() => setSurveyStep(2)}
         onNext={handleComplete}
         nextLabel={isSavingSurvey ? "저장 중..." : "설문 완료"}
         nextDisabled={isSavingSurvey || !birthDate || !height || !weight}
       />
-    </PageWrapper>
+    </SurveyPageWrapper>
   );
 }

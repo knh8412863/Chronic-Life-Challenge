@@ -207,8 +207,10 @@ class VirtualPetService:
 
     async def get_pet_catalog(self, user: User, pet_type: PetType | None = None) -> PetCatalogResponse:
         current_streak_days = await self._current_challenge_streak_days(user.id, self._today())
+        current_pet = await VirtualPet.get_or_none(user_id=user.id)
+        current_pet_type = current_pet.pet_type if current_pet else None
         catalog_items = [item for item in PET_CATALOG if pet_type is None or item["pet_type"] == pet_type]
-        items = [self._to_catalog_item(item, current_streak_days) for item in catalog_items]
+        items = [self._to_catalog_item(item, current_streak_days, current_pet_type) for item in catalog_items]
         unlocked_count = sum(1 for item in items if item.is_unlocked)
         return PetCatalogResponse(
             summary=PetCatalogSummaryResponse(
@@ -303,9 +305,17 @@ class VirtualPetService:
         return streak
 
     @staticmethod
-    def _to_catalog_item(item: dict, current_streak_days: int) -> PetCatalogItemResponse:
+    def _to_catalog_item(
+        item: dict,
+        current_streak_days: int,
+        current_pet_type: PetType | None,
+    ) -> PetCatalogItemResponse:
         required_streak_days = item["required_streak_days"]
-        is_unlocked = current_streak_days >= required_streak_days
+        is_selected_pet = item["pet_type"] == current_pet_type
+        if required_streak_days <= 0:
+            is_unlocked = is_selected_pet
+        else:
+            is_unlocked = is_selected_pet or current_streak_days >= required_streak_days
         return PetCatalogItemResponse(
             catalog_id=item["catalog_id"],
             pet_type=item["pet_type"],

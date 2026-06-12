@@ -71,6 +71,8 @@ export function PetPage({ onNavigate }: PetPageProps) {
   const [nameError, setNameError] = useState("");
   const [isSavingName, setIsSavingName] = useState(false);
   const [isClaiming, setIsClaiming] = useState(false);
+  const [rewardModal, setRewardModal] = useState<{ title: string; message: string } | null>(null);
+  const [showIntroModal, setShowIntroModal] = useState(false);
 
   function loadPet() {
     const token = getStoredAccessToken();
@@ -90,6 +92,10 @@ export function PetPage({ onNavigate }: PetPageProps) {
 
   useEffect(() => {
     loadPet();
+    if (!localStorage.getItem("pet.introSeen")) {
+      setShowIntroModal(true);
+      localStorage.setItem("pet.introSeen", "true");
+    }
   }, []);
 
   async function handleSaveName() {
@@ -124,13 +130,16 @@ export function PetPage({ onNavigate }: PetPageProps) {
     try {
       const response = await claimVirtualPetRewards(token);
       if (response.data.claimed_task_count === 0) {
-        alert("수령할 보상이 없습니다.");
+        setRewardModal({ title: "수령 가능한 보상이 없습니다.", message: "오늘 완료한 보상 과제를 확인해 주세요." });
       } else {
-        alert(`${response.data.awarded_experience} XP를 받았습니다.`);
+        setRewardModal({
+          title: "보상 수령 완료",
+          message: `${response.data.claimed_task_count}개 과제를 완료해 ${response.data.awarded_experience} XP를 받았습니다.`,
+        });
       }
       loadPet();
     } catch {
-      alert("보상 수령에 실패했습니다.");
+      setRewardModal({ title: "보상 수령 실패", message: "잠시 후 다시 시도해 주세요." });
     } finally {
       setIsClaiming(false);
     }
@@ -329,6 +338,31 @@ export function PetPage({ onNavigate }: PetPageProps) {
           </div>
         </div>
       </div>
+
+      {showIntroModal && (
+        <div className="app-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="app-modal-card">
+            <h2>나만의 펫 키우기</h2>
+            <p>건강 기록, 운동, 챌린지 달성 같은 오늘의 과제를 완료하면 펫 경험치를 받을 수 있습니다.</p>
+            <p>경험치가 쌓이면 펫이 성장하고, 도감에서 선택한 펫의 상태를 확인할 수 있습니다.</p>
+            <button type="button" className="green-button" onClick={() => setShowIntroModal(false)}>
+              확인
+            </button>
+          </div>
+        </div>
+      )}
+
+      {rewardModal && (
+        <div className="app-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="app-modal-card">
+            <h2>{rewardModal.title}</h2>
+            <p>{rewardModal.message}</p>
+            <button type="button" className="green-button" onClick={() => setRewardModal(null)}>
+              확인
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

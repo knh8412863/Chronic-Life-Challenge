@@ -4,11 +4,13 @@ import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
 import {
   MEASURE_TYPE_LABELS,
+  deleteVital,
   getVitalDetail,
   isBpType,
   type VitalDetail,
 } from "../../api/vitals";
 import { LoadingState } from "../../components/common/LoadingState";
+import { localDateString } from "../../utils/date";
 
 function formatDateTime(iso: string) {
   const d = new Date(iso);
@@ -17,16 +19,16 @@ function formatDateTime(iso: string) {
 }
 
 const fallbackDetail: VitalDetail = {
-  id: 1,
+  id: 0,
   measure_type: "BP_MORNING",
-  measured_at: "2026-05-13T09:30:00",
-  systolic: 125,
-  diastolic: 82,
+  measured_at: `${localDateString()}T00:00:00`,
+  systolic: null,
+  diastolic: null,
   is_critical: false,
-  memo: "아침 식사 전 측정. 전날 수면 부족으로 인한 영향 가능성 있음.",
-  created_at: "2026-05-13T09:30:00",
-  avg_systolic_7d: 128,
-  avg_diastolic_7d: 84,
+  memo: null,
+  created_at: `${localDateString()}T00:00:00`,
+  avg_systolic_7d: null,
+  avg_diastolic_7d: null,
   avg_glucose_7d: null,
   recent_records: [],
 };
@@ -64,6 +66,24 @@ export function VitalsDetailPage({ onNavigate }: VitalsDetailPageProps) {
   if (isLoading) return <LoadingState message="기록을 불러오는 중입니다." />;
 
   const isBp = isBpType(detail.measure_type);
+  const canModify = detail.id > 0 && detail.measured_at.slice(0, 10) === localDateString();
+
+  function handleEdit() {
+    sessionStorage.setItem("editingVitalData", JSON.stringify(detail));
+    onNavigate?.("/health/vitals/input");
+  }
+
+  async function handleDelete() {
+    if (!window.confirm("이 기록을 삭제하시겠습니까?")) return;
+    if (!canModify) return;
+    const token = getStoredAccessToken();
+    try {
+      await deleteVital(detail.id, token ?? undefined);
+      onNavigate?.("/health/vitals");
+    } catch {
+      alert("삭제에 실패했습니다.");
+    }
+  }
 
   return (
     <div className="vitals-detail-page page-stack">
@@ -76,11 +96,12 @@ export function VitalsDetailPage({ onNavigate }: VitalsDetailPageProps) {
           <button
             type="button"
             className="wide-subtle-button"
-            onClick={() => onNavigate?.("/health/vitals/input")}
+            onClick={handleEdit}
+            disabled={!canModify}
           >
             수정
           </button>
-          <button type="button" className="vl-action-btn vl-delete-btn">
+          <button type="button" className="vl-action-btn vl-delete-btn" onClick={handleDelete} disabled={!canModify}>
             삭제
           </button>
         </div>

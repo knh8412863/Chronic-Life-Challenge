@@ -176,6 +176,9 @@ class ActivityLog(models.Model):
     alcohol_frequency = fields.IntField(null=True)
     alcohol_amount = fields.IntField(null=True)
     walking_days = fields.IntField(null=True)
+    steps = fields.IntField(null=True)
+    exercise_minutes = fields.IntField(null=True)
+    water_ml = fields.IntField(null=True)
     sedentary_hours = fields.DecimalField(max_digits=4, decimal_places=1, null=True)
     sleep_hours = fields.DecimalField(max_digits=3, decimal_places=1, null=True)
     stress_level = fields.IntField(null=True)
@@ -186,7 +189,6 @@ class ActivityLog(models.Model):
 
     class Meta:
         table = "activity_logs"
-        unique_together = (("user", "record_date"),)
 
 
 class ExerciseLog(models.Model):

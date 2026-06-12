@@ -218,7 +218,7 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
         <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", lineHeight: 1.35, margin: "0 0 12px" }}>
           건강한 변화의<br />첫 걸음을 시작하세요
         </h2>
-        <p style={{ fontSize: 12, color: "#555", lineHeight: 1.6, margin: "0 0 24px" }}>
+        <p style={{ fontSize: 15, color: "#555", lineHeight: 1.6, margin: "0 0 24px" }}>
           All4Health와 함께 만성질환을 예방하고<br />생활습관을 개선해보세요.
         </p>
         <hr style={{ border: "none", borderTop: "1px solid #ddd", margin: "0 0 20px" }} />
@@ -231,10 +231,10 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
             { num: "5", title: "완료", desc: "가입 완료 및 서비스 시작", active: false },
           ].map((item) => (
             <div key={item.num} style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-              <div style={{ width: 28, height: 28, borderRadius: "50%", border: `1.5px solid ${item.active ? "#1a1a1a" : "#ddd"}`, background: item.active ? "#1a1a1a" : "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: item.active ? "#fff" : "#888", flexShrink: 0 }}>{item.num}</div>
+              <div style={{ width: 28, height: 28, borderRadius: "50%", border: `1.5px solid ${item.active ? "#1a1a1a" : "#ddd"}`, background: item.active ? "#1a1a1a" : "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, color: item.active ? "#fff" : "#888", flexShrink: 0 }}>{item.num}</div>
               <div>
-                <div style={{ fontSize: 11, fontWeight: item.active ? 600 : 400, color: item.active ? "#1a1a1a" : "#888", marginBottom: 3 }}>{item.title}</div>
-                <div style={{ fontSize: 10, color: "#aaa", lineHeight: 1.5 }}>{item.desc}</div>
+                <div style={{ fontSize: 17, fontWeight: item.active ? 600 : 400, color: item.active ? "#1a1a1a" : "#888", marginBottom: 3 }}>{item.title}</div>
+                <div style={{ fontSize: 16, color: "#aaa", lineHeight: 1.5 }}>{item.desc}</div>
               </div>
             </div>
           ))}
@@ -243,24 +243,24 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
 
       {/* Right - 회원가입 폼 */}
       <div style={{ flex: 1, padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center", background: "#fff", overflowY: "auto" }}>
-        <div style={{ fontSize: 11, fontWeight: 500, color: "#888", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>회원가입</div>
-        <div style={{ fontSize: 12, color: "#555", marginBottom: 20 }}>아래 정보를 입력하여 계정을 만드세요</div>
+        <div style={{ fontSize: 17, fontWeight: 500, color: "#888", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>회원가입</div>
+        <div style={{ fontSize: 15, color: "#555", marginBottom: 20 }}>아래 정보를 입력하여 계정을 만드세요</div>
         <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "0 0 16px" }} />
 
         <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* 이름 + 성별 */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>이름</label>
+              <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>이름</label>
               <input value={name} onChange={e => setName(e.target.value)} placeholder="홍길동"
-                style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
+                style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }} />
             </div>
             <div>
-              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>성별</label>
+              <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>성별</label>
               <div style={{ display: "flex", gap: 8 }}>
                 {(["male", "female"] as const).map(g => (
                   <button key={g} onClick={() => setGender(g)}
-                    style={{ flex: 1, height: 34, border: `1.5px solid ${gender === g ? "#1a1a1a" : "#ddd"}`, borderRadius: 5, background: gender === g ? "#1a1a1a" : "#fff", color: gender === g ? "#fff" : "#555", fontSize: 11, cursor: "pointer" }}>
+                    style={{ flex: 1, height: 34, border: `1.5px solid ${gender === g ? "#1a1a1a" : "#ddd"}`, borderRadius: 5, background: gender === g ? "#1a1a1a" : "#fff", color: gender === g ? "#fff" : "#555", fontSize: 17, cursor: "pointer" }}>
                     {g === "male" ? "남성" : "여성"}
                   </button>
                 ))}
@@ -271,93 +271,93 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
           {/* 생년월일 + 휴대폰 */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <div>
-              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>생년월일</label>
+              <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>생년월일</label>
               <input type="date" value={birthDate} onChange={e => setBirthDate(e.target.value)}
-                style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
+                style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }} />
             </div>
             <div>
-              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>휴대폰 번호</label>
+              <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>휴대폰 번호</label>
               <input value={phoneNumber} onChange={e => { setPhoneNumber(e.target.value); setPhoneServerError(""); }} placeholder="01012345678"
-                style={{ width: "100%", height: 34, border: `1.5px solid ${phoneError || phoneServerError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
-              {phoneError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>휴대폰 번호 형식을 확인해주세요.</p>}
-              {phoneServerError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>{phoneServerError}</p>}
+                style={{ width: "100%", height: 34, border: `1.5px solid ${phoneError || phoneServerError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }} />
+              {phoneError && <p style={{ fontSize: 17, color: "#E24B4A", margin: "4px 0 0" }}>휴대폰 번호 형식을 확인해주세요.</p>}
+              {phoneServerError && <p style={{ fontSize: 17, color: "#E24B4A", margin: "4px 0 0" }}>{phoneServerError}</p>}
             </div>
           </div>
 
           {/* 이메일 */}
           <div>
-            <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>이메일 (필수)</label>
+            <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>이메일 (필수)</label>
             <div style={{ display: "flex", gap: 8 }}>
               <input type="email" value={email} disabled={Boolean(googleDraft)} onChange={e => { setEmail(e.target.value); setEmailChecked(false); setEmailServerError(""); }} placeholder="example@email.com"
-                style={{ flex: 1, height: 34, border: `1.5px solid ${emailServerError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none", background: googleDraft ? "#fafafa" : "#fff" }} />
+                style={{ flex: 1, height: 34, border: `1.5px solid ${emailServerError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 10px", fontSize: 17, boxSizing: "border-box", outline: "none", background: googleDraft ? "#fafafa" : "#fff" }} />
               {!googleDraft && (
                 <button onClick={handleEmailCheck}
-                  style={{ height: 34, minWidth: 70, border: "1.5px solid #ddd", borderRadius: 5, background: "#f5f5f5", fontSize: 10, color: "#555", cursor: "pointer" }}>이메일 확인</button>
+                  style={{ height: 34, minWidth: 70, border: "1.5px solid #ddd", borderRadius: 5, background: "#f5f5f5", fontSize: 16, color: "#555", cursor: "pointer" }}>이메일 확인</button>
               )}
             </div>
-            {googleDraft && <p style={{ fontSize: 11, color: "#2e7d32", margin: "4px 0 0" }}>Google 계정 이메일로 가입합니다.</p>}
-            {!googleDraft && emailChecked && <p style={{ fontSize: 11, color: "#2e7d32", margin: "4px 0 0" }}>✓ 이메일 형식이 확인되었습니다.</p>}
-            {emailServerError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>{emailServerError}</p>}
+            {googleDraft && <p style={{ fontSize: 17, color: "#2e7d32", margin: "4px 0 0" }}>Google 계정 이메일로 가입합니다.</p>}
+            {!googleDraft && emailChecked && <p style={{ fontSize: 17, color: "#2e7d32", margin: "4px 0 0" }}>✓ 이메일 형식이 확인되었습니다.</p>}
+            {emailServerError && <p style={{ fontSize: 17, color: "#E24B4A", margin: "4px 0 0" }}>{emailServerError}</p>}
           </div>
 
           {/* 비밀번호 */}
           {!googleDraft && (
             <div>
-              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>비밀번호</label>
+              <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>비밀번호</label>
               <div style={{ position: "relative" }}>
                 <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="영문+숫자+특수문자 조합 8자 이상"
-                  style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 36px 0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
-                <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>
+                  style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 36px 0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }} />
+                <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 15 }}>
                   {showPw ? "🙈" : "👁"}
                 </button>
               </div>
-              {passwordError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>{passwordError}</p>}
+              {passwordError && <p style={{ fontSize: 17, color: "#E24B4A", margin: "4px 0 0" }}>{passwordError}</p>}
             </div>
           )}
 
           {/* 비밀번호 확인 */}
           {!googleDraft && (
             <div>
-              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>비밀번호 확인</label>
+              <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>비밀번호 확인</label>
               <div style={{ position: "relative" }}>
                 <input type={showPwConfirm ? "text" : "password"} value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)}
                   placeholder="동일하게 입력"
-                  style={{ width: "100%", height: 34, border: `1.5px solid ${pwMismatch ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
-                <button onClick={() => setShowPwConfirm(!showPwConfirm)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>
+                  style={{ width: "100%", height: 34, border: `1.5px solid ${pwMismatch ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }} />
+                <button onClick={() => setShowPwConfirm(!showPwConfirm)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 15 }}>
                   {showPwConfirm ? "🙈" : "👁"}
                 </button>
               </div>
-              {pwMismatch && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>비밀번호가 일치하지 않습니다.</p>}
+              {pwMismatch && <p style={{ fontSize: 17, color: "#E24B4A", margin: "4px 0 0" }}>비밀번호가 일치하지 않습니다.</p>}
             </div>
           )}
 
           {/* 관리 질환 선택 */}
           <div>
-            <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>관리 대상 질환 선택 *</label>
-            <p style={{ fontSize: 11, color: "#888", margin: "0 0 10px" }}>1개 이상 선택해주세요.</p>
+            <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>관리 대상 질환 선택 *</label>
+            <p style={{ fontSize: 17, color: "#888", margin: "0 0 10px" }}>1개 이상 선택해주세요.</p>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
               {DISEASES.map(d => (
                 <label key={d} style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                   <input type="checkbox" checked={selectedDiseases.includes(d)} onChange={() => toggleDisease(d)}
                     style={{ width: 14, height: 14, cursor: "pointer" }} />
-                  <span style={{ fontSize: 12, color: "#333" }}>{d}</span>
+                  <span style={{ fontSize: 15, color: "#333" }}>{d}</span>
                 </label>
               ))}
             </div>
-            {selectedDiseases.length === 0 && <p style={{ fontSize: 11, color: "#E24B4A", margin: "6px 0 0" }}>관리 대상 질환을 1개 이상 선택해주세요.</p>}
+            {selectedDiseases.length === 0 && <p style={{ fontSize: 17, color: "#E24B4A", margin: "6px 0 0" }}>관리 대상 질환을 1개 이상 선택해주세요.</p>}
           </div>
 
-          {formMessage && <p style={{ fontSize: 11, color: formMessage.includes("확인되었습니다") ? "#2e7d32" : "#E24B4A", margin: 0 }}>{formMessage}</p>}
+          {formMessage && <p style={{ fontSize: 17, color: formMessage.includes("확인되었습니다") ? "#2e7d32" : "#E24B4A", margin: 0 }}>{formMessage}</p>}
 
           <button onClick={handleNext} disabled={!isValid || isLoading}
-            style={{ width: "100%", height: 36, background: !isValid || isLoading ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: !isValid || isLoading ? "not-allowed" : "pointer", marginTop: 6 }}>
+            style={{ width: "100%", height: 36, background: !isValid || isLoading ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: !isValid || isLoading ? "not-allowed" : "pointer", marginTop: 6 }}>
             {isLoading ? "처리 중..." : "다음"}
           </button>
 
           <div style={{ textAlign: "right" }}>
-            <span style={{ fontSize: 11, color: "#888" }}>이미 계정이 있으신가요? </span>
-            <button onClick={() => onNavigate("/login")} style={{ background: "none", border: "none", fontSize: 11, color: "#1a1a1a", cursor: "pointer", fontWeight: 600 }}>로그인</button>
+            <span style={{ fontSize: 17, color: "#888" }}>이미 계정이 있으신가요? </span>
+            <button onClick={() => onNavigate("/login")} style={{ background: "none", border: "none", fontSize: 17, color: "#1a1a1a", cursor: "pointer", fontWeight: 600 }}>로그인</button>
           </div>
         </div>
       </div>

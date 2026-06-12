@@ -9,7 +9,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from tortoise.transactions import in_transaction
 
-from app.core import config
+from app.core import config, default_logger
 from app.dtos.predictions import (
     ActivityLogCreateRequest,
     ActivityLogListResponse,
@@ -206,6 +206,7 @@ class HealthInputService:
     async def create_lipid_obesity_record(
         self, user: User, data: LipidObesityRecordCreateRequest
     ) -> OptionalRecordCreateResponse:
+        await self._ensure_daily_health_record_limit(user.id, data.record_date)
         bmi = _calculate_bmi(data.height, data.weight) if data.height is not None and data.weight is not None else None
         record = await LipidObesityRecord.create(
             user=user,
@@ -229,6 +230,7 @@ class HealthInputService:
         return OptionalRecordCreateResponse(record_id=record.id, bmi=bmi, created_at=record.created_at)
 
     async def create_renal_record(self, user: User, data: RenalRecordCreateRequest) -> OptionalRecordCreateResponse:
+        await self._ensure_daily_health_record_limit(user.id, data.record_date)
         record = await RenalRecord.create(user=user, **data.model_dump())
         return OptionalRecordCreateResponse(record_id=record.id, created_at=record.created_at)
 
@@ -283,6 +285,7 @@ class HealthInputService:
         return self._to_renal_record(record)
 
     async def create_vital_record(self, user: User, data: VitalRecordCreateRequest) -> OptionalRecordCreateResponse:
+        await self._ensure_daily_health_record_limit(user.id, data.measured_at.date())
         is_critical = self._is_vital_critical(data.measure_type.value, data.sbp, data.dbp, data.glucose)
         record = await VitalRecord.create(
             user=user,
@@ -380,13 +383,14 @@ class HealthInputService:
         await record.delete()
 
     async def create_activity_log(self, user: User, data: ActivityLogCreateRequest) -> OptionalRecordCreateResponse:
-        exists = await ActivityLog.exists(user_id=user.id, record_date=data.record_date)
-        if exists:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="이미 등록된 날짜의 생활습관 기록입니다.")
+        await self._ensure_daily_health_record_limit(user.id, data.record_date)
 
         record = await ActivityLog.create(
             user=user,
             record_date=data.record_date,
+            steps=data.steps,
+            exercise_minutes=data.exercise_minutes,
+            water_ml=data.water_ml,
             alcohol_frequency=data.alcohol_frequency,
             alcohol_amount=data.alcohol_amount,
             walking_days=data.walking_days,
@@ -441,7 +445,16 @@ class HealthInputService:
         alcohol_amount = update_data.get("alcohol_amount", record.alcohol_amount)
         self._validate_activity_alcohol(alcohol_frequency, alcohol_amount)
 
-        for field in ["alcohol_frequency", "alcohol_amount", "walking_days", "stress_level", "memo"]:
+        for field in [
+            "steps",
+            "exercise_minutes",
+            "water_ml",
+            "alcohol_frequency",
+            "alcohol_amount",
+            "walking_days",
+            "stress_level",
+            "memo",
+        ]:
             if field in update_data:
                 setattr(record, field, update_data[field])
         for field in ["sedentary_hours", "sleep_hours", "diet_score"]:
@@ -491,6 +504,7 @@ class HealthInputService:
         )
 
     async def create_exercise_log(self, user: User, data: ExerciseLogCreateRequest) -> OptionalRecordCreateResponse:
+        await self._ensure_daily_health_record_limit(user.id, data.exercise_date)
         record = await ExerciseLog.create(
             user=user,
             exercise_date=data.exercise_date,
@@ -882,6 +896,9 @@ class HealthInputService:
         return ActivityLogResponse(
             activity_log_id=record.id,
             record_date=record.record_date,
+            steps=record.steps,
+            exercise_minutes=record.exercise_minutes,
+            water_ml=record.water_ml,
             alcohol_frequency=record.alcohol_frequency,
             alcohol_amount=record.alcohol_amount,
             walking_days=record.walking_days,
@@ -1221,6 +1238,19 @@ class HealthInputService:
         if record_date != HealthInputService._today():
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT, detail="당일 기록만 수정 또는 삭제할 수 있습니다."
+            )
+
+    @staticmethod
+    async def _ensure_daily_health_record_limit(user_id: int, record_date: date) -> None:
+        vital_count = await VitalRecord.filter(user_id=user_id, record_date=record_date).count()
+        lipid_count = await LipidObesityRecord.filter(user_id=user_id, record_date=record_date).count()
+        renal_count = await RenalRecord.filter(user_id=user_id, record_date=record_date).count()
+        exercise_count = await ExerciseLog.filter(user_id=user_id, exercise_date=record_date).count()
+        activity_count = await ActivityLog.filter(user_id=user_id, record_date=record_date).count()
+        total = vital_count + lipid_count + renal_count + exercise_count + activity_count
+        if total >= 3:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT, detail="하루 건강 기록은 3회까지 입력할 수 있습니다."
             )
 
     @staticmethod
@@ -1620,6 +1650,33 @@ class PredictionService:
                     "urine_protein": int(renal.urine_protein_pos) if renal.urine_protein_pos is not None else None,
                 }
             )
+        try:
+            today = self._today()
+            latest_bp = (
+                await VitalRecord.filter(user_id=user_id, record_date=today, measure_type__startswith="BP_")
+                .order_by("-measured_at", "-id")
+                .first()
+            )
+            latest_fasting_glucose = (
+                await VitalRecord.filter(user_id=user_id, record_date=today, measure_type="GLUCOSE_FASTING")
+                .order_by("-measured_at", "-id")
+                .first()
+            )
+            latest_activity = (
+                await ActivityLog.filter(user_id=user_id, record_date=today).order_by("-created_at", "-id").first()
+            )
+            if latest_bp:
+                raw["sbp"] = latest_bp.sbp
+                raw["dbp"] = latest_bp.dbp
+            if latest_fasting_glucose and latest_fasting_glucose.glucose is not None:
+                raw["glucose_fasting"] = latest_fasting_glucose.glucose
+            if latest_activity:
+                if latest_activity.walking_days is not None:
+                    raw["walking_days"] = latest_activity.walking_days
+                if latest_activity.sedentary_hours is not None:
+                    raw["sedentary_hours"] = float(latest_activity.sedentary_hours)
+        except Exception as exc:
+            default_logger.warning("daily prediction context skipped: %s", exc)
         return (
             {key: value for key, value in raw.items() if value is not None},
             snapshot,

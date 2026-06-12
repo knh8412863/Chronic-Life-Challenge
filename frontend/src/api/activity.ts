@@ -81,6 +81,9 @@ function toDailyActivity(log?: ActivityLogResponse): DailyActivity {
 function toApiActivityBody(body: SaveActivityBody) {
   return {
     record_date: todayStr(),
+    steps: body.steps,
+    exercise_minutes: body.exercise_minutes,
+    water_ml: body.water_ml,
     alcohol_frequency: body.alcohol_frequency,
     alcohol_amount: body.alcohol_amount,
     walking_days: body.walking_days,

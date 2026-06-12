@@ -58,12 +58,14 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
       <section className="section-header-row">
         <h1>오늘의 조언</h1>
         <div className="button-row">
-          <button className="small-button" type="button">
-            재생성 {advice?.remaining_regeneration_count ?? 0}/2회 남음
-          </button>
-          <button className="green-button" type="button" onClick={handleGenerate} disabled={isGenerating}>
-            {isGenerating ? "생성 중..." : "조언 새로 받기"}
-          </button>
+          <div
+            className="advice-regenerate-tooltip-wrap"
+            data-tooltip={`조언은 하루 최대 2회 생성 가능합니다.\n오늘 ${advice?.remaining_regeneration_count ?? 0}회 생성 가능합니다.`}
+          >
+            <button className="green-button" type="button" onClick={handleGenerate} disabled={isGenerating}>
+              {isGenerating ? "생성 중..." : "조언 새로 받기"}
+            </button>
+          </div>
           <button className="small-button" type="button" onClick={() => onNavigate("/advices/history")}>
             조언 이력
           </button>

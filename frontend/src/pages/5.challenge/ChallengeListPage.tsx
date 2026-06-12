@@ -7,10 +7,8 @@ import {
   getChallengeList,
   joinChallenge,
   CATEGORY_LABELS,
-  DIFFICULTY_LABELS,
   type Challenge,
   type ChallengeCategory,
-  type ChallengeDifficulty,
   type ChallengeListQuery,
 } from "../../api/challenges";
 import { ErrorState } from "../../components/common/ErrorState";
@@ -42,10 +40,6 @@ function catClass(cat: ChallengeCategory) {
   return { WALK: "walk", WATER: "water", EXERCISE: "exercise", SLEEP: "sleep", DIET: "diet", COMPREHENSIVE: "comprehensive" }[cat] ?? "walk";
 }
 
-function diffClass(d: ChallengeDifficulty) {
-  return { EASY: "easy", NORMAL: "normal", HARD: "hard" }[d] ?? "normal";
-}
-
 type Props = { onNavigate?: (route: AppRoute) => void };
 
 export function ChallengeListPage({ onNavigate }: Props) {
@@ -57,7 +51,6 @@ export function ChallengeListPage({ onNavigate }: Props) {
   const [joinErrorMessage, setJoinErrorMessage] = useState("");
 
   const [category, setCategory] = useState<CategoryFilter>("ALL");
-  const [difficulty, setDifficulty] = useState<ChallengeDifficulty | "ALL">("ALL");
   const [sort, setSort] = useState<SortOption>("POPULAR");
 
   function fetchList(query: ChallengeListQuery) {
@@ -76,16 +69,14 @@ export function ChallengeListPage({ onNavigate }: Props) {
   }
 
   useEffect(() => {
-    fetchList({ category: category === "ALL" ? "ALL" : category, difficulty, sort });
-  }, [category, difficulty, sort]);
+    fetchList({ category: category === "ALL" ? "ALL" : category, sort });
+  }, [category, sort]);
 
   const isUsingFallback = challenges.length === 0;
-  const displayItems = isUsingFallback ? filterFallback(FALLBACK_CHALLENGES, category, difficulty) : challenges;
+  const displayItems = isUsingFallback ? filterFallback(FALLBACK_CHALLENGES, category) : challenges;
 
-  function filterFallback(items: Challenge[], cat: CategoryFilter, diff: ChallengeDifficulty | "ALL") {
-    return items
-      .filter((c) => cat === "ALL" || c.category === cat)
-      .filter((c) => diff === "ALL" || c.difficulty === diff);
+  function filterFallback(items: Challenge[], cat: CategoryFilter) {
+    return items.filter((c) => cat === "ALL" || c.category === cat);
   }
 
   async function handleJoin(challengeId: number) {
@@ -126,48 +117,6 @@ export function ChallengeListPage({ onNavigate }: Props) {
 
       {hasError && <ErrorState title="목록을 불러오지 못했습니다." description="예시 데이터로 표시됩니다." />}
 
-      {/* 필터 드롭다운 */}
-      <div className="challenge-filter-row">
-        <div>
-          <p className="challenge-filter-label">카테고리</p>
-          <select
-            className="challenge-filter-select"
-            value={category}
-            onChange={(e) => setCategory(e.target.value as CategoryFilter)}
-          >
-            <option value="ALL">전체</option>
-            {Object.entries(CATEGORY_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <p className="challenge-filter-label">난이도</p>
-          <select
-            className="challenge-filter-select"
-            value={difficulty}
-            onChange={(e) => setDifficulty(e.target.value as ChallengeDifficulty | "ALL")}
-          >
-            <option value="ALL">전체</option>
-            {Object.entries(DIFFICULTY_LABELS).map(([k, v]) => (
-              <option key={k} value={k}>{v}</option>
-            ))}
-          </select>
-        </div>
-        <div>
-          <p className="challenge-filter-label">정렬</p>
-          <select
-            className="challenge-filter-select"
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortOption)}
-          >
-            <option value="POPULAR">인기순</option>
-            <option value="LATEST">최신순</option>
-            <option value="DURATION">기간순</option>
-          </select>
-        </div>
-      </div>
-
       {/* 카테고리 탭 */}
       <div className="challenge-category-tabs">
         {CATEGORY_TABS.map((tab) => (
@@ -180,6 +129,16 @@ export function ChallengeListPage({ onNavigate }: Props) {
             {tab.label}
           </button>
         ))}
+        <select
+          className="challenge-filter-select"
+          value={sort}
+          onChange={(e) => setSort(e.target.value as SortOption)}
+          style={{ marginLeft: "auto", maxWidth: 140 }}
+        >
+          <option value="POPULAR">인기순</option>
+          <option value="LATEST">최신순</option>
+          <option value="DURATION">기간순</option>
+        </select>
       </div>
 
       {/* 챌린지 카드 그리드 */}
@@ -193,7 +152,6 @@ export function ChallengeListPage({ onNavigate }: Props) {
               <p className="challenge-card-name">{c.name}</p>
               <p className="challenge-card-desc">{c.description}</p>
               <div className="challenge-card-tags">
-                <span className={`challenge-diff-tag ${diffClass(c.difficulty)}`}>{DIFFICULTY_LABELS[c.difficulty]}</span>
                 <span className="challenge-diff-tag">{c.duration_days}일</span>
               </div>
               <p className="challenge-card-participants">참여 {c.participant_count.toLocaleString()}명</p>
@@ -228,7 +186,7 @@ export function ChallengeListPage({ onNavigate }: Props) {
         <button
           type="button"
           className="challenge-load-more"
-          onClick={() => fetchList({ category: category === "ALL" ? "ALL" : category, difficulty, sort, page: 2 })}
+          onClick={() => fetchList({ category: category === "ALL" ? "ALL" : category, sort, page: 2 })}
         >
           더 보기
         </button>

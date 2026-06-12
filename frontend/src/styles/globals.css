@@ -1,5 +1,5 @@
 :root {
-  --font-size: 16px;
+  --font-size: 15px;
   --background: #f5f6f7;
   --foreground: #161719;
   --card: #ffffff;
@@ -168,7 +168,7 @@ button {
 .public-logo strong,
 .brand-text {
   display: grid;
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 800;
   line-height: 1;
 }
@@ -177,7 +177,7 @@ button {
 .brand-text small {
   margin-top: 3px;
   color: var(--muted-foreground);
-  font-size: 9px;
+  font-size: 8px;
   font-weight: 500;
 }
 
@@ -252,7 +252,7 @@ button {
   padding: 0 16px;
   border: 1px solid transparent;
   border-radius: 999px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 800;
 }
 
@@ -277,7 +277,7 @@ button {
 .landing-copy h1 {
   max-width: 560px;
   margin: 0;
-  font-size: 42px;
+  font-size: 41px;
   line-height: 1.25;
   letter-spacing: 0;
 }
@@ -312,13 +312,13 @@ button {
 
 .landing-metrics strong {
   color: var(--brand-green);
-  font-size: 28px;
+  font-size: 27px;
 }
 
 .landing-metrics span,
 .stat-strip span {
   color: #4b5563;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .dashboard-preview {
@@ -352,11 +352,11 @@ button {
 }
 
 .risk-card span {
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .risk-card strong {
-  font-size: 20px;
+  font-size: 19px;
 }
 
 .risk-low {
@@ -463,7 +463,7 @@ button {
 
 .stat-strip strong {
   color: var(--brand-green);
-  font-size: 30px;
+  font-size: 29px;
 }
 
 .stat-strip div:nth-child(2) strong {
@@ -486,7 +486,7 @@ button {
 
 .landing-section h2 {
   margin: 0 0 12px;
-  font-size: 32px;
+  font-size: 31px;
 }
 
 .section-label {
@@ -602,20 +602,20 @@ button {
   border-radius: 999px;
   background: var(--brand-green);
   color: #ffffff;
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 900;
 }
 
 .process-step h3 {
   margin: 16px 0 0;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .process-step p {
   max-width: 210px;
   margin: 0;
   color: #4b5563;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.65;
 }
 
@@ -635,7 +635,7 @@ button {
 
 .disease-card h3 {
   margin: 0 0 12px;
-  font-size: 22px;
+  font-size: 21px;
 }
 
 .disease-card p {
@@ -650,7 +650,7 @@ button {
   align-items: center;
   padding: 0 12px;
   border-radius: 999px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 900;
 }
 
@@ -736,7 +736,7 @@ button {
 }
 
 .challenge-card h3 {
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .challenge-card p {
@@ -774,7 +774,7 @@ button {
 
 .challenge-status h3 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .challenge-lines {
@@ -940,7 +940,7 @@ button {
 
 .landing-cta h2 {
   margin: 0;
-  font-size: 34px;
+  font-size: 33px;
 }
 
 .landing-cta p {
@@ -992,7 +992,7 @@ button {
 
 .footer-links h2 {
   margin: 0 0 10px;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 .footer-links a {
@@ -1008,7 +1008,7 @@ button {
   padding-top: 24px;
   border-top: 1px solid #333333;
   color: #9b9b9b;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .auth-card {
@@ -1050,7 +1050,7 @@ button {
   display: grid;
   grid-template-columns: 220px minmax(0, 1fr);
   min-height: 100vh;
-  padding: 38px;
+  padding: 24px;
   background: #eef0f2;
 }
 
@@ -1060,10 +1060,11 @@ button {
 
 .sidebar {
   position: sticky;
-  top: 38px;
+  top: 24px;
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 76px);
+  height: calc(100dvh - 48px);
+  min-height: 0;
   border-right: 1px solid var(--sidebar-border);
   background: var(--sidebar);
   color: var(--sidebar-foreground);
@@ -1074,8 +1075,8 @@ button {
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  height: 86px;
-  padding: 16px;
+  height: 68px;
+  padding: 12px;
   border-bottom: 1px solid var(--sidebar-border);
 }
 
@@ -1114,19 +1115,28 @@ button {
 .sidebar-nav {
   display: grid;
   align-content: start;
-  gap: 8px;
+  gap: 5px;
   flex: 1;
-  padding: 24px 12px;
+  min-height: 0;
+  padding: 12px 10px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+
+.sidebar-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .sidebar-item {
   display: flex;
   align-items: center;
   width: 100%;
-  height: 44px;
-  padding: 10px 16px;
+  height: 36px;
+  padding: 8px 14px;
   border-radius: 8px;
   color: var(--muted-foreground);
+  font-size: 14px;
   font-weight: 700;
   text-align: left;
 }
@@ -1147,24 +1157,24 @@ button {
 
 .sidebar-menu-group {
   display: grid;
-  gap: 6px;
+  gap: 3px;
 }
 
 .sidebar-subnav {
   display: grid;
-  gap: 4px;
-  padding-left: 14px;
+  gap: 2px;
+  padding-left: 12px;
 }
 
 .sidebar-subitem {
   width: 100%;
-  min-height: 34px;
-  padding: 8px 12px;
+  min-height: 27px;
+  padding: 5px 10px;
   border: 0;
   border-radius: 8px;
   background: transparent;
   color: var(--muted-foreground);
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 700;
   text-align: left;
 }
@@ -1180,9 +1190,9 @@ button {
   align-items: center;
   gap: 12px;
   width: calc(100% - 24px);
-  min-height: 64px;
-  margin: 0 12px 16px;
-  padding: 10px 12px;
+  min-height: 52px;
+  margin: 0 12px 10px;
+  padding: 8px 12px;
   border: 0;
   border-top: 1px solid var(--sidebar-border);
   border-radius: 8px;
@@ -1193,8 +1203,8 @@ button {
 
 .sidebar-logout {
   width: calc(100% - 24px);
-  min-height: 38px;
-  margin: 0 12px 8px;
+  min-height: 34px;
+  margin: 0 12px 6px;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   background: #ffffff;
@@ -1309,7 +1319,7 @@ button {
 }
 
 .topbar-brand {
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
 }
 
@@ -1338,7 +1348,7 @@ button {
   border-radius: 999px;
   background: var(--primary);
   color: var(--primary-foreground);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -1359,7 +1369,7 @@ button {
 
 .page-heading h1 {
   margin: 0;
-  font-size: 28px;
+  font-size: 27px;
   line-height: 1.35;
   letter-spacing: 0;
 }
@@ -1367,7 +1377,7 @@ button {
 .eyebrow {
   margin: 0;
   color: var(--brand-green);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 800;
 }
 
@@ -1415,7 +1425,7 @@ button {
 }
 
 .summary-card strong {
-  font-size: 26px;
+  font-size: 25px;
 }
 
 .content-panel {
@@ -1499,7 +1509,7 @@ button {
 .section-header-row h1,
 .prediction-title-row h1 {
   margin: 0;
-  font-size: 24px;
+  font-size: 23px;
 }
 
 .home-header p {
@@ -1527,7 +1537,7 @@ button {
   border-radius: 999px;
   background: #c85b7d;
   color: #ffffff;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .warning-banner {
@@ -1569,7 +1579,7 @@ button {
 
 .dashboard-card h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .health-score-card,
@@ -1589,7 +1599,7 @@ button {
 }
 
 .score-value strong {
-  font-size: 56px;
+  font-size: 55px;
   line-height: 1;
 }
 
@@ -1610,7 +1620,7 @@ button {
   border: 1px solid #d7dce2;
   border-radius: 999px;
   background: #f7f8fa;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .score-badges span:last-child {
@@ -1701,7 +1711,7 @@ button {
   border: 1px solid #d7dce2;
   border-radius: 999px;
   color: #4b5563;
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .challenge-stat-grid,
@@ -1723,7 +1733,7 @@ button {
 }
 
 .challenge-stat-grid strong {
-  font-size: 28px;
+  font-size: 27px;
 }
 
 .health-dashboard-card {
@@ -1742,7 +1752,7 @@ button {
 }
 
 .metric-card strong {
-  font-size: 22px;
+  font-size: 21px;
 }
 
 .metric-normal {
@@ -1766,7 +1776,7 @@ button {
 .mini-label {
   margin: 0;
   color: #4b5563;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .health-bars {
@@ -1827,7 +1837,7 @@ button {
 
 .quick-record-section h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .quick-record-grid {
@@ -1867,7 +1877,7 @@ button {
   margin-top: 0;
   padding: 0 18px;
   border-radius: 10px;
-  font-size: 15px;
+  font-size: 14px;
   white-space: nowrap;
 }
 
@@ -1907,7 +1917,7 @@ button {
   place-items: center;
   border-radius: 999px;
   background: #f3f4f6;
-  font-size: 24px;
+  font-size: 23px;
 }
 
 .notification-time {
@@ -1933,7 +1943,7 @@ button {
 }
 
 .notification-content strong {
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .notification-content small {
@@ -2072,7 +2082,7 @@ button {
   border: 14px solid #3f3f3f;
   border-left-color: transparent;
   border-radius: 999px;
-  font-size: 32px;
+  font-size: 31px;
   font-weight: 800;
 }
 
@@ -2110,7 +2120,7 @@ button {
 }
 
 .risk-outline strong {
-  font-size: 22px;
+  font-size: 21px;
 }
 
 .risk-outline.blue {
@@ -2169,7 +2179,7 @@ button {
 
 .disease-card > strong {
   justify-self: end;
-  font-size: 22px;
+  font-size: 21px;
 }
 
 .risk-badge.danger {
@@ -2267,7 +2277,7 @@ button {
   justify-content: space-between;
   gap: 16px;
   color: #6b7280;
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .feedback-helper-row strong {
@@ -2287,7 +2297,7 @@ button {
 
 .advice-feedback-modal .advice-text-box {
   min-height: 130px;
-  font-size: 15px;
+  font-size: 14px;
   line-height: 1.75;
 }
 
@@ -2308,13 +2318,13 @@ button {
 
 .advice-feedback-summary h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .advice-feedback-summary p {
   margin: 4px 0 0;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .advice-feedback-ai {
@@ -2335,7 +2345,7 @@ button {
 
 .advice-feedback-section h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .advice-feedback-card .feedback-choice-grid {
@@ -2352,7 +2362,7 @@ button {
 
 .advice-feedback-card .feedback-choice-grid span {
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   line-height: 1.45;
 }
@@ -2361,7 +2371,7 @@ button {
   display: grid;
   gap: 8px;
   color: #333333;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -2430,7 +2440,7 @@ button {
   border: 1px solid #d9dde2;
   border-radius: 6px;
   background: #f8f9fa;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .feedback-week-grid .good strong {
@@ -2468,7 +2478,7 @@ button {
   border-radius: 999px;
   background: #e8f5e9;
   color: var(--brand-green);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -2488,7 +2498,7 @@ button {
 
 .field-label {
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .state-box {
@@ -2535,12 +2545,12 @@ button {
 
 .goal-section-header h2 {
   margin: 0;
-  font-size: 18px;
+  font-size: 17px;
 }
 
 .goal-updated-at {
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .goal-group {
@@ -2553,7 +2563,7 @@ button {
   padding-bottom: 8px;
   border-bottom: 1px solid #eceff3;
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2579,12 +2589,12 @@ button {
 }
 
 .goal-val {
-  font-size: 15px;
+  font-size: 14px;
   color: var(--foreground);
 }
 
 .goal-val-empty {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--muted-foreground);
 }
@@ -2603,7 +2613,7 @@ button {
   border: 1px solid #c9d0d8;
   border-radius: 6px;
   background: #ffffff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -2615,7 +2625,7 @@ button {
 .goal-edit-unit {
   flex: 0 0 auto;
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 10px;
   white-space: nowrap;
 }
 
@@ -2629,7 +2639,7 @@ button {
 .goal-section-note {
   margin: 0;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 11px;
   line-height: 1.5;
 }
 
@@ -2655,7 +2665,7 @@ button {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -2664,13 +2674,13 @@ button {
   border-radius: 99px;
   background: #f0f2f5;
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
 }
 
 .goal-progress-meta {
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .goal-progress-bar-wrap {
@@ -2689,7 +2699,7 @@ button {
 
 .goal-progress-pct {
   text-align: right;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   color: var(--brand-green);
 }
@@ -2701,7 +2711,7 @@ button {
   border: 1px dashed #d0d4da;
   border-radius: 8px;
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 12px;
   background: #f8f9fa;
 }
 
@@ -2737,7 +2747,7 @@ button {
 .goal-score-date {
   margin-top: 4px;
   color: var(--muted-foreground);
-  font-size: 10px;
+  font-size: 9px;
 }
 
 /* ── GoalEditPage ─────────────────────────────────── */
@@ -2758,7 +2768,7 @@ button {
   padding: 8px 0 12px;
   border-bottom: 2px solid #eceff3;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.04em;
@@ -2778,18 +2788,18 @@ button {
 }
 
 .goal-edit-item-label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .goal-edit-unit-col {
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .goal-edit-current {
   color: var(--foreground);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
 }
 
@@ -2830,7 +2840,7 @@ button {
   background: #ffffff;
   color: #1f2328;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 14px;
 }
 
 /* ── 기간 탭 (공통) ──────────────────────────────── */
@@ -2847,7 +2857,7 @@ button {
   border-radius: 6px;
   background: #ffffff;
   color: #444;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
 }
 
@@ -2871,7 +2881,7 @@ button {
 
 .hp-section h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .hp-info-grid {
@@ -2889,7 +2899,7 @@ button {
 }
 
 .hp-info-val {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 
@@ -2923,7 +2933,7 @@ button {
 }
 
 .hp-body-val {
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 800;
 }
 
@@ -2935,7 +2945,7 @@ button {
   border: none;
   background: none;
   color: var(--brand-green);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   text-decoration: underline;
   cursor: pointer;
@@ -2948,7 +2958,7 @@ button {
   border: 1px solid #c9d0d8;
   border-radius: 6px;
   background: #ffffff;
-  font-size: 14px;
+  font-size: 13px;
   font-family: inherit;
 }
 
@@ -2974,7 +2984,7 @@ button {
 
 .hp-body-unit {
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 12px;
   white-space: nowrap;
 }
 
@@ -2989,7 +2999,7 @@ button {
   border: 1px solid #eceff3;
   border-radius: 8px;
   background: #f5f6f8;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-align: center;
 }
@@ -3028,12 +3038,12 @@ button {
 }
 
 .vl-summary-val {
-  font-size: 24px;
+  font-size: 23px;
   font-weight: 800;
 }
 
 .vl-summary-val small {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--muted-foreground);
 }
@@ -3043,7 +3053,7 @@ button {
   align-items: center;
   padding: 3px 10px;
   border-radius: 99px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
 }
 
@@ -3069,8 +3079,17 @@ button {
   border-radius: 6px;
   background: #f5f6f8;
   color: #444;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 700;
+  cursor: pointer;
+}
+
+.vl-action-btn:disabled {
+  border-color: #e5e7eb;
+  background: #f3f4f6;
+  color: #b6bcc6;
+  cursor: not-allowed;
+  opacity: 0.65;
 }
 
 .vl-delete-btn {
@@ -3079,13 +3098,19 @@ button {
   color: #d4183d;
 }
 
+.vl-delete-btn:disabled {
+  border-color: #e5e7eb;
+  background: #f3f4f6;
+  color: #b6bcc6;
+}
+
 .vl-memo-cell {
   max-width: 160px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 12px;
 }
 
 .vl-row-clickable {
@@ -3124,12 +3149,12 @@ button {
 .vd-stat-pink { background: var(--soft-pink); border-color: #ffb3cc; }
 
 .vd-stat-val {
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 800;
 }
 
 .vd-stat-val small {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--muted-foreground);
 }
@@ -3148,7 +3173,7 @@ button {
 
 .vd-info-card h2 {
   margin: 0 0 16px;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .vd-info-row {
@@ -3166,24 +3191,24 @@ button {
 
 .vd-info-val {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
 }
 
 .vd-measure-label {
   margin: 0;
   color: var(--muted-foreground);
-  font-size: 12px;
+  font-size: 11px;
 }
 
 .vd-measure-big {
   margin: 4px 0 0;
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 800;
 }
 
 .vd-status-large {
-  font-size: 14px;
+  font-size: 13px;
   padding: 5px 14px;
 }
 
@@ -3193,7 +3218,7 @@ button {
   border-radius: 8px;
   background: #f8f9fa;
   line-height: 1.7;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .vd-trend-card {
@@ -3205,7 +3230,7 @@ button {
 
 .vd-trend-card h2 {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 .vd-chart-placeholder {
@@ -3215,7 +3240,7 @@ button {
   border: 1px dashed #d0d4da;
   border-radius: 8px;
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 12px;
   background: #f8f9fa;
 }
 
@@ -3226,7 +3251,7 @@ button {
 
 .vd-avg-list p {
   margin: 0;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 
@@ -3250,7 +3275,7 @@ button {
   margin-bottom: -2px;
   background: none;
   color: var(--muted-foreground);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -3277,7 +3302,7 @@ button {
 
 .vi-section h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -3291,12 +3316,13 @@ button {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 4px;
   min-height: 64px;
   border: 1px solid #d9dde2;
   border-radius: 8px;
   background: #f8f9fa;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -3307,7 +3333,7 @@ button {
 
 .vi-type-code {
   color: var(--muted-foreground);
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 500;
 }
 
@@ -3322,7 +3348,7 @@ button {
   border: 1px solid #d9dde2;
   border-radius: 8px;
   background: #f8f9fa;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -3358,7 +3384,7 @@ button {
   border: 2px solid #d9dde2;
   border-radius: 10px;
   background: #fafbfc;
-  font-size: 28px;
+  font-size: 27px;
   font-weight: 800;
   text-align: center;
 }
@@ -3367,13 +3393,13 @@ button {
 .vi-bp-diastolic { background: #eef4ff; border-color: #b5c6ff; }
 
 .vi-bp-sep {
-  font-size: 24px;
+  font-size: 23px;
   font-weight: 700;
   color: var(--muted-foreground);
 }
 
 .vi-bp-unit {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 700;
   color: var(--muted-foreground);
   align-self: flex-end;
@@ -3390,7 +3416,7 @@ button {
 
 .vi-warning-banner p {
   margin: 0 0 4px;
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -3415,7 +3441,7 @@ button {
   border: 1px solid #d9dde2;
   border-radius: 8px;
   background: #f8f9fa;
-  font-size: 14px;
+  font-size: 13px;
   font-family: inherit;
 }
 
@@ -3425,7 +3451,7 @@ button {
   border: 1px solid #d9dde2;
   border-radius: 8px;
   background: #f8f9fa;
-  font-size: 14px;
+  font-size: 13px;
   font-family: inherit;
   resize: vertical;
 }
@@ -3447,7 +3473,7 @@ button {
   padding: 0 14px;
   border: 1px solid #d9dde2;
   border-radius: 8px;
-  font-size: 16px;
+  font-size: 15px;
   font-family: inherit;
 }
 
@@ -3470,7 +3496,7 @@ button {
   border: 1px solid #4a7bbf;
   border-radius: 8px;
   background: #eef4ff;
-  font-size: 15px;
+  font-size: 14px;
   font-family: inherit;
 }
 
@@ -3479,7 +3505,7 @@ button {
   border-radius: 8px;
   background: #f0f2f5;
   color: var(--muted-foreground);
-  font-size: 14px;
+  font-size: 13px;
   text-align: center;
 }
 
@@ -3502,7 +3528,7 @@ button {
   margin-bottom: -2px;
   background: none;
   color: var(--muted-foreground);
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -3535,7 +3561,7 @@ button {
 
 .ex-summary-title h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -3560,12 +3586,12 @@ button {
 .ex-summary-neutral { background: #f5f6f8; border-color: #e0e3e8; }
 
 .ex-summary-val {
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 800;
 }
 
 .ex-summary-val small {
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--muted-foreground);
 }
@@ -3592,7 +3618,7 @@ button {
   border: 1px solid #d9dde2;
   border-radius: 10px;
   background: #f8f9fa;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
@@ -3603,7 +3629,7 @@ button {
 }
 
 .ex-type-icon {
-  font-size: 24px;
+  font-size: 23px;
 }
 
 .ex-info-row {
@@ -3628,13 +3654,13 @@ button {
   border: 1px solid #d9dde2;
   border-radius: 50%;
   background: #ffffff;
-  font-size: 18px;
+  font-size: 17px;
   font-weight: 700;
 }
 
 .ex-stepper-val {
   min-width: 48px;
-  font-size: 20px;
+  font-size: 19px;
   font-weight: 800;
   text-align: center;
 }
@@ -3651,7 +3677,7 @@ button {
   border-radius: 8px;
   background: #eef4ff;
   color: #1d3f78;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
@@ -3669,7 +3695,7 @@ button {
 
 .act-section h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -3680,13 +3706,13 @@ button {
   border: 1px solid #d9dde2;
   border-radius: 8px;
   background: #f8f9fa;
-  font-size: 16px;
+  font-size: 15px;
   font-family: inherit;
 }
 
 .act-slider-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: 1fr;
   gap: 32px;
 }
 
@@ -3700,6 +3726,111 @@ button {
   accent-color: var(--brand-green);
   height: 6px;
   cursor: pointer;
+  background: #eef1f4;
+}
+
+.app-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(20, 24, 30, 0.42);
+}
+
+.app-modal-card {
+  width: min(420px, 100%);
+  border: 1px solid #e0e0e0;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 24px 70px rgba(20, 24, 30, 0.24);
+  padding: 28px;
+  text-align: center;
+}
+
+.app-modal-card h2 {
+  margin: 0 0 12px;
+  font-size: 19px;
+}
+
+.app-modal-card p {
+  margin: 0 0 10px;
+  color: #555;
+  line-height: 1.55;
+}
+
+.app-modal-card button {
+  margin-top: 12px;
+}
+
+.risk-factor-list {
+  display: grid;
+  gap: 4px;
+}
+
+.risk-factor-list span {
+  display: block;
+}
+
+.health-record-action-tooltip,
+.advice-regenerate-tooltip-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.health-record-action-tooltip::after,
+.advice-regenerate-tooltip-wrap::after {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  z-index: 20;
+  width: max-content;
+  max-width: 260px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #4a4f57;
+  color: #ffffff;
+  box-shadow: 0 10px 24px rgba(20, 24, 30, 0.18);
+  content: attr(data-tooltip);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.55;
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  white-space: pre-line;
+}
+
+.health-record-action-tooltip::before,
+.advice-regenerate-tooltip-wrap::before {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 2px);
+  z-index: 21;
+  border: 6px solid transparent;
+  border-top-color: #4a4f57;
+  content: "";
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.health-record-action-tooltip:hover::after,
+.health-record-action-tooltip:hover::before,
+.advice-regenerate-tooltip-wrap:hover::after,
+.advice-regenerate-tooltip-wrap:hover::before {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+.health-record-action-tooltip:not([data-tooltip])::after,
+.health-record-action-tooltip:not([data-tooltip])::before {
+  display: none;
 }
 
 /* ── 건강 관리 허브 ──────────────────────────────── */
@@ -3727,18 +3858,18 @@ button {
 }
 
 .health-hub-icon {
-  font-size: 28px;
+  font-size: 27px;
 }
 
 .health-hub-title {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
 }
 
 .health-hub-desc {
   margin: 0;
   color: var(--muted-foreground);
-  font-size: 13px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -3766,20 +3897,20 @@ button {
 }
 
 .challenge-stat-card .stat-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
   text-align: center;
 }
 
 .challenge-stat-card .stat-value {
-  font-size: 32px;
+  font-size: 31px;
   font-weight: 800;
   text-align: center;
   color: var(--foreground);
 }
 
 .challenge-stat-card .stat-value .stat-unit {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 600;
 }
 
@@ -3811,7 +3942,7 @@ button {
   display: inline-block;
   padding: 2px 10px;
   border-radius: 99px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
 }
 
@@ -3827,7 +3958,7 @@ button {
   display: inline-block;
   padding: 2px 10px;
   border-radius: 99px;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   background: var(--muted);
   color: var(--muted-foreground);
@@ -3868,7 +3999,7 @@ button {
 }
 
 .challenge-item-name {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   display: flex;
   align-items: center;
@@ -3876,7 +4007,7 @@ button {
 }
 
 .challenge-item-pct {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 
@@ -3892,7 +4023,7 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .challenge-mission-check {
@@ -3914,7 +4045,7 @@ button {
 }
 
 .challenge-mission-note {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
   padding: 0 20px 16px;
   margin: 0;
@@ -3934,7 +4065,7 @@ button {
   background: var(--background);
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   text-align: center;
   cursor: pointer;
@@ -3955,7 +4086,7 @@ button {
 }
 
 .challenge-weekly-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
   margin-bottom: 6px;
 }
@@ -3981,7 +4112,7 @@ button {
   display: flex;
   gap: 16px;
   padding: 0 20px 16px;
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
 }
 
@@ -4006,7 +4137,7 @@ button {
   border: 1px solid var(--border);
   border-radius: 8px;
   background: var(--card);
-  font-size: 14px;
+  font-size: 13px;
   cursor: pointer;
   appearance: none;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
@@ -4016,7 +4147,7 @@ button {
 }
 
 .challenge-filter-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
   margin-bottom: 4px;
 }
@@ -4032,7 +4163,7 @@ button {
   border-radius: 99px;
   border: 1px solid var(--border);
   background: var(--card);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s;
@@ -4067,16 +4198,16 @@ button {
 }
 
 .challenge-card-icon {
-  font-size: 28px;
+  font-size: 27px;
 }
 
 .challenge-card-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
 }
 
 .challenge-card-desc {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
   margin: 0;
 }
@@ -4088,7 +4219,7 @@ button {
 }
 
 .challenge-card-participants {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
 }
 
@@ -4099,7 +4230,7 @@ button {
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   cursor: pointer;
   margin-top: auto;
@@ -4112,7 +4243,7 @@ button {
   color: var(--muted-foreground);
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: default;
 }
@@ -4133,7 +4264,7 @@ button {
   background: var(--card);
   border: 1px solid var(--border);
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -4155,13 +4286,13 @@ button {
   align-items: center;
   justify-content: center;
   color: var(--muted-foreground);
-  font-size: 14px;
+  font-size: 13px;
   overflow: hidden;
   margin-bottom: 16px;
 }
 
 .challenge-detail-title {
-  font-size: 22px;
+  font-size: 21px;
   font-weight: 800;
   margin: 0 0 8px;
   display: flex;
@@ -4170,7 +4301,7 @@ button {
 }
 
 .challenge-detail-subtitle {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--muted-foreground);
   margin: 0 0 20px;
 }
@@ -4186,13 +4317,13 @@ button {
 }
 
 .challenge-detail-section h3 {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   margin: 0;
 }
 
 .challenge-detail-section h4 {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   margin: 0 0 6px;
   color: var(--muted-foreground);
@@ -4208,7 +4339,7 @@ button {
 }
 
 .challenge-how-list li {
-  font-size: 14px;
+  font-size: 13px;
   padding-left: 16px;
   position: relative;
 }
@@ -4238,11 +4369,11 @@ button {
 }
 
 .challenge-reward-item .reward-icon {
-  font-size: 24px;
+  font-size: 23px;
 }
 
 .challenge-reward-item .reward-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 
@@ -4263,13 +4394,13 @@ button {
 }
 
 .challenge-sidebar-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
   margin-bottom: 4px;
 }
 
 .challenge-sidebar-value {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 
@@ -4280,7 +4411,7 @@ button {
   color: white;
   border: none;
   border-radius: 8px;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
   cursor: pointer;
 }
@@ -4318,7 +4449,7 @@ button {
 }
 
 .my-challenge-name {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
   flex: 1;
 }
@@ -4339,12 +4470,12 @@ button {
 .my-challenge-progress-label {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 
 .my-challenge-mission-col {
-  font-size: 14px;
+  font-size: 13px;
   display: flex;
   align-items: center;
   gap: 8px;
@@ -4361,7 +4492,7 @@ button {
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--card);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -4372,7 +4503,7 @@ button {
   border-radius: 6px;
   background: white;
   color: #c44040;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -4404,23 +4535,23 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 13px;
   flex-shrink: 0;
 }
 
 .completed-challenge-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
   flex: 1;
 }
 
 .completed-challenge-date {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
 }
 
 .my-challenge-detail-link {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--brand-blue);
   font-weight: 600;
   border: none;
@@ -4431,7 +4562,7 @@ button {
 
 /* ── 리더보드 ── */
 .leaderboard-period {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
   margin: 0;
 }
@@ -4462,7 +4593,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 28px;
+  font-size: 27px;
   position: relative;
 }
 
@@ -4470,33 +4601,33 @@ button {
   position: absolute;
   bottom: -4px;
   right: -4px;
-  font-size: 20px;
+  font-size: 19px;
   line-height: 1;
 }
 
 .leaderboard-nickname {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 700;
 }
 
 .leaderboard-rank-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
 }
 
 .leaderboard-score {
-  font-size: 26px;
+  font-size: 25px;
   font-weight: 800;
   color: var(--brand-green);
 }
 
 .leaderboard-score-unit {
-  font-size: 14px;
+  font-size: 13px;
   color: var(--muted-foreground);
 }
 
 .leaderboard-completed {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 
@@ -4508,12 +4639,12 @@ button {
   display: flex;
   align-items: center;
   gap: 16px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
 }
 
 .leaderboard-my-rank .rank-highlight {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 800;
   color: var(--brand-green);
 }
@@ -4526,7 +4657,7 @@ button {
 .leaderboard-table th {
   text-align: left;
   padding: 12px 16px;
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
   font-weight: 600;
   border-bottom: 1px solid var(--border);
@@ -4534,7 +4665,7 @@ button {
 
 .leaderboard-table td {
   padding: 14px 16px;
-  font-size: 14px;
+  font-size: 13px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -4550,7 +4681,7 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 /* ── 뱃지 목록 ── */
@@ -4565,12 +4696,12 @@ button {
 }
 
 .badge-earned-count {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 
 .badge-earned-num {
-  font-size: 32px;
+  font-size: 31px;
   font-weight: 800;
 }
 
@@ -4582,7 +4713,7 @@ button {
 }
 
 .badge-total-label {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 
@@ -4604,7 +4735,7 @@ button {
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--card);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -4619,7 +4750,7 @@ button {
   border-radius: 99px;
   border: 1px solid var(--border);
   background: var(--card);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   cursor: pointer;
 }
@@ -4664,7 +4795,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 30px;
+  font-size: 29px;
 }
 
 .badge-icon-wrap.not-earned {
@@ -4673,17 +4804,17 @@ button {
 }
 
 .badge-card-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .badge-card-streak {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 
 .badge-card-points {
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 700;
   color: var(--brand-green);
 }
@@ -4692,7 +4823,7 @@ button {
   width: 100%;
   padding: 8px;
   border-radius: 6px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   text-align: center;
 }
@@ -4710,13 +4841,13 @@ button {
 }
 
 .badge-card-progress-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
   text-align: left;
 }
 
 .badge-card-target-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
   text-align: center;
 }
@@ -4747,7 +4878,7 @@ button {
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
+  font-size: 21px;
 }
 
 .recent-badge-info {
@@ -4755,17 +4886,17 @@ button {
 }
 
 .recent-badge-name {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 700;
 }
 
 .recent-badge-streak {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
 }
 
 .recent-badge-date {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
 }
 
@@ -4784,18 +4915,18 @@ button {
 }
 
 .achievement-card .ach-label {
-  font-size: 12px;
+  font-size: 11px;
   color: var(--muted-foreground);
   margin-bottom: 4px;
 }
 
 .achievement-card .ach-value {
-  font-size: 28px;
+  font-size: 27px;
   font-weight: 800;
 }
 
 .achievement-card .ach-unit {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--muted-foreground);
 }
@@ -4807,7 +4938,7 @@ button {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .streak-record-box .streak-text {
@@ -4815,7 +4946,7 @@ button {
 }
 
 .streak-record-box .streak-sub {
-  font-size: 13px;
+  font-size: 12px;
   color: var(--muted-foreground);
 }
 
@@ -4830,7 +4961,7 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 700;
   cursor: help;
   outline: none;
@@ -4847,7 +4978,7 @@ button {
   background: #f1f3f5;
   color: #333;
   box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 1.5;
   text-align: center;

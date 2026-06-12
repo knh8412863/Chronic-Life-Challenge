@@ -82,6 +82,10 @@ class UserWithdrawalRequest(BaseModel):
     confirm_agreed: bool
 
 
+class UserPasswordVerificationRequest(BaseModel):
+    password: Annotated[str, Field(min_length=8, max_length=128)]
+
+
 class PasswordChangeRequest(BaseModel):
     current_password: Annotated[str, Field(min_length=8, max_length=128)]
     new_password: Annotated[str, Field(min_length=8, max_length=128), optional_after_validator(validate_password)]

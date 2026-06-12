@@ -2,6 +2,7 @@ import { apiRequest } from "./client";
 
 const ACCESS_TOKEN_KEY = "access_token";
 const LEGACY_ACCESS_TOKEN_KEY = "accessToken";
+const MYPAGE_VERIFIED_AT_KEY = "mypage_verified_at";
 
 export type LoginPayload = {
   email: string;
@@ -66,6 +67,7 @@ export function storeAccessToken(accessToken: string, persist = false) {
 
 export function clearStoredAccessToken() {
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(MYPAGE_VERIFIED_AT_KEY);
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
 }

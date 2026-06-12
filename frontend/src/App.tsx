@@ -42,6 +42,7 @@ import { SignUpPage } from "./pages/0.auth/SignUpPage";
 // ── front/mypage-management 브랜치에서 추가
 import { MyInfoPage } from "./pages/7.mypage/MyInfoPage";
 import { EditProfilePage } from "./pages/7.mypage/EditProfilePage";
+import { MyPagePasswordVerifyPage } from "./pages/7.mypage/MyPagePasswordVerifyPage";
 import { ChangePasswordPage, NotificationSettingsPage, TermsManagementPage, WithdrawalPage } from "./pages/7.mypage/MyPageSubPages";
 
 export type AppRoute =
@@ -63,6 +64,7 @@ export type AppRoute =
   | "/prediction/result"
   | "/prediction/history"
   | "/prediction/feedback"
+  | "/mypage/verify"
   | "/mypage"
   | "/mypage/profile"
   | "/mypage/edit"
@@ -126,6 +128,7 @@ function normalizePath(pathname: string): AppRoute {
     "/prediction/result",
     "/prediction/history",
     "/prediction/feedback",
+    "/mypage/verify",
     "/mypage",
     "/mypage/profile",
     "/mypage/edit",
@@ -163,12 +166,19 @@ function normalizePath(pathname: string): AppRoute {
 
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(() => normalizePath(window.location.pathname));
+  const [verifiedMypageRoute, setVerifiedMypageRoute] = useState<AppRoute | null>(null);
 
   useEffect(() => {
     const onPopState = () => setRoute(normalizePath(window.location.pathname));
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);
   }, []);
+
+  useEffect(() => {
+    if (!route.startsWith("/mypage")) {
+      setVerifiedMypageRoute(null);
+    }
+  }, [route]);
 
   const navigate = (nextRoute: AppRoute) => {
     const nextUrl =
@@ -180,6 +190,17 @@ export default function App() {
   };
 
   const page = useMemo(() => {
+    const isMypageProtectedRoute = route.startsWith("/mypage") && route !== "/mypage/verify";
+    if (isMypageProtectedRoute && verifiedMypageRoute !== route) {
+      return (
+        <MyPagePasswordVerifyPage
+          onNavigate={navigate}
+          onVerified={() => setVerifiedMypageRoute(route)}
+          targetRoute={route}
+        />
+      );
+    }
+
     switch (route) {
       case "/":
         return <LandingPage onNavigate={navigate} />;
@@ -217,6 +238,14 @@ export default function App() {
         return <PredictionHistoryPage onNavigate={navigate} />;
       case "/prediction/feedback":
         return <PredictionFeedbackPage onNavigate={navigate} />;
+      case "/mypage/verify":
+        return (
+          <MyPagePasswordVerifyPage
+            onNavigate={navigate}
+            onVerified={() => setVerifiedMypageRoute("/mypage/profile")}
+            targetRoute="/mypage/profile"
+          />
+        );
       case "/mypage":
       case "/mypage/profile":
         return <MyInfoPage onNavigate={navigate} />;
@@ -279,7 +308,7 @@ export default function App() {
       default:
         return <HomePage onNavigate={navigate} />;
     }
-  }, [route]);
+  }, [route, verifiedMypageRoute]);
 
   if (publicRoutes.has(route)) {
     return <PublicLayout onNavigate={navigate}>{page}</PublicLayout>;

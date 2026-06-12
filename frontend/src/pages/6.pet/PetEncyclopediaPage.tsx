@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
-import { getPetCatalog, type PetCatalog, type PetCatalogItem, type PetType } from "../../api/pets";
+import { getMyVirtualPet, getPetCatalog, type PetCatalog, type PetCatalogItem, type PetType } from "../../api/pets";
 import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingState } from "../../components/common/LoadingState";
 import { getPetImage, PET_META, PET_TYPES } from "../../utils/petAssets";
@@ -54,12 +54,20 @@ function PetCard({ pet }: { pet: PetCatalogItem }) {
 }
 
 export function PetEncyclopediaPage({ onNavigate }: PetEncyclopediaPageProps) {
-  const [activeTab, setActiveTab] = useState<PetType>("DOG");
+  const [activeTab, setActiveTab] = useState<PetType | null>(null);
   const [catalog, setCatalog] = useState<PetCatalog>(emptyCatalog);
   const [isLoading, setIsLoading] = useState(true);
   const [hasApiError, setHasApiError] = useState(false);
 
   useEffect(() => {
+    const token = getStoredAccessToken();
+    getMyVirtualPet(token)
+      .then((response) => setActiveTab(response.data.pet?.pet_type ?? "DOG"))
+      .catch(() => setActiveTab("DOG"));
+  }, []);
+
+  useEffect(() => {
+    if (!activeTab) return;
     const token = getStoredAccessToken();
     setIsLoading(true);
     getPetCatalog(activeTab, token)
@@ -100,17 +108,6 @@ export function PetEncyclopediaPage({ onNavigate }: PetEncyclopediaPageProps) {
             {PET_META[tab].emoji} {PET_META[tab].label}
           </button>
         ))}
-      </div>
-
-      <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 14, marginBottom: 16 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>수집 현황</span>
-          <span style={{ fontSize: 12, color: "#888" }}>{catalog.summary.unlocked_count} / {catalog.summary.total_count} 종류</span>
-          <div style={{ flex: 1, height: 10, background: "#f0f0f0", borderRadius: 5, overflow: "hidden" }}>
-            <div style={{ width: `${catalog.summary.completion_rate}%`, height: "100%", background: "#1a1a1a", borderRadius: 5 }} />
-          </div>
-          <span style={{ fontSize: 14, fontWeight: 700 }}>{catalog.summary.completion_rate}%</span>
-        </div>
       </div>
 
       {catalog.items.length === 0 ? (

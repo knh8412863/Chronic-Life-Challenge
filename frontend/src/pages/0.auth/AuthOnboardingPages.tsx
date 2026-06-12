@@ -173,11 +173,7 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
           managed_diseases: _managedDiseases ?? [],
         }),
       );
-      try {
-        await requestEmailVerification();
-      } catch {
-        // 가입은 완료된 상태이므로 인증 화면에서 재발송할 수 있게 이동은 유지합니다.
-      }
+      await requestEmailVerification();
       sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
       onNavigate("/email-verify");
     } catch (error) {
@@ -203,18 +199,18 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
         <div style={{ textAlign: "center", marginBottom: 24 }}>
           <img src="/logo.png" alt="All4Health" style={{ height: 40, margin: "0 auto 16px", display: "block" }} onError={e => { (e.target as HTMLImageElement).style.display = "none"; }} />
           <h2 style={{ fontSize: 18, fontWeight: 600, color: "#1a1a1a", margin: "0 0 8px" }}>회원가입</h2>
-          <p style={{ fontSize: 12, color: "#888", margin: 0 }}>서비스 이용을 위한 약관에 동의해주세요</p>
+          <p style={{ fontSize: 15, color: "#888", margin: 0 }}>서비스 이용을 위한 약관에 동의해주세요</p>
         </div>
 
         <Stepper steps={["계정정보", "약관동의", "이메일인증", "건강설문", "완료"]} current={1} />
 
         <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 24 }}>
-          <h3 style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a", margin: "0 0 16px" }}>약관 동의</h3>
+          <h3 style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a", margin: "0 0 16px" }}>약관 동의</h3>
 
           {/* 전체 동의 */}
           <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: 14 }}>
             <input type="checkbox" checked={allChecked} onChange={toggleAll} style={{ width: 16, height: 16, cursor: "pointer" }} />
-            <span style={{ fontSize: 13, fontWeight: 600, color: "#1a1a1a" }}>전체 동의</span>
+            <span style={{ fontSize: 16, fontWeight: 600, color: "#1a1a1a" }}>전체 동의</span>
           </label>
           <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "0 0 14px" }} />
 
@@ -229,12 +225,12 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
                 <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer" }}>
                   <input type="checkbox" checked={checked[item.key]} onChange={() => setChecked(prev => ({ ...prev, [item.key]: !prev[item.key] }))}
                     style={{ width: 14, height: 14, cursor: "pointer" }} />
-                  <span style={{ fontSize: 12, color: "#333" }}>{item.label}</span>
+                  <span style={{ fontSize: 15, color: "#333" }}>{item.label}</span>
                 </label>
                 <button
                   type="button"
                   onClick={() => openPolicy(item.policyType)}
-                  style={{ background: "none", border: "none", fontSize: 10, color: "#888", cursor: "pointer" }}
+                  style={{ background: "none", border: "none", fontSize: 16, color: "#888", cursor: "pointer" }}
                 >
                   보기
                 </button>
@@ -242,31 +238,31 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
             ))}
           </div>
 
-          <p style={{ fontSize: 11, color: "#aaa", textAlign: "right", margin: "14px 0 20px" }}>적용 약관 버전: v1.0</p>
+          <p style={{ fontSize: 17, color: "#aaa", textAlign: "right", margin: "14px 0 20px" }}>적용 약관 버전: v1.0</p>
 
-          {submitMessage && <p style={{ fontSize: 11, color: "#E24B4A", margin: "0 0 10px" }}>{submitMessage}</p>}
+          {submitMessage && <p style={{ fontSize: 17, color: "#E24B4A", margin: "0 0 10px" }}>{submitMessage}</p>}
           <button onClick={handleSubmit} disabled={!allRequired || isSubmitting}
-            style={{ width: "100%", height: 40, background: allRequired && !isSubmitting ? "#1a1a1a" : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: allRequired && !isSubmitting ? "pointer" : "not-allowed" }}>
-            {isSubmitting ? "가입 처리 중..." : "다음"}
+            style={{ width: "100%", height: 40, background: allRequired && !isSubmitting ? "#1a1a1a" : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontSize: 17, fontWeight: 600, cursor: allRequired && !isSubmitting ? "pointer" : "not-allowed" }}>
+            {isSubmitting ? "가입 및 인증 메일 발송 중..." : "가입하고 인증 메일 받기"}
           </button>
         </div>
 
-        <p style={{ textAlign: "center", marginTop: 16, fontSize: 11, color: "#888" }}>
+        <p style={{ textAlign: "center", marginTop: 16, fontSize: 17, color: "#888" }}>
           이미 계정이 있으신가요? {" "}
-          <button onClick={() => onNavigate("/login")} style={{ background: "none", border: "none", fontSize: 11, color: "#1a1a1a", cursor: "pointer", fontWeight: 600 }}>로그인</button>
+          <button onClick={() => onNavigate("/login")} style={{ background: "none", border: "none", fontSize: 17, color: "#1a1a1a", cursor: "pointer", fontWeight: 600 }}>로그인</button>
         </p>
       </div>
       {policyModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
           <div style={{ width: "100%", maxWidth: 560, maxHeight: "80vh", background: "#fff", borderRadius: 12, padding: 24, overflow: "auto" }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 12px" }}>{policyModal.title}</h3>
-            <div style={{ whiteSpace: "pre-wrap", fontSize: 12, lineHeight: 1.7, color: "#444", minHeight: 120 }}>
+            <div style={{ whiteSpace: "pre-wrap", fontSize: 15, lineHeight: 1.7, color: "#444", minHeight: 120 }}>
               {isPolicyLoading ? "약관을 불러오는 중입니다." : policyModal.content}
             </div>
             <button
               type="button"
               onClick={() => setPolicyModal(null)}
-              style={{ width: "100%", height: 38, marginTop: 18, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, cursor: "pointer" }}
+              style={{ width: "100%", height: 38, marginTop: 18, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 16, cursor: "pointer" }}
             >
               확인
             </button>
@@ -338,7 +334,7 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
           <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>All4Health</span>
         </div>
         <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", margin: "0 0 12px" }}>이메일로 인증<br />링크를 보냈습니다</h2>
-        <p style={{ fontSize: 12, color: "#555", lineHeight: 1.6, margin: "0 0 24px" }}>
+        <p style={{ fontSize: 15, color: "#555", lineHeight: 1.6, margin: "0 0 24px" }}>
           example@email.com 으로 인증 메일을 발송했습니다.<br />메일함을 확인하고 인증 링크를 클릭해주세요.
         </p>
         <hr style={{ border: "none", borderTop: "1px solid #ddd", margin: "0 0 20px" }} />
@@ -352,8 +348,8 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
               <img src={item.icon} alt="" aria-hidden="true" style={{ width: 24, height: 24, objectFit: "contain" }} />
             </div>
             <div>
-              <div style={{ fontSize: 11, fontWeight: 500, color: "#1a1a1a", marginBottom: 3 }}>{item.title}</div>
-              <div style={{ fontSize: 10, color: "#888", lineHeight: 1.5 }}>{item.desc}</div>
+              <div style={{ fontSize: 17, fontWeight: 500, color: "#1a1a1a", marginBottom: 3 }}>{item.title}</div>
+              <div style={{ fontSize: 16, color: "#888", lineHeight: 1.5 }}>{item.desc}</div>
             </div>
           </div>
         ))}
@@ -361,15 +357,15 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
 
       {/* Right */}
       <div style={{ flex: 1, padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center", background: "#fff" }}>
-        <div style={{ fontSize: 11, fontWeight: 500, color: "#888", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>이메일 인증</div>
-        <div style={{ fontSize: 12, color: "#555", marginBottom: 20 }}>
+        <div style={{ fontSize: 17, fontWeight: 500, color: "#888", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>이메일 인증</div>
+        <div style={{ fontSize: 15, color: "#555", marginBottom: 20 }}>
           {verificationToken ? "인증 링크를 확인하고 있습니다" : "아래 절차에 따라 인증을 완료해주세요"}
         </div>
         <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "0 0 20px" }} />
 
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", marginBottom: 24 }}>
           <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", marginBottom: 14, fontSize: 24 }}>📧</div>
-          <p style={{ fontSize: 12, color: "#555", textAlign: "center" }}>
+          <p style={{ fontSize: 15, color: "#555", textAlign: "center" }}>
             {verifyStatus === "VERIFYING"
               ? "이메일 인증을 처리하는 중입니다."
               : verifyStatus === "SUCCESS"
@@ -379,48 +375,48 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
         </div>
 
         <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 8, padding: 16, marginBottom: 20 }}>
-          <div style={{ fontSize: 11, fontWeight: 500, color: "#555", marginBottom: 12 }}>인증 절차</div>
+          <div style={{ fontSize: 17, fontWeight: 500, color: "#555", marginBottom: 12 }}>인증 절차</div>
           <hr style={{ border: "none", borderTop: "1px solid #eee", margin: "0 0 10px" }} />
           {["이메일 수신 확인", "인증 링크 클릭", "인증 완료"].map((step, i) => (
             <div key={step} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 0" }}>
               <div style={{ width: 16, height: 16, borderRadius: "50%", border: `1.5px solid ${i === 0 ? "#1a1a1a" : "#ddd"}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 9, flexShrink: 0 }} />
-              <span style={{ fontSize: 11, color: "#333" }}>{step}</span>
+              <span style={{ fontSize: 17, color: "#333" }}>{step}</span>
             </div>
           ))}
         </div>
 
         <button onClick={handleResend} disabled={resendCooldown > 0 || verifyStatus === "SUCCESS"}
-          style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 12, color: resendCooldown > 0 ? "#aaa" : "#333", cursor: resendCooldown > 0 ? "not-allowed" : "pointer", marginBottom: 10 }}>
+          style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 15, color: resendCooldown > 0 ? "#aaa" : "#333", cursor: resendCooldown > 0 ? "not-allowed" : "pointer", marginBottom: 10 }}>
           {resendCooldown > 0 ? `재발송 가능까지 ${resendCooldown}초` : "이메일 재발송"}
         </button>
-        {message && <p style={{ fontSize: 11, color: message.includes("실패") ? "#E24B4A" : "#2e7d32", margin: "0 0 10px" }}>{message}</p>}
+        {message && <p style={{ fontSize: 17, color: message.includes("실패") ? "#E24B4A" : "#2e7d32", margin: "0 0 10px" }}>{message}</p>}
         {isLocalDev && verifyStatus !== "SUCCESS" && (
           <div style={{ border: "1px solid #f0d58c", background: "#fff8e1", borderRadius: 8, padding: 12, marginBottom: 10 }}>
-            <p style={{ fontSize: 11, color: "#6d5400", lineHeight: 1.6, margin: "0 0 8px" }}>
+            <p style={{ fontSize: 17, color: "#6d5400", lineHeight: 1.6, margin: "0 0 8px" }}>
               로컬 개발 환경에서는 실제 이메일 발송이 연결되지 않아 인증 링크를 받을 수 없습니다. 화면 흐름 확인을 위해 건강 설문으로 이동할 수 있습니다.
             </p>
             <button
               type="button"
               onClick={() => onNavigate("/health-survey")}
-              style={{ width: "100%", height: 34, border: "none", borderRadius: 8, background: "#8A6D00", color: "#fff", fontSize: 12, cursor: "pointer" }}
+              style={{ width: "100%", height: 34, border: "none", borderRadius: 8, background: "#8A6D00", color: "#fff", fontSize: 15, cursor: "pointer" }}
             >
               로컬 테스트용: 건강 설문으로 이동
             </button>
           </div>
         )}
         <button onClick={() => onNavigate("/signup")}
-          style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 12, color: "#333", cursor: "pointer", marginBottom: 20 }}>
+          style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 15, color: "#333", cursor: "pointer", marginBottom: 20 }}>
           이전으로 돌아가기
         </button>
 
         {verifyStatus === "SUCCESS" && (
           <button onClick={() => onNavigate("/health-survey")}
-            style={{ width: "100%", height: 36, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 12, cursor: "pointer", marginBottom: 16 }}>
+            style={{ width: "100%", height: 36, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 15, cursor: "pointer", marginBottom: 16 }}>
             건강 설문으로 이동
           </button>
         )}
 
-        <p style={{ textAlign: "center", fontSize: 11, color: "#888", cursor: "pointer", margin: 0 }}
+        <p style={{ textAlign: "center", fontSize: 17, color: "#888", cursor: "pointer", margin: 0 }}
           onClick={() => onNavigate("/login")}>로그인으로 돌아가기</p>
       </div>
       {(verifyStatus === "SUCCESS" || verifyStatus === "FAILED") && (
@@ -446,7 +442,7 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
             <h3 style={{ fontSize: 18, fontWeight: 700, color: "#1a1a1a", margin: "0 0 8px" }}>
               {verifyStatus === "SUCCESS" ? "이메일 인증 완료" : "이메일 인증 실패"}
             </h3>
-            <p style={{ fontSize: 13, color: "#555", lineHeight: 1.6, margin: "0 0 22px" }}>
+            <p style={{ fontSize: 16, color: "#555", lineHeight: 1.6, margin: "0 0 22px" }}>
               {verifyStatus === "SUCCESS"
                 ? "이메일 인증이 완료되었습니다. 이제 건강 설문을 입력하고 서비스를 시작할 수 있습니다."
                 : "인증 링크가 만료되었거나 유효하지 않습니다. 인증 메일을 다시 요청해주세요."}
@@ -455,7 +451,7 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
               <button
                 type="button"
                 onClick={() => onNavigate("/health-survey")}
-                style={{ width: "100%", height: 40, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer" }}
+                style={{ width: "100%", height: 40, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 17, fontWeight: 600, cursor: "pointer" }}
               >
                 건강 설문으로 이동
               </button>
@@ -465,14 +461,14 @@ export function EmailVerifyPage({ onNavigate }: EmailVerifyPageProps) {
                   type="button"
                   onClick={handleResend}
                   disabled={resendCooldown > 0}
-                  style={{ width: "100%", height: 40, border: "none", borderRadius: 8, background: resendCooldown > 0 ? "#ccc" : "#1a1a1a", color: "#fff", fontSize: 14, fontWeight: 600, cursor: resendCooldown > 0 ? "not-allowed" : "pointer" }}
+                  style={{ width: "100%", height: 40, border: "none", borderRadius: 8, background: resendCooldown > 0 ? "#ccc" : "#1a1a1a", color: "#fff", fontSize: 17, fontWeight: 600, cursor: resendCooldown > 0 ? "not-allowed" : "pointer" }}
                 >
                   {resendCooldown > 0 ? `재발송 가능까지 ${resendCooldown}초` : "인증 메일 재발송"}
                 </button>
                 <button
                   type="button"
                   onClick={() => onNavigate("/login")}
-                  style={{ width: "100%", height: 40, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", color: "#333", fontSize: 13, cursor: "pointer" }}
+                  style={{ width: "100%", height: 40, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", color: "#333", fontSize: 16, cursor: "pointer" }}
                 >
                   로그인으로 돌아가기
                 </button>
@@ -513,7 +509,7 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
         <span style={{ fontSize: 16, fontWeight: 700, color: "#1a1a1a" }}>All4Health</span>
       </div>
       <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", margin: "0 0 12px" }}>비밀번호를<br />재설정합니다</h2>
-      <p style={{ fontSize: 12, color: "#555", lineHeight: 1.6, margin: "0 0 8px" }}>재설정 링크는 발송 후 1시간 동안 유효합니다.</p>
+      <p style={{ fontSize: 15, color: "#555", lineHeight: 1.6, margin: "0 0 8px" }}>재설정 링크는 발송 후 1시간 동안 유효합니다.</p>
       <hr style={{ border: "none", borderTop: "1px solid #ddd", margin: "20px 0" }} />
       {[
         { num: "1", title: "이메일 입력", desc: "가입 시 사용한 이메일 주소를 입력하세요" },
@@ -521,12 +517,12 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
         { num: "3", title: "새 비밀번호 설정", desc: "안전한 새 비밀번호로 계정을 보호하세요" },
       ].map((item, i) => (
         <div key={item.num} style={{ display: "flex", gap: 12, alignItems: "flex-start", marginBottom: 16 }}>
-          <div style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #ddd", background: step - 1 > i ? "#1a1a1a" : "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 11, color: step - 1 > i ? "#fff" : "#888", flexShrink: 0 }}>
+          <div style={{ width: 28, height: 28, borderRadius: "50%", border: "1.5px solid #ddd", background: step - 1 > i ? "#1a1a1a" : "#f0f0f0", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 17, color: step - 1 > i ? "#fff" : "#888", flexShrink: 0 }}>
             {step - 1 > i ? "✓" : item.num}
           </div>
           <div>
-            <div style={{ fontSize: 11, fontWeight: 500, color: "#1a1a1a", marginBottom: 3 }}>{item.title}</div>
-            <div style={{ fontSize: 10, color: "#888", lineHeight: 1.5 }}>{item.desc}</div>
+            <div style={{ fontSize: 17, fontWeight: 500, color: "#1a1a1a", marginBottom: 3 }}>{item.title}</div>
+            <div style={{ fontSize: 16, color: "#888", lineHeight: 1.5 }}>{item.desc}</div>
           </div>
         </div>
       ))}
@@ -539,9 +535,9 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
         <div style={{ textAlign: "center", maxWidth: 360, padding: "48px 40px" }}>
           <div style={{ width: 56, height: 56, borderRadius: "50%", background: "#2e7d32", margin: "0 auto 20px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 24, color: "#fff" }}>✓</div>
           <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", margin: "0 0 8px" }}>비밀번호가 변경되었습니다</h2>
-          <p style={{ fontSize: 12, color: "#555", lineHeight: 1.6, margin: "0 0 24px" }}>새 비밀번호로 로그인해주세요.</p>
+          <p style={{ fontSize: 15, color: "#555", lineHeight: 1.6, margin: "0 0 24px" }}>새 비밀번호로 로그인해주세요.</p>
           <button onClick={() => onNavigate("/login")}
-            style={{ width: "100%", height: 40, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            style={{ width: "100%", height: 40, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 17, fontWeight: 600, cursor: "pointer" }}>
             로그인하러 가기
           </button>
         </div>
@@ -553,21 +549,25 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
     <div style={{ display: "flex", minHeight: "100vh" }}>
       <ProcessGuide />
       <div style={{ flex: 1, padding: "48px 40px", display: "flex", flexDirection: "column", justifyContent: "center", background: "#fff" }}>
-        <div style={{ fontSize: 11, fontWeight: 500, color: "#888", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>비밀번호 재설정</div>
+        <div style={{ fontSize: 17, fontWeight: 500, color: "#888", letterSpacing: 0.5, textTransform: "uppercase", marginBottom: 6 }}>비밀번호 재설정</div>
         <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "16px 0" }} />
 
         {step === 1 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ fontSize: 12, color: "#555", marginBottom: 4 }}>가입 시 사용한 이메일 주소를 입력하세요</div>
+            <div style={{ fontSize: 15, color: "#555", marginBottom: 4 }}>가입 시 사용한 이메일 주소를 입력하세요</div>
             <div>
-              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>이메일</label>
+              <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>이메일</label>
               <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="example@email.com"
-                style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
-              <p style={{ fontSize: 11, color: "#aaa", margin: "4px 0 0" }}>가입된 이메일이 아니더라도 동일한 안내를 드립니다.</p>
+                style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }} />
+              <p style={{ fontSize: 17, color: "#aaa", margin: "4px 0 0" }}>가입된 이메일이 아니더라도 동일한 안내를 드립니다.</p>
             </div>
             <button
               onClick={async () => {
                 setErrorMessage("");
+                if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+                  setErrorMessage("이메일 입력이 잘못되었습니다.");
+                  return;
+                }
                 setIsSubmitting(true);
                 try {
                   await requestPasswordReset(email);
@@ -579,22 +579,22 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
                 }
               }}
               disabled={!email || isSubmitting}
-              style={{ width: "100%", height: 36, background: email ? "#1a1a1a" : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: email ? "pointer" : "not-allowed" }}>
+              style={{ width: "100%", height: 36, background: email ? "#1a1a1a" : "#ccc", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: email ? "pointer" : "not-allowed" }}>
               {isSubmitting ? "발송 중..." : "인증 메일 발송"}
             </button>
-            {errorMessage && <p style={{ fontSize: 11, color: "#E24B4A", margin: 0 }}>{errorMessage}</p>}
+            {errorMessage && <p style={{ fontSize: 17, color: "#E24B4A", margin: 0 }}>{errorMessage}</p>}
             <hr style={{ border: "none", borderTop: "1px solid #eee" }} />
-            <p style={{ textAlign: "center", fontSize: 11, color: "#888", cursor: "pointer" }} onClick={() => onNavigate("/login")}>로그인으로 돌아가기</p>
+            <p style={{ textAlign: "center", fontSize: 17, color: "#888", cursor: "pointer" }} onClick={() => onNavigate("/login")}>로그인으로 돌아가기</p>
           </div>
         )}
 
         {step === 2 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ fontSize: 12, color: "#555" }}>이메일을 확인해주세요</div>
-            <p style={{ fontSize: 13, color: "#333", lineHeight: 1.6, margin: 0 }}>
+            <div style={{ fontSize: 15, color: "#555" }}>이메일을 확인해주세요</div>
+            <p style={{ fontSize: 16, color: "#333", lineHeight: 1.6, margin: 0 }}>
               {email}으로 재설정 링크를 발송했습니다. 메일함을 확인하고 링크를 클릭해주세요.
             </p>
-            <p style={{ fontSize: 11, color: "#aaa", margin: 0 }}>링크는 발송 후 1시간 동안 유효합니다. 스팸 메일함도 확인해보세요.</p>
+            <p style={{ fontSize: 17, color: "#aaa", margin: 0 }}>링크는 발송 후 1시간 동안 유효합니다. 스팸 메일함도 확인해보세요.</p>
             <button
               onClick={async () => {
                 try {
@@ -603,35 +603,35 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
                   setErrorMessage(getApiErrorMessage(error, "이메일 재발송에 실패했습니다."));
                 }
               }}
-              style={{ width: "100%", height: 36, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}
+              style={{ width: "100%", height: 36, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, cursor: "pointer" }}
             >
               이메일 재발송
             </button>
             <hr style={{ border: "none", borderTop: "1px solid #eee" }} />
-            <p style={{ textAlign: "center", fontSize: 11, color: "#888", cursor: "pointer" }} onClick={() => onNavigate("/login")}>로그인으로 돌아가기</p>
+            <p style={{ textAlign: "center", fontSize: 17, color: "#888", cursor: "pointer" }} onClick={() => onNavigate("/login")}>로그인으로 돌아가기</p>
           </div>
         )}
 
         {step === 3 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-            <div style={{ fontSize: 12, color: "#555" }}>새 비밀번호를 입력해주세요</div>
+            <div style={{ fontSize: 15, color: "#555" }}>새 비밀번호를 입력해주세요</div>
             <div>
-              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>새 비밀번호</label>
+              <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>새 비밀번호</label>
               <div style={{ position: "relative" }}>
                 <input type={showPw ? "text" : "password"} value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="영문+숫자+특수문자 조합 8자 이상"
-                  style={{ width: "100%", height: 34, border: `1.5px solid ${passwordError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
-                <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>{showPw ? "🙈" : "👁"}</button>
+                  style={{ width: "100%", height: 34, border: `1.5px solid ${passwordError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }} />
+                <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 15 }}>{showPw ? "🙈" : "👁"}</button>
               </div>
-              {passwordError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>{passwordError}</p>}
+              {passwordError && <p style={{ fontSize: 17, color: "#E24B4A", margin: "4px 0 0" }}>{passwordError}</p>}
             </div>
             <div>
-              <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>새 비밀번호 확인</label>
+              <label style={{ fontSize: 16, color: "#555", display: "block", marginBottom: 4 }}>새 비밀번호 확인</label>
               <div style={{ position: "relative" }}>
                 <input type={showConfirm ? "text" : "password"} value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="동일하게 입력"
-                  style={{ width: "100%", height: 34, border: `1.5px solid ${pwMismatch ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
-                <button onClick={() => setShowConfirm(!showConfirm)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 12 }}>{showConfirm ? "🙈" : "👁"}</button>
+                  style={{ width: "100%", height: 34, border: `1.5px solid ${pwMismatch ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }} />
+                <button onClick={() => setShowConfirm(!showConfirm)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 15 }}>{showConfirm ? "🙈" : "👁"}</button>
               </div>
-              {pwMismatch && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>비밀번호가 일치하지 않습니다.</p>}
+              {pwMismatch && <p style={{ fontSize: 17, color: "#E24B4A", margin: "4px 0 0" }}>비밀번호가 일치하지 않습니다.</p>}
             </div>
             <button
               onClick={async () => {
@@ -659,10 +659,10 @@ export function PasswordResetPage({ onNavigate }: PasswordResetPageProps) {
                 }
               }}
               disabled={resetPasswordInvalid || isSubmitting}
-              style={{ width: "100%", height: 36, background: resetPasswordInvalid ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: resetPasswordInvalid ? "not-allowed" : "pointer" }}>
+              style={{ width: "100%", height: 36, background: resetPasswordInvalid ? "#ccc" : "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 16, fontWeight: 600, cursor: resetPasswordInvalid ? "not-allowed" : "pointer" }}>
               {isSubmitting ? "변경 중..." : "비밀번호 변경하기"}
             </button>
-            {errorMessage && <p style={{ fontSize: 11, color: "#E24B4A", margin: 0 }}>{errorMessage}</p>}
+            {errorMessage && <p style={{ fontSize: 17, color: "#E24B4A", margin: 0 }}>{errorMessage}</p>}
           </div>
         )}
       </div>
@@ -678,6 +678,12 @@ interface OnboardingCompletePageProps {
 }
 
 export function OnboardingCompletePage({ onNavigate }: OnboardingCompletePageProps) {
+  const nextActions: Array<{ icon: string; label: string; route: AppRoute }> = [
+    { icon: "🎯", label: "건강 목표 설정하기", route: "/health/goal" },
+    { icon: "📊", label: "추가 건강 수치 입력하기", route: "/health/vitals/input" },
+    { icon: "🏆", label: "챌린지 참여하기", route: "/challenges/list" },
+  ];
+
   return (
     <div style={{ minHeight: "100vh", background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "center", padding: 40 }}>
       <div style={{ width: "100%", maxWidth: 680 }}>
@@ -689,31 +695,32 @@ export function OnboardingCompletePage({ onNavigate }: OnboardingCompletePagePro
 
         <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 28, textAlign: "center" }}>
           <div style={{ width: 72, height: 72, borderRadius: "50%", background: "#f0f0f0", border: "2px solid #ddd", margin: "0 auto 20px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 32 }}>✓</div>
-          <div style={{ display: "inline-block", padding: "4px 12px", background: "#2e7d32", borderRadius: 12, fontSize: 11, color: "#fff", marginBottom: 14 }}>✓ 이메일 인증 완료</div>
+          <div style={{ display: "inline-block", padding: "4px 12px", background: "#2e7d32", borderRadius: 12, fontSize: 17, color: "#fff", marginBottom: 14 }}>✓ 이메일 인증 완료</div>
           <h2 style={{ fontSize: 20, fontWeight: 600, color: "#1a1a1a", margin: "0 0 10px" }}>가입이 완료되었습니다!</h2>
-          <p style={{ fontSize: 12, color: "#888", margin: "0 0 24px" }}>All4Health와 함께 건강한 생활을 시작해보세요.</p>
+          <p style={{ fontSize: 15, color: "#888", margin: "0 0 24px" }}>All4Health와 함께 건강한 생활을 시작해보세요.</p>
 
           <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "0 0 20px" }} />
 
           <div style={{ textAlign: "left", marginBottom: 24 }}>
-            <p style={{ fontSize: 11, color: "#888", marginBottom: 12 }}>다음 단계로 진행하세요:</p>
-            {[
-              { icon: "🎯", label: "건강 목표 설정하기" },
-              { icon: "📊", label: "추가 건강 수치 입력하기" },
-              { icon: "🏆", label: "챌린지 참여하기" },
-            ].map(item => (
-              <div key={item.label} style={{ padding: "12px 16px", border: "1.5px solid #e0e0e0", borderRadius: 8, background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", marginBottom: 8 }}>
+            <p style={{ fontSize: 17, color: "#888", marginBottom: 12 }}>다음 단계로 진행하세요:</p>
+            {nextActions.map(item => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={() => onNavigate(item.route)}
+                style={{ width: "100%", padding: "12px 16px", border: "1.5px solid #e0e0e0", borderRadius: 8, background: "#fafafa", display: "flex", alignItems: "center", justifyContent: "space-between", cursor: "pointer", marginBottom: 8, textAlign: "left" }}
+              >
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <span style={{ fontSize: 16 }}>{item.icon}</span>
-                  <span style={{ fontSize: 14, fontWeight: 500, color: "#1a1a1a" }}>{item.label}</span>
+                  <span style={{ fontSize: 17, fontWeight: 500, color: "#1a1a1a" }}>{item.label}</span>
                 </div>
                 <span style={{ fontSize: 16, color: "#aaa" }}>›</span>
-              </div>
+              </button>
             ))}
           </div>
 
           <button onClick={() => onNavigate("/home")}
-            style={{ width: "100%", height: 40, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: "pointer" }}>
+            style={{ width: "100%", height: 40, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 17, fontWeight: 600, cursor: "pointer" }}>
             홈으로 이동
           </button>
         </div>

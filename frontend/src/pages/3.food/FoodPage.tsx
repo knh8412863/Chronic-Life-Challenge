@@ -335,13 +335,13 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
           </div>
 
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={handleSaveInput}
-              style={{ flex: 1, height: 40, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer" }}>
-              📁 저장
-            </button>
             <button onClick={() => { setFoodItems([{ food: "", amount: "" }]); setCalories(""); setMemo(""); setShowValidation(false); }}
-              style={{ flex: 1, height: 40, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              style={{ flex: 1, height: 40, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer" }}>
               초기화
+            </button>
+            <button onClick={handleSaveInput}
+              style={{ flex: 1, height: 40, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
+              저장
             </button>
           </div>
         </div>
@@ -376,18 +376,13 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
               {["전체", "아침", "점심", "저녁", "간식"].map(t => <option key={t}>{t}</option>)}
             </select>
 
-            <button onClick={() => onNavigate("/food/analyze")}
-              style={{ width: "100%", height: 36, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-              + 새로운 식단 추가
-            </button>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12, marginBottom: 20 }}>
             {[
               { label: "총 칼로리", val: totalCalories.toLocaleString(), unit: "kcal", bg: "#e3f2fd", color: "#1565c0", border: "#90caf9" },
               { label: "총 나트륨", val: totalSodium.toLocaleString(), unit: "mg", bg: "#fff8e1", color: "#f57f17", border: "#ffe082" },
               { label: "총 당류", val: totalSugar, unit: "g", bg: "#fce4ec", color: "#c2185b", border: "#f48fb1" },
-              { label: "식사 횟수", val: filteredMeals.length, unit: "회", bg: "#fafafa", color: "#555", border: "#e0e0e0" },
             ].map(item => (
               <div key={item.label} style={{ padding: "12px 14px", background: item.bg, border: `1.5px solid ${item.border}`, borderRadius: 8, textAlign: "center" }}>
                 <div style={{ fontSize: 10, color: item.color, marginBottom: 4 }}>{item.label}</div>
@@ -403,10 +398,6 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
           ) : filteredMeals.length === 0 ? (
             <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10 }}>
               <EmptyState title="식단 기록이 없습니다." description="새로운 식단을 입력하거나 식단 분석 결과를 저장해 보세요." icon="🍽️" />
-              <button onClick={() => onNavigate("/food/analyze")}
-                style={{ display: "block", margin: "0 auto 24px", padding: "10px 24px", border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, cursor: "pointer" }}>
-                + 새로운 식단 추가
-              </button>
             </div>
           ) : (
             <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -435,13 +426,22 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
                       title={!meal.isToday ? "당일 기록만 삭제할 수 있습니다." : ""}
                       style={{ padding: "6px 12px", border: "1.5px solid #ddd", borderRadius: 6, background: "#fff", fontSize: 11,
                         cursor: meal.isToday ? "pointer" : "not-allowed", opacity: meal.isToday ? 1 : 0.4 }}>
-                      🗑️ 삭제
+                      삭제
                     </button>
                   </div>
                 </div>
               ))}
             </div>
           )}
+          <div style={{ display: "flex", justifyContent: "center", marginTop: 20 }}>
+            <button
+              type="button"
+              className="green-button"
+              onClick={() => onNavigate("/food/analyze")}
+            >
+              식단 기록하기
+            </button>
+          </div>
         </div>
       )}
 
@@ -472,12 +472,6 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
             <h2 style={{ fontSize: 15, fontWeight: 700, margin: 0 }}>
               {MEAL_LABELS[selectedMeal.meal_type].label} - {selectedMeal.food_name}
             </h2>
-            {!isEditMode && selectedMeal.isToday && (
-              <button onClick={() => setIsEditMode(true)}
-                style={{ marginLeft: "auto", padding: "6px 14px", border: "1.5px solid #ddd", borderRadius: 6, background: "#fff", fontSize: 12, cursor: "pointer" }}>
-                수정
-              </button>
-            )}
           </div>
 
           {/* 기본 정보 */}
@@ -546,7 +540,7 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
               <>
                 <button onClick={handleSaveEdit}
                   style={{ flex: 1, height: 40, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                  📁 저장
+                  저장
                 </button>
                 <button onClick={() => setIsEditMode(false)}
                   style={{ flex: 1, height: 40, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer" }}>
@@ -561,7 +555,7 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
                 </button>
                 <button onClick={() => { setDeleteTargetId(selectedMeal.meal_log_id); setShowDeleteConfirm(true); }}
                   style={{ flex: 1, height: 40, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer" }}>
-                  🗑️ 삭제
+                  삭제
                 </button>
               </>
             ) : (
