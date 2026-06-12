@@ -1,12 +1,14 @@
 import { useEffect, useState } from "react";
 import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
+import { ApiError } from "../../api/client";
 import {
   getNotificationPreferences,
   updateNotificationPreferences,
   type NotificationPreference,
 } from "../../api/notifications";
 import {
+  changeCurrentUserPassword,
   getPolicyDocument,
   getUserConsents,
   updateUserConsent,
@@ -46,6 +48,7 @@ export function ChangePasswordPage({ onNavigate }: ChangePasswordPageProps) {
   const [newPw, setNewPw] = useState("");
   const [confirmPw, setConfirmPw] = useState("");
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [successMessage, setSuccessMessage] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
   const validate = () => {
@@ -57,12 +60,36 @@ export function ChangePasswordPage({ onNavigate }: ChangePasswordPageProps) {
     return e;
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     const e = validate();
+    setSuccessMessage("");
     if (Object.keys(e).length > 0) { setErrors(e); return; }
     setIsSaving(true);
-    setErrors({ api: "현재 비밀번호 변경을 처리할 수 없습니다. 잠시 후 다시 시도해주세요." });
-    setIsSaving(false);
+    setErrors({});
+    try {
+      await changeCurrentUserPassword(
+        {
+          current_password: currentPw,
+          new_password: newPw,
+          new_password_confirm: confirmPw,
+        },
+        getStoredAccessToken(),
+      );
+      setCurrentPw("");
+      setNewPw("");
+      setConfirmPw("");
+      setSuccessMessage("비밀번호가 변경되었습니다. 다음 로그인부터 새 비밀번호를 사용해주세요.");
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 401) {
+        setErrors({ current: "현재 비밀번호가 올바르지 않습니다." });
+      } else if (error instanceof ApiError && error.status === 422) {
+        setErrors({ api: typeof error.detail === "string" ? error.detail : "새 비밀번호 조건을 확인해주세요." });
+      } else {
+        setErrors({ api: "비밀번호 변경에 실패했습니다. 잠시 후 다시 시도해주세요." });
+      }
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -85,6 +112,7 @@ export function ChangePasswordPage({ onNavigate }: ChangePasswordPageProps) {
             {errors.confirm && <p style={{ fontSize: 11, color: "#E24B4A", margin: "4px 0 0" }}>{errors.confirm}</p>}
           </div>
           {errors.api && <p style={{ fontSize: 11, color: "#E24B4A", margin: 0 }}>{errors.api}</p>}
+          {successMessage && <p style={{ fontSize: 12, color: "#2e7d32", margin: 0 }}>{successMessage}</p>}
         </div>
 
         <hr style={{ border: "none", borderTop: "1px solid #e0e0e0", margin: "16px 0" }} />
@@ -97,7 +125,7 @@ export function ChangePasswordPage({ onNavigate }: ChangePasswordPageProps) {
         </div>
 
         <div style={{ display: "flex", gap: 10, marginTop: 20 }}>
-          <button onClick={handleSave} disabled={isSaving}
+          <button onClick={() => void handleSave()} disabled={isSaving}
             style={{ padding: "10px 24px", border: "none", borderRadius: 8, background: isSaving ? "#aaa" : "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: isSaving ? "not-allowed" : "pointer" }}>
             {isSaving ? "변경 중..." : "변경"}
           </button>

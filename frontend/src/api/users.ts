@@ -180,6 +180,12 @@ export type WithdrawalPayload = {
   confirm_agreed: boolean;
 };
 
+export type PasswordChangePayload = {
+  current_password: string;
+  new_password: string;
+  new_password_confirm: string;
+};
+
 export async function getCurrentUser(token?: string) {
   const response = await apiRequest<MaybeData<UserInfo>>("/users/me", { token });
   return unwrapData(response);
@@ -206,6 +212,14 @@ export async function verifyCurrentUserPassword(password: string, token?: string
   return apiRequest<void>("/users/me/password-verification", {
     method: "POST",
     body: JSON.stringify({ password }),
+    token,
+  });
+}
+
+export async function changeCurrentUserPassword(payload: PasswordChangePayload, token?: string) {
+  return apiRequest<void>("/users/me/password", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
     token,
   });
 }
