@@ -15,6 +15,16 @@ async def test_security_headers_are_applied():
     assert "default-src 'self'" in response.headers["Content-Security-Policy"]
 
 
+async def test_docs_csp_allows_swagger_static_assets():
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        response = await client.get("/api/docs")
+
+    assert response.status_code == status.HTTP_200_OK
+    csp = response.headers["Content-Security-Policy"]
+    assert "https://cdn.jsdelivr.net" in csp
+    assert "https://fastapi.tiangolo.com" in csp
+
+
 async def test_cors_preflight_allows_configured_local_origin():
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
         response = await client.options(
