@@ -106,24 +106,29 @@ read -p "선택(ex. 1): " is_https
 echo ""
 
 # ---------- EC2 내에 배포 준비 파일 복사  ----------
+chmod 400 ~/.ssh/${ssh_key_file}
+ssh -i ~/.ssh/${ssh_key_file} ubuntu@${ec2_ip} "mkdir -p ~/project/nginx"
 scp -i ~/.ssh/${ssh_key_file} envs/.prod.env ubuntu@${ec2_ip}:~/project/.env
 scp -i ~/.ssh/${ssh_key_file} infra/docker/docker-compose.prod.yml ubuntu@${ec2_ip}:~/project/docker-compose.yml
+tmp_nginx_conf=$(mktemp)
+trap 'rm -f "$tmp_nginx_conf"' EXIT
 if [[ "$is_https" == "1" ]] ; then
-  # ---------- prod_http.conf 파일의 server_name 자동 수정 ----------
-  sed -i '' "s/server_name .*/server_name ${ec2_ip};/g" infra/nginx/prod_http.conf
-  scp -i ~/.ssh/${ssh_key_file} infra/nginx/prod_http.conf ubuntu@${ec2_ip}:~/project/nginx/default.conf
+  # ---------- prod_http.conf 템플릿의 server_name 자동 수정 ----------
+  cp infra/nginx/prod_http.conf "$tmp_nginx_conf"
+  sed -i '' "s/server_name .*/server_name ${ec2_ip};/g" "$tmp_nginx_conf"
+  scp -i ~/.ssh/${ssh_key_file} "$tmp_nginx_conf" ubuntu@${ec2_ip}:~/project/nginx/default.conf
 else
   echo "${COLOR_BLUE} 사용중인 도메인을 입력하세요. (ex. api.ozcoding.site)${COLOR_NC}"
   read -p "Domain: " domain
-  # ---------- prod_https.conf 파일의 server_name, ssl_certificate 자동 수정 ----------
-  sed -i '' "s/server_name .*/server_name ${domain};/g" infra/nginx/prod_https.conf
-  sed -i '' "s|/etc/letsencrypt/live/[^/]*|/etc/letsencrypt/live/${domain}|g" infra/nginx/prod_https.conf
-  scp -i ~/.ssh/${ssh_key_file} infra/nginx/prod_https.conf ubuntu@${ec2_ip}:~/project/nginx/default.conf
+  # ---------- prod_https.conf 템플릿의 server_name, ssl_certificate 자동 수정 ----------
+  cp infra/nginx/prod_https.conf "$tmp_nginx_conf"
+  sed -i '' "s/server_name .*/server_name ${domain};/g" "$tmp_nginx_conf"
+  sed -i '' "s|/etc/letsencrypt/live/[^/]*|/etc/letsencrypt/live/${domain}|g" "$tmp_nginx_conf"
+  scp -i ~/.ssh/${ssh_key_file} "$tmp_nginx_conf" ubuntu@${ec2_ip}:~/project/nginx/default.conf
 fi
 
 # ---------- EC2 배포 자동화  ----------
 echo "${COLOR_BLUE}EC2 인스턴스에 SSH 접속을 시도합니다.${COLOR_NC}"
-chmod 400 ~/.ssh/${ssh_key_file}
 ssh -i ~/.ssh/${ssh_key_file} ubuntu@${ec2_ip} \
   "DOCKER_USERNAME=${docker_user} \
    DOCKER_PAT=${docker_pw} \
@@ -136,7 +141,17 @@ ssh -i ~/.ssh/${ssh_key_file} ubuntu@${ec2_ip} \
   docker login -u "$DOCKER_USERNAME" -p "$DOCKER_PAT"
 
   echo "Deploying services: $DEPLOY_SERVICES"
-  docker compose up -d --pull always --no-deps $DEPLOY_SERVICES
+  docker compose pull $DEPLOY_SERVICES
+
+  if [[ " $DEPLOY_SERVICES " == *" fastapi "* ]]; then
+    echo "Ensuring database and redis are running"
+    docker compose up -d mysql redis
+
+    echo "Running database migrations"
+    docker compose run --rm --no-deps fastapi uv run --no-sync aerich upgrade
+  fi
+
+  docker compose up -d --no-deps $DEPLOY_SERVICES
 
   docker image prune -af
 EOF
