@@ -87,6 +87,7 @@ services:
       - media_volume:/vol/web/media
       - certbot-conf:/etc/letsencrypt
       - certbot-www:/var/www/certbot
+      - ./frontend-dist:/vol/web/frontend:ro
     ports:
       - "80:80"
       - "443:443"
