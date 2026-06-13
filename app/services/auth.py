@@ -115,21 +115,16 @@ class AuthService:
             return linked_user
 
         user = await self.user_repo.get_user_by_email(google_user.email)
-        if not user:
+        if user:
             raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="해당 Google 이메일로 가입된 계정이 없습니다. 먼저 회원가입을 완료해 주세요.",
-            )
-        if not user.is_active:
-            raise HTTPException(status_code=status.HTTP_423_LOCKED, detail="비활성화된 계정입니다.")
-
-        if user.google_sub and user.google_sub != google_user.sub:
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT, detail="다른 Google 계정과 이미 연결된 회원입니다."
+                status_code=status.HTTP_409_CONFLICT,
+                detail="이미 이메일로 가입된 계정입니다. 일반 로그인으로 이용해 주세요.",
             )
 
-        await self.user_repo.link_google_account(user, google_user.sub, google_user.picture)
-        return user
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="해당 Google 이메일로 가입된 계정이 없습니다. 먼저 회원가입을 완료해 주세요.",
+        )
 
     async def signup_google(self, data: GoogleRegistrationRequest) -> User:
         google_user = self.google_auth_service.verify_id_token(data.id_token)

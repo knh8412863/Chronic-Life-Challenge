@@ -138,6 +138,17 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
     setEmailChecked(true);
   };
 
+  const switchToEmailSignup = () => {
+    sessionStorage.removeItem(GOOGLE_SIGNUP_DRAFT_KEY);
+    sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+    setGoogleDraft(null);
+    setEmail("");
+    setEmailChecked(false);
+    setPassword("");
+    setPasswordConfirm("");
+    setFormMessage("이메일 회원가입으로 전환했습니다. 계정 정보를 다시 입력해주세요.");
+  };
+
   const handleNext = async () => {
     const passwordError = googleDraft ? "" : validatePassword(password);
     setEmailServerError("");
@@ -296,6 +307,15 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
               )}
             </div>
             {googleDraft && <p style={{ fontSize: 17, color: "#2e7d32", margin: "4px 0 0" }}>Google 계정 이메일로 가입합니다.</p>}
+            {googleDraft && (
+              <button
+                type="button"
+                onClick={switchToEmailSignup}
+                style={{ marginTop: 6, background: "none", border: "none", color: "#555", fontSize: 16, textDecoration: "underline", cursor: "pointer", padding: 0 }}
+              >
+                이메일로 직접 가입하기
+              </button>
+            )}
             {!googleDraft && emailChecked && <p style={{ fontSize: 17, color: "#2e7d32", margin: "4px 0 0" }}>✓ 이메일 형식이 확인되었습니다.</p>}
             {emailServerError && <p style={{ fontSize: 17, color: "#E24B4A", margin: "4px 0 0" }}>{emailServerError}</p>}
           </div>

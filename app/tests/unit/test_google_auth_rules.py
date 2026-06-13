@@ -3,6 +3,7 @@ from types import SimpleNamespace
 import pytest
 from fastapi import HTTPException
 
+from app.services.auth import AuthService
 from app.services.google_auth import GoogleAuthService
 
 
@@ -81,3 +82,60 @@ def test_google_auth_rejects_missing_identity(monkeypatch):
         GoogleAuthService().verify_id_token("id-token")
 
     assert exc.value.status_code == 401
+
+
+class FakeAuthGoogleService:
+    def __init__(self, *, email: str = "google@example.com", sub: str = "google-sub-1") -> None:
+        self.email = email
+        self.sub = sub
+
+    def verify_id_token(self, id_token: str) -> SimpleNamespace:
+        assert id_token == "id-token"
+        return SimpleNamespace(
+            sub=self.sub,
+            email=self.email,
+            email_verified=True,
+            name="홍길동",
+            picture="https://example.com/profile.png",
+        )
+
+
+class FakeGoogleLoginUserRepository:
+    def __init__(
+        self, *, linked_user: SimpleNamespace | None = None, email_user: SimpleNamespace | None = None
+    ) -> None:
+        self.linked_user = linked_user
+        self.email_user = email_user
+
+    async def get_user_by_google_sub(self, google_sub: str) -> SimpleNamespace | None:
+        return self.linked_user
+
+    async def get_user_by_email(self, email: str) -> SimpleNamespace | None:
+        return self.email_user
+
+
+@pytest.mark.asyncio
+async def test_google_login_requires_existing_google_link():
+    service = AuthService()
+    service.google_auth_service = FakeAuthGoogleService()  # type: ignore[assignment]
+    service.user_repo = FakeGoogleLoginUserRepository()  # type: ignore[assignment]
+
+    with pytest.raises(HTTPException) as exc:
+        await service.authenticate_google("id-token")
+
+    assert exc.value.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_google_login_does_not_auto_link_email_account():
+    service = AuthService()
+    service.google_auth_service = FakeAuthGoogleService(email="local@example.com")  # type: ignore[assignment]
+    service.user_repo = FakeGoogleLoginUserRepository(
+        email_user=SimpleNamespace(id=1, email="local@example.com", is_active=True, google_sub=None)
+    )  # type: ignore[assignment]
+
+    with pytest.raises(HTTPException) as exc:
+        await service.authenticate_google("id-token")
+
+    assert exc.value.status_code == 409
+    assert exc.value.detail == "이미 이메일로 가입된 계정입니다. 일반 로그인으로 이용해 주세요."

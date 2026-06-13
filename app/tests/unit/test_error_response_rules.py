@@ -1,12 +1,21 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 
 from app.core.exceptions import register_exception_handlers
 
 
 class SampleRequest(BaseModel):
     count: int
+
+
+class ValueErrorRequest(BaseModel):
+    birth_date: str
+
+    @field_validator("birth_date")
+    @classmethod
+    def reject_value(cls, value: str) -> str:
+        raise ValueError("서비스 약관에 따라 만14세 미만은 회원가입이 불가합니다.")
 
 
 def create_test_app() -> FastAPI:
@@ -19,6 +28,10 @@ def create_test_app() -> FastAPI:
 
     @app.post("/samples")
     async def create_sample(request: SampleRequest):
+        return request
+
+    @app.post("/value-error-samples")
+    async def create_value_error_sample(request: ValueErrorRequest):
         return request
 
     @app.get("/unexpected")
@@ -52,6 +65,21 @@ def test_validation_error_response_keeps_detail_list_and_adds_error_metadata():
     assert response.status_code == 422
     body = response.json()
     assert isinstance(body["detail"], list)
+    assert body["error"] == {
+        "code": "VALIDATION_ERROR",
+        "message": "입력값 형식이 올바르지 않습니다.",
+        "status_code": 422,
+    }
+
+
+def test_validation_error_response_serializes_value_error_context():
+    client = TestClient(create_test_app(), raise_server_exceptions=False)
+
+    response = client.post("/value-error-samples", json={"birth_date": "2025-12-13"})
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["detail"][0]["ctx"]["error"] == "서비스 약관에 따라 만14세 미만은 회원가입이 불가합니다."
     assert body["error"] == {
         "code": "VALIDATION_ERROR",
         "message": "입력값 형식이 올바르지 않습니다.",

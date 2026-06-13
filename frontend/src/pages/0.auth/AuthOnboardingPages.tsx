@@ -125,7 +125,22 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
           consent_marketing: checked.marketing,
           remember_me: parsedDraft.remember_me,
         };
-        const loginResponse = await googleSignup(payload);
+        let loginResponse;
+        try {
+          loginResponse = await googleSignup(payload);
+        } catch (error) {
+          if (
+            error instanceof ApiError &&
+            error.status === 401 &&
+            String(error.detail ?? "").includes("Google")
+          ) {
+            sessionStorage.removeItem(SIGNUP_DRAFT_KEY);
+            sessionStorage.removeItem(GOOGLE_SIGNUP_DRAFT_KEY);
+            setSubmitMessage("Google 인증 시간이 만료되었습니다. 로그인 화면에서 Google 계정으로 다시 시작해주세요.");
+            return;
+          }
+          throw error;
+        }
         storeAccessToken(loginResponse.access_token, Boolean(parsedDraft.remember_me));
         sessionStorage.setItem(
           ONBOARDING_PROFILE_KEY,

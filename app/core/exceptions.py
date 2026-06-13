@@ -41,6 +41,18 @@ def build_error_response(
     }
 
 
+def _make_json_serializable(value: Any) -> Any:
+    if isinstance(value, BaseException):
+        return str(value)
+    if isinstance(value, list):
+        return [_make_json_serializable(item) for item in value]
+    if isinstance(value, tuple):
+        return [_make_json_serializable(item) for item in value]
+    if isinstance(value, dict):
+        return {key: _make_json_serializable(item) for key, item in value.items()}
+    return value
+
+
 async def http_exception_handler(request: Request, exc: StarletteHTTPException) -> ORJSONResponse:
     return ORJSONResponse(
         status_code=exc.status_code,
@@ -54,7 +66,7 @@ async def request_validation_exception_handler(request: Request, exc: RequestVal
         status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
         content=build_error_response(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
-            detail=exc.errors(),
+            detail=_make_json_serializable(exc.errors()),
             code="VALIDATION_ERROR",
             message="입력값 형식이 올바르지 않습니다.",
         ),
