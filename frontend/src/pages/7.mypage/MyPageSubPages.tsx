@@ -163,6 +163,7 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
     // 월간 리포트는 MVP 제외
   });
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -203,17 +204,33 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
   const handleSave = async () => {
     setIsSaving(true);
     setErrorMessage("");
+    setSuccessMessage("");
     try {
       const payload: Partial<NotificationPreference> = {
         ...push,
         ...email,
       };
-      await updateNotificationPreferences(payload, getStoredAccessToken());
+      const { data } = await updateNotificationPreferences(payload, getStoredAccessToken());
+      setPush({
+        push_enabled: data.push_enabled,
+        health_data_reminder_enabled: data.health_data_reminder_enabled,
+        challenge_mission_enabled: data.challenge_mission_enabled,
+        prediction_result_enabled: data.prediction_result_enabled,
+        advice_update_enabled: data.advice_update_enabled,
+        virtual_pet_enabled: data.virtual_pet_enabled,
+      });
+      setEmail({
+        email_enabled: data.email_enabled,
+        weekly_report_enabled: data.weekly_report_enabled,
+        important_notice_enabled: data.important_notice_enabled,
+        promotion_enabled: data.promotion_enabled,
+      });
+      setSuccessMessage("알림 설정이 저장되었습니다.");
+    } catch (error) {
+      const detail = error instanceof ApiError && typeof error.detail === "string" ? error.detail : "";
+      setErrorMessage(detail || "알림 설정 저장에 실패했습니다.");
+    } finally {
       setIsSaving(false);
-      onNavigate("/mypage");
-    } catch {
-      setIsSaving(false);
-      setErrorMessage("알림 설정 저장에 실패했습니다.");
     }
   };
 
@@ -237,6 +254,7 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
 
       {isLoading && <p style={{ fontSize: 13, color: "#888" }}>알림 설정을 불러오는 중입니다.</p>}
       {errorMessage && <p style={{ fontSize: 12, color: "#c62828" }}>{errorMessage}</p>}
+      {successMessage && <p style={{ fontSize: 12, color: "#2e7d32" }}>{successMessage}</p>}
 
       {/* 푸시 알림 */}
       <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 20, marginBottom: 14 }}>

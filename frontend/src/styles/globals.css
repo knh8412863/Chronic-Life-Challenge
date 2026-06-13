@@ -2284,6 +2284,80 @@ button {
   color: var(--brand-green);
 }
 
+.prediction-feedback-page {
+  max-width: 820px;
+}
+
+.prediction-feedback-page > h1 {
+  margin: 0;
+  font-size: 31px;
+  line-height: 1.2;
+}
+
+.prediction-feedback-card {
+  width: 100%;
+  gap: 26px;
+  padding: 38px 42px;
+}
+
+.prediction-feedback-card h2 {
+  font-size: 18px;
+  line-height: 1.35;
+}
+
+.prediction-feedback-meta {
+  margin: 0;
+  color: #444444;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.prediction-feedback-divider {
+  height: 1px;
+  background: #e5e7eb;
+}
+
+.prediction-feedback-section {
+  display: grid;
+  gap: 14px;
+}
+
+.prediction-feedback-card .feedback-choice-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.prediction-feedback-card .feedback-choice-grid button {
+  min-height: 76px;
+  font-size: 17px;
+}
+
+.prediction-feedback-card input {
+  height: 54px;
+  text-align: center;
+  font-size: 15px;
+}
+
+.prediction-feedback-card textarea {
+  min-height: 150px;
+  font-size: 15px;
+}
+
+.prediction-feedback-card textarea::placeholder {
+  text-align: center;
+}
+
+.prediction-feedback-note {
+  color: #4b5563;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.prediction-feedback-submit {
+  min-height: 58px;
+  font-size: 17px;
+}
+
 .advice-feedback-card {
   display: grid;
   max-width: 760px;

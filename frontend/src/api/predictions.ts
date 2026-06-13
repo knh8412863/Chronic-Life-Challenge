@@ -101,6 +101,7 @@ export type DiseaseRisk = {
 export type PredictionResult = {
   result_id: number;
   prediction_mode: string;
+  created_at: string;
   disease_risks: Record<string, DiseaseRisk>;
   input_completeness: {
     used_default_values: boolean;

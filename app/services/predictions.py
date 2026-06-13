@@ -1322,19 +1322,22 @@ class PredictionService:
                 user_id,
             )
             disease_predictions = await asyncio.to_thread(self._run_models, raw_input)
+            for disease, values in disease_predictions.items():
+                values["risk_factors"] = self._risk_factors(disease, health, lifestyle, lipid, renal)
+                self._apply_clinical_risk_overrides(disease, values)
             completeness = self._input_completeness(snapshot.missing_fields)
             at_risk = [disease for disease, values in disease_predictions.items() if values["is_at_risk"]]
+            overall_risk_level = self._overall_risk_level(disease_predictions)
             result = await PredictionResult.create(
                 task=task,
                 user_id=user_id,
-                overall_risk_level="HIGH" if at_risk else "LOW",
+                overall_risk_level=overall_risk_level,
                 lifestyle_priority=at_risk,
                 input_completeness=completeness,
                 inference_ms=int((time.perf_counter() - started) * 1000),
                 disclaimer=DISCLAIMER,
             )
             for disease, values in disease_predictions.items():
-                values["risk_factors"] = self._risk_factors(disease, health, lifestyle, lipid, renal)
                 model_version = await self._ensure_model_version(
                     disease_code=disease,
                     threshold=values["threshold"],
@@ -1379,6 +1382,7 @@ class PredictionService:
         return PredictionResultResponse(
             result_id=result.id,
             prediction_mode=result.task.prediction_mode.value,
+            created_at=result.created_at,
             disease_risks=self._to_disease_risks(result.items),
             input_completeness=InputCompletenessResponse(**result.input_completeness),
             disclaimer=result.disclaimer,
@@ -1756,3 +1760,39 @@ class PredictionService:
                 ),
             }
         return results
+
+    @staticmethod
+    def _apply_clinical_risk_overrides(disease_code: str, values: dict[str, Any]) -> None:
+        factors = values.get("risk_factors") or []
+        if disease_code == "DIABETES":
+            high = any("공복혈당이 당뇨 의심 기준 이상" in factor for factor in factors)
+            medium = any("BMI가 비만 범위" in factor or "당뇨 가족력" in factor for factor in factors)
+        elif disease_code == "HYPERTENSION":
+            high = any("혈압이 높은 범위" in factor for factor in factors)
+            medium = any("BMI가 비만 범위" in factor or "고혈압 가족력" in factor for factor in factors)
+        elif disease_code == "CKD":
+            high = any("크레아티닌" in factor or "BUN" in factor or "소변 단백" in factor for factor in factors)
+            medium = any("당뇨 또는 고혈압 진단 이력" in factor for factor in factors)
+        else:
+            return
+
+        probability = Decimal(str(values["probability"]))
+        if high:
+            values["probability"] = max(probability, Decimal("0.65"))
+            values["is_at_risk"] = True
+            values["risk_level"] = "HIGH"
+            values["message"] = "입력 수치가 고위험 기준에 해당합니다. 전문의와 상담해 보세요."
+        elif medium and values["risk_level"] == "LOW":
+            values["probability"] = max(probability, Decimal("0.35"))
+            values["is_at_risk"] = True
+            values["risk_level"] = "MEDIUM"
+            values["message"] = "입력 수치상 주의가 필요합니다. 생활습관 관리와 추가 확인을 권장합니다."
+
+    @staticmethod
+    def _overall_risk_level(disease_predictions: dict[str, dict[str, Any]]) -> str:
+        levels = {values["risk_level"] for values in disease_predictions.values()}
+        if "HIGH" in levels:
+            return "HIGH"
+        if "MEDIUM" in levels:
+            return "MEDIUM"
+        return "LOW"

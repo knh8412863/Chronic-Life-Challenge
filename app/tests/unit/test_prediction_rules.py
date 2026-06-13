@@ -124,6 +124,52 @@ def test_ckd_risk_factors_use_renal_values_and_history():
     assert "당뇨 또는 고혈압 진단 이력이 입력되었습니다." in result
 
 
+def test_clinical_risk_override_marks_severe_hypertension_as_high_risk():
+    values = {
+        "probability": Decimal("0.030000"),
+        "threshold": Decimal("0.09600"),
+        "is_at_risk": False,
+        "risk_level": "LOW",
+        "message": "고혈압 위험 신호는 현재 기준에서 높지 않습니다.",
+        "risk_factors": ["수축기 혈압이 높은 범위입니다.", "이완기 혈압이 높은 범위입니다."],
+    }
+
+    PredictionService._apply_clinical_risk_overrides("HYPERTENSION", values)
+
+    assert values["probability"] == Decimal("0.65")
+    assert values["is_at_risk"] is True
+    assert values["risk_level"] == "HIGH"
+
+
+def test_clinical_risk_override_marks_diabetes_fasting_glucose_as_high_risk():
+    values = {
+        "probability": Decimal("0.009000"),
+        "threshold": Decimal("0.05500"),
+        "is_at_risk": False,
+        "risk_level": "LOW",
+        "message": "당뇨 위험 신호는 현재 기준에서 높지 않습니다.",
+        "risk_factors": ["공복혈당이 당뇨 의심 기준 이상입니다."],
+    }
+
+    PredictionService._apply_clinical_risk_overrides("DIABETES", values)
+
+    assert values["probability"] == Decimal("0.65")
+    assert values["is_at_risk"] is True
+    assert values["risk_level"] == "HIGH"
+
+
+def test_overall_risk_level_uses_highest_clinical_level():
+    result = PredictionService._overall_risk_level(
+        {
+            "DIABETES": {"risk_level": "LOW"},
+            "HYPERTENSION": {"risk_level": "MEDIUM"},
+            "CKD": {"risk_level": "LOW"},
+        }
+    )
+
+    assert result == "MEDIUM"
+
+
 def test_prediction_model_input_uses_latest_lipid_obesity_body_values():
     raw = {"height": 165.0, "weight": 63.0, "bmi": 23.14, "waist_circumference": 78.0}
     lipid = SimpleNamespace(

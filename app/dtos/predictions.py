@@ -626,6 +626,7 @@ class InputCompletenessResponse(BaseModel):
 class PredictionResultResponse(BaseModel):
     result_id: int
     prediction_mode: str
+    created_at: datetime
     disease_risks: dict[str, DiseaseRiskResponse]
     input_completeness: InputCompletenessResponse
     disclaimer: str
