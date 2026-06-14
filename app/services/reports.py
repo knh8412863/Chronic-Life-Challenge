@@ -36,6 +36,7 @@ from app.models.users import User
 from app.services.email import EmailService
 from app.services.llm_advice import OPENAI_PROVIDER
 from app.services.llm_report import OpenAIReportClient, ReportLLMError, ReportLLMResult
+from app.services.notifications import NotificationService
 
 RULE_BASED_PROVIDER = "RULE_BASED"
 RULE_BASED_MODEL = "weekly-report-rules-v1"
@@ -72,6 +73,7 @@ class WeeklyReportService:
             output_tokens=llm_result.output_tokens if llm_result else 0,
             cache_read_tokens=llm_result.cache_read_tokens if llm_result else 0,
         )
+        await NotificationService().notify_weekly_report_created(user_id=user.id, report_id=report.id)
         return self._to_response(report, generated=True)
 
     async def get_current_week(self, user: User) -> CurrentWeeklyReportResponse:

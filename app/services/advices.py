@@ -17,6 +17,7 @@ from app.models.advices import AdviceFeedback, LLMAdvice
 from app.models.predictions import ActivityLog, ChronicHealthInput, ExerciseLog, MealLog, PredictionResult, VitalRecord
 from app.models.users import User
 from app.services.llm_advice import OPENAI_PROVIDER, AdviceLLMError, AdviceLLMResult, OpenAIAdviceClient
+from app.services.notifications import NotificationService
 from app.services.predictions import HealthInputService
 
 RULE_BASED_PROVIDER = "RULE_BASED"
@@ -71,6 +72,7 @@ class AdviceService:
             cache_read_tokens=llm_result.cache_read_tokens if llm_result else 0,
             trigger_type=data.trigger_type.value,
         )
+        await NotificationService().notify_advice_created(user_id=user.id, advice_id=advice.id)
         remaining = await self._remaining_manual_regeneration_count(user.id, today)
         return self._to_response(advice, generated=True, remaining_regeneration_count=remaining)
 

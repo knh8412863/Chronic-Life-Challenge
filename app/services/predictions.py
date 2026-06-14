@@ -86,6 +86,7 @@ from app.models.predictions import (
     VitalRecord,
 )
 from app.models.users import Gender, User
+from app.services.notifications import NotificationService
 
 DISCLAIMER = "본 결과는 의료 진단이 아닌 참고 지표입니다. 증상이나 우려가 있다면 전문의와 상담해 주세요."
 MODELS_DIR = Path(__file__).resolve().parents[2] / "ai_worker" / "models"
@@ -1349,6 +1350,11 @@ class PredictionService:
                     model_version_ref=model_version,
                     **values,
                 )
+            await NotificationService().notify_prediction_result(
+                user_id=user_id,
+                result_id=result.id,
+                overall_risk_level=overall_risk_level,
+            )
             task.status = PredictionStatus.SUCCESS
         except Exception as exc:
             task.status = PredictionStatus.FAILED

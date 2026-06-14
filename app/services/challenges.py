@@ -33,6 +33,7 @@ from app.models.challenges import (
 from app.models.users import User
 from app.services.account_stats import sync_user_account_stats
 from app.services.managed_diseases import get_user_managed_disease_codes
+from app.services.notifications import NotificationService
 
 DEFAULT_CHALLENGES = [
     {
@@ -323,6 +324,11 @@ class ChallengeService:
             await self._award_streak_badges(user=user, challenge=participation.challenge, current_streak=current_streak)
             await self._upsert_weekly_leaderboard(user=user, week_start=self._current_week_start(today))
 
+        await NotificationService().notify_challenge_checkin(
+            user_id=user.id,
+            challenge_title=participation.challenge.title,
+            completed=participation.status == ChallengeParticipationStatus.COMPLETED.value,
+        )
         return self._to_checkin_response(checkin, participation)
 
     async def cancel_participation(self, user: User, participation_id: int) -> ChallengeCancelResponse:
