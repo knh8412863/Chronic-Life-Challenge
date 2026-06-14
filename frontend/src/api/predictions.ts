@@ -72,7 +72,7 @@ export type HealthSurveyRecord = HealthSurveyResponse & {
 };
 
 export type PredictionTaskCreatePayload = {
-  health_input_id: number;
+  health_input_id?: number;
   prediction_mode: "SCREENING";
 };
 

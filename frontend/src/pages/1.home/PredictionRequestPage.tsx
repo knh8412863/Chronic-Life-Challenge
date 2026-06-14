@@ -209,10 +209,17 @@ export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps
     setErrorMessage("");
 
     try {
-      const latestInput = await getLatestHealthSurveyInput(token);
+      let healthInputId: number | undefined;
+      try {
+        const latestInput = await getLatestHealthSurveyInput(token);
+        healthInputId = latestInput.data.health_input_id;
+      } catch {
+        healthInputId = undefined;
+      }
+
       const task = await createPredictionTask(
         {
-          health_input_id: latestInput.data.health_input_id,
+          ...(healthInputId ? { health_input_id: healthInputId } : {}),
           prediction_mode: "SCREENING",
         },
         token,
@@ -225,7 +232,7 @@ export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps
       window.history.pushState({}, "", `/prediction/progress?task_uuid=${task.data.task_uuid}`);
       onNavigate("/prediction/progress");
     } catch {
-      setErrorMessage("최근 건강설문 입력을 찾을 수 없습니다. 건강설문을 먼저 저장해 주세요.");
+      setErrorMessage("예측에 사용할 건강 수치 또는 건강설문 입력을 찾을 수 없습니다.");
     } finally {
       setIsSubmitting(false);
     }
@@ -289,8 +296,8 @@ export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps
             <div className="warning-banner compact">
               <strong>!</strong>
               <span>{errorMessage}</span>
-              <button type="button" onClick={() => onNavigate("/health-survey")}>
-                건강설문 입력
+              <button type="button" onClick={() => onNavigate("/health/vitals/input")}>
+                건강 수치 입력
               </button>
             </div>
           )}

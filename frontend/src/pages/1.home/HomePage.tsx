@@ -105,7 +105,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
 
   const recentScoreBars = useMemo(() => {
     if (summary.today_score.score == null) return [];
-    const base = Math.max(20, Math.min(78, summary.today_score.score));
+    const base = Math.max(20, Math.min(100, summary.today_score.score));
     return [base - 18, base - 12, base - 20, base - 8, base - 14, base - 4, base].map((value) =>
       Math.max(16, value),
     );

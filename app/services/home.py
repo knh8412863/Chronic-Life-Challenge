@@ -62,6 +62,7 @@ class HomeService:
                 metric_assessment,
                 latest_bp=latest_bp,
                 latest_glucose=latest_glucose,
+                latest_lipid=latest_lipid,
                 latest_renal=latest_renal,
             ),
             recent_prediction=self._build_recent_prediction(latest_prediction),
@@ -104,18 +105,20 @@ class HomeService:
         metric_assessment: MetricAssessmentResponse,
         latest_bp: VitalRecord | None = None,
         latest_glucose: VitalRecord | None = None,
+        latest_lipid: LipidObesityRecord | None = None,
         latest_renal: RenalRecord | None = None,
     ) -> HomeHealthScoreResponse:
-        if latest_health is None:
+        has_health_record = any([latest_health, latest_bp, latest_glucose, latest_lipid, latest_renal])
+        if not has_health_record:
             return HomeHealthScoreResponse(
                 score=None,
                 status="NEEDS_INPUT",
-                message="건강 설문을 입력하면 오늘의 건강 점수를 확인할 수 있습니다.",
-                calculation_basis=["건강 설문 미입력"],
+                message="건강 수치를 기록하면 오늘의 건강 점수를 확인할 수 있습니다.",
+                calculation_basis=["건강 수치 미입력"],
             )
 
         score = 100
-        basis = ["건강 설문 입력 완료"]
+        basis = ["건강 설문 입력 완료"] if latest_health else ["건강 수치 입력 완료"]
 
         for penalty, reasons in [
             HomeService._prediction_score_adjustment(latest_prediction),

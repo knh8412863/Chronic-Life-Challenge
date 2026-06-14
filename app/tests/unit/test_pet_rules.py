@@ -108,6 +108,12 @@ def test_pet_percent_caps_at_one_hundred():
     assert VirtualPetService._percent(1, 0) == 0
 
 
+def test_pet_water_task_accepts_activity_water_amount():
+    assert VirtualPetService._water_task_completed(water_checkin_exists=False, water_ml=1999) is False
+    assert VirtualPetService._water_task_completed(water_checkin_exists=False, water_ml=2000) is True
+    assert VirtualPetService._water_task_completed(water_checkin_exists=True, water_ml=0) is True
+
+
 def test_pet_catalog_item_unlocks_by_streak_days():
     item = {
         "catalog_id": "PET_RABBIT",

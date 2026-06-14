@@ -268,7 +268,7 @@ function BpForm({ onSaveAll, isSavingAll, todayBpCount }, ref) {
     const measuredAt = `${date}T${time}:00`;
     const requests: CreateVitalBody[] = [];
 
-    if (category === "BP") {
+    if (editingVital && category === "BP") {
       if (!systolic && !diastolic) return false;
       if (!systolic || !diastolic) throw new Error("혈압 입력값이 부족합니다.");
       requests.push({
@@ -277,8 +277,32 @@ function BpForm({ onSaveAll, isSavingAll, todayBpCount }, ref) {
         systolic: Number(systolic),
         diastolic: Number(diastolic),
       });
-    } else {
+    } else if (editingVital && category === "BG") {
       if (!fastingGlucose && !postprandialGlucose) return false;
+      if (fastingGlucose) {
+        requests.push({
+          measure_type: "GLUCOSE_FASTING",
+          measured_at: measuredAt,
+          glucose: Number(fastingGlucose),
+        });
+      }
+      if (postprandialGlucose) {
+        requests.push({
+          measure_type: "GLUCOSE_POSTPRANDIAL",
+          measured_at: measuredAt,
+          glucose: Number(postprandialGlucose),
+        });
+      }
+    } else {
+      if (systolic || diastolic) {
+        if (!systolic || !diastolic) throw new Error("혈압 입력값이 부족합니다.");
+        requests.push({
+          measure_type: `BP_${bpTime}` as MeasureType,
+          measured_at: measuredAt,
+          systolic: Number(systolic),
+          diastolic: Number(diastolic),
+        });
+      }
       if (fastingGlucose) {
         requests.push({
           measure_type: "GLUCOSE_FASTING",

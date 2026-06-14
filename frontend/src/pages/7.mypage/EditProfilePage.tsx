@@ -1,4 +1,5 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { ChangeEvent } from "react";
 import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
 import { getCurrentUser, updateCurrentUser } from "../../api/users";
@@ -16,11 +17,15 @@ const DISEASE_OPTIONS = [
 ];
 
 export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
+  const profileImageInputRef = useRef<HTMLInputElement | null>(null);
   const [email, setEmail] = useState("");
   const [birthday, setBirthday] = useState("");
   const [gender, setGender] = useState<"MALE" | "FEMALE">("MALE");
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
+  const [profileImagePreviewUrl, setProfileImagePreviewUrl] = useState<string | null>(null);
+  const [selectedProfileImageName, setSelectedProfileImageName] = useState("");
   const [height, setHeight] = useState("");
   const [weight, setWeight] = useState("");
   const [diseases, setDiseases] = useState<string[]>([]);
@@ -43,6 +48,8 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
         setBirthday(user.birthday);
         setGender(user.gender);
         setPhone(user.phone_number);
+        setProfileImageUrl(user.profile_image_url);
+        setProfileImagePreviewUrl(user.profile_image_url);
         setHeight(user.height ? String(user.height) : "");
         setWeight(user.weight ? String(user.weight) : "");
         setDiseases(user.managed_diseases);
@@ -60,6 +67,14 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
   }, []);
 
   useEffect(() => {
+    return () => {
+      if (profileImagePreviewUrl?.startsWith("blob:")) {
+        URL.revokeObjectURL(profileImagePreviewUrl);
+      }
+    };
+  }, [profileImagePreviewUrl]);
+
+  useEffect(() => {
     const h = parseFloat(height);
     const w = parseFloat(weight);
     if (h > 0 && w > 0) setBmi(parseFloat((w / Math.pow(h / 100, 2)).toFixed(1)));
@@ -72,6 +87,22 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
     setDiseases(next);
     // 관리 질환 변경 시 경고 안내
     if (next.length !== prev.length) setShowDiseaseWarning(true);
+  };
+
+  const handleProfileImageChange = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("image/")) {
+      setErrorMessage("이미지 파일만 선택할 수 있습니다.");
+      return;
+    }
+
+    setErrorMessage("");
+    if (profileImagePreviewUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(profileImagePreviewUrl);
+    }
+    setSelectedProfileImageName(file.name);
+    setProfileImagePreviewUrl(URL.createObjectURL(file));
   };
 
   const handleSave = async () => {
@@ -219,11 +250,35 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
           {/* 프로필 사진 */}
           <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 16, marginBottom: 14 }}>
             <h3 style={{ fontSize: 12, fontWeight: 600, margin: "0 0 12px" }}>프로필 사진</h3>
-            <div style={{ width: "100%", height: 140, background: "#f5f5f5", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40, marginBottom: 10 }}>👤</div>
-            <button style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 6, background: "#fff", fontSize: 12, cursor: "pointer" }}>
-              {/* TODO: 파일 업로드 후 profile_image_url을 PATCH /api/v1/users/me 에 포함 */}
+            <div style={{ width: "100%", height: 140, background: "#f5f5f5", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40, marginBottom: 10, overflow: "hidden" }}>
+              {profileImagePreviewUrl ? (
+                <img src={profileImagePreviewUrl} alt="프로필 미리보기" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+              ) : (
+                "👤"
+              )}
+            </div>
+            <input
+              ref={profileImageInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleProfileImageChange}
+              style={{ display: "none" }}
+            />
+            <button
+              type="button"
+              onClick={() => profileImageInputRef.current?.click()}
+              style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 6, background: "#fff", fontSize: 12, cursor: "pointer" }}
+            >
               사진 변경
             </button>
+            {selectedProfileImageName && (
+              <p style={{ fontSize: 10, color: "#777", margin: "8px 0 0", wordBreak: "break-all" }}>
+                선택됨: {selectedProfileImageName}
+              </p>
+            )}
+            {!profileImageUrl && !selectedProfileImageName && (
+              <p style={{ fontSize: 10, color: "#aaa", margin: "8px 0 0" }}>내 정보 수정 화면에서만 사진을 변경할 수 있습니다.</p>
+            )}
           </div>
 
           {/* 계정 설정 */}

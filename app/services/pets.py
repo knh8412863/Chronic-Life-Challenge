@@ -264,6 +264,8 @@ class VirtualPetService:
             checkin_date=target_date,
             participation__challenge__target_metric="WATER",
         ).exists()
+        water_logs = await ActivityLog.filter(user_id=user_id, record_date=target_date)
+        water_ml = sum(record.water_ml or 0 for record in water_logs)
         return {
             "VITAL_BP": await VitalRecord.filter(
                 user_id=user_id,
@@ -271,9 +273,13 @@ class VirtualPetService:
                 measure_type__startswith="BP_",
             ).exists(),
             "EXERCISE_30": exercise_minutes >= 30,
-            "WATER_CHALLENGE": water_checkin_exists,
+            "WATER_CHALLENGE": self._water_task_completed(water_checkin_exists, water_ml),
             "DAILY_HEALTH_LOG": await ActivityLog.filter(user_id=user_id, record_date=target_date).exists(),
         }
+
+    @staticmethod
+    def _water_task_completed(water_checkin_exists: bool, water_ml: int) -> bool:
+        return water_checkin_exists or water_ml >= 2000
 
     async def _calculate_health_percent(self, user_id: int, today: date) -> int:
         total = 0

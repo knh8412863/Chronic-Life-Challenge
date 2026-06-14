@@ -58,7 +58,7 @@ def test_prediction_result_list_item_uses_highest_probability_and_feedback_state
 
     assert item.result_id == 3
     assert item.highest_risk_disease == "diabetes"
-    assert item.highest_risk_probability == 0.12
+    assert item.highest_risk_probability == 0.65
     assert item.feedback_submitted is True
     assert set(item.disease_risks) == {"diabetes", "hypertension"}
 
@@ -220,6 +220,25 @@ def test_health_score_penalizes_missing_prediction_and_metric_inputs():
     assert score.status == "CAUTION"
     assert "AI 예측 결과 없음" in score.calculation_basis
     assert "비만 수치 위험" in score.calculation_basis
+
+
+def test_health_score_can_use_latest_vitals_without_health_survey():
+    metric_assessment = MetricAssessmentResponse(
+        dyslipidemia=MetricAssessmentItemResponse(status="UNAVAILABLE", reasons=[], missing_fields=[]),
+        obesity=MetricAssessmentItemResponse(status="UNAVAILABLE", reasons=[], missing_fields=[]),
+    )
+
+    score = HomeService._build_health_score(
+        latest_health=None,
+        latest_prediction=None,
+        metric_assessment=metric_assessment,
+        latest_bp=SimpleNamespace(sbp=145, dbp=92),
+    )
+
+    assert score.score is not None
+    assert score.status == "CAUTION"
+    assert "건강 수치 입력 완료" in score.calculation_basis
+    assert "최근 혈압 수치 위험" in score.calculation_basis
 
 
 @pytest.mark.asyncio

@@ -616,7 +616,7 @@ class MetricAssessmentResponse(BaseModel):
 
 
 class PredictionTaskCreateRequest(BaseModel):
-    health_input_id: int
+    health_input_id: int | None = None
     prediction_mode: Literal["SCREENING"] = "SCREENING"
 
 

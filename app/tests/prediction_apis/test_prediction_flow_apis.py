@@ -12,6 +12,85 @@ from app.services.predictions import PredictionService
 
 
 class TestPredictionFlowAPIs(TestCase):
+    async def test_prediction_flow_can_use_latest_health_records_without_survey(self):
+        signup_data = {
+            "email": "prediction-record-only@example.com",
+            "password": "Password123!",
+            "name": "수치예측",
+            "gender": "MALE",
+            "birth_date": "1988-01-01",
+            "phone_number": "01033334444",
+        }
+        bp_data = {
+            "measured_at": "2026-06-13T09:00:00+09:00",
+            "measure_type": "BP_MORNING",
+            "sbp": 165,
+            "dbp": 105,
+        }
+        glucose_data = {
+            "measured_at": "2026-06-13T09:05:00+09:00",
+            "measure_type": "GLUCOSE_FASTING",
+            "glucose": 190,
+        }
+        model_outputs = {
+            "DIABETES": {
+                "probability": Decimal("0.220000"),
+                "threshold": Decimal("0.05500"),
+                "is_at_risk": True,
+                "risk_level": "HIGH",
+                "message": "당뇨 위험 신호가 감지되었습니다. 전문의와 상담해 보세요.",
+            },
+            "HYPERTENSION": {
+                "probability": Decimal("0.180000"),
+                "threshold": Decimal("0.09600"),
+                "is_at_risk": True,
+                "risk_level": "HIGH",
+                "message": "고혈압 위험 신호가 감지되었습니다. 전문의와 상담해 보세요.",
+            },
+            "CKD": {
+                "probability": Decimal("0.020000"),
+                "threshold": Decimal("0.05900"),
+                "is_at_risk": False,
+                "risk_level": "LOW",
+                "message": "만성신장질환 위험 신호는 현재 기준에서 높지 않습니다.",
+            },
+        }
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            await client.post("/api/v1/auth/signup", json=signup_data)
+            login_response = await client.post(
+                "/api/v1/auth/login",
+                json={"email": signup_data["email"], "password": signup_data["password"]},
+            )
+            headers = {"Authorization": f"Bearer {login_response.json()['access_token']}"}
+            bp_response = await client.post("/api/v1/health/vitals", json=bp_data, headers=headers)
+            glucose_response = await client.post("/api/v1/health/vitals", json=glucose_data, headers=headers)
+
+            with patch.object(PredictionService, "_run_models", return_value=model_outputs):
+                task_response = await client.post(
+                    "/api/v1/prediction-tasks",
+                    json={"prediction_mode": "SCREENING"},
+                    headers=headers,
+                )
+                task_processed = await PredictionWorker().process_once()
+
+            task_uuid = task_response.json()["data"]["task_uuid"]
+            status_response = await client.get(f"/api/v1/prediction-tasks/{task_uuid}/status", headers=headers)
+            result_response = await client.get(
+                f"/api/v1/prediction-results/{status_response.json()['data']['result_id']}",
+                headers=headers,
+            )
+
+        assert bp_response.status_code == status.HTTP_201_CREATED
+        assert glucose_response.status_code == status.HTTP_201_CREATED
+        assert task_response.status_code == status.HTTP_202_ACCEPTED
+        assert task_processed is True
+        result = result_response.json()["data"]
+        assert result["input_completeness"]["used_default_values"] is True
+        assert "health_survey" in result["input_completeness"]["missing_fields"]
+        assert result["disease_risks"]["diabetes"]["is_at_risk"] is True
+        assert result["disease_risks"]["hypertension"]["is_at_risk"] is True
+
     async def test_prediction_flow_returns_three_disease_results_and_missing_input_notice(self):
         signup_data = {
             "email": "prediction@example.com",
