@@ -1341,9 +1341,10 @@ class HealthInputService:
         exercise_count = await ExerciseLog.filter(user_id=user_id, exercise_date=record_date).count()
         activity_count = await ActivityLog.filter(user_id=user_id, record_date=record_date).count()
         total = vital_count + lipid_count + renal_count + exercise_count + activity_count
-        if total >= 3:
+        if total >= 15:
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT, detail="하루 건강 기록은 3회까지 입력할 수 있습니다."
+                status_code=status.HTTP_409_CONFLICT,
+                detail="하루 건강 기록 입력은 최대 3회까지 가능합니다.",
             )
 
     @staticmethod

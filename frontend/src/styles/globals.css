@@ -2008,6 +2008,7 @@ button {
   display: grid;
   grid-template-columns: 2fr 1fr;
   gap: 16px;
+  align-items: start;
 }
 
 .prediction-request-grid .dashboard-card {
