@@ -17,6 +17,7 @@ from app.models.predictions import (
     LipidObesityRecord,
     PredictionResult,
     RenalRecord,
+    VitalRecord,
 )
 from app.models.users import User
 from app.services.notifications import NotificationService
@@ -32,6 +33,16 @@ DISEASE_LABELS = {
 class HomeService:
     async def get_summary(self, user: User) -> HomeSummaryResponse:
         latest_health = await ChronicHealthInput.filter(user_id=user.id).order_by("-created_at").first()
+        latest_bp = (
+            await VitalRecord.filter(user_id=user.id, measure_type__startswith="BP_")
+            .order_by("-measured_at", "-created_at")
+            .first()
+        )
+        latest_glucose = (
+            await VitalRecord.filter(user_id=user.id, measure_type__startswith="GLUCOSE_")
+            .order_by("-measured_at", "-created_at")
+            .first()
+        )
         latest_lipid = await LipidObesityRecord.filter(user_id=user.id).order_by("-record_date", "-created_at").first()
         latest_renal = await RenalRecord.filter(user_id=user.id).order_by("-record_date", "-created_at").first()
         latest_prediction = (
@@ -45,7 +56,14 @@ class HomeService:
         metric_assessment = await HealthInputService().get_metric_assessments(user)
 
         return HomeSummaryResponse(
-            today_score=self._build_health_score(latest_health, latest_prediction, metric_assessment),
+            today_score=self._build_health_score(
+                latest_health,
+                latest_prediction,
+                metric_assessment,
+                latest_bp=latest_bp,
+                latest_glucose=latest_glucose,
+                latest_renal=latest_renal,
+            ),
             recent_prediction=self._build_recent_prediction(latest_prediction),
             today_advice=self._build_today_advice(today_advice, latest_prediction),
             challenge_summary=self._build_challenge_summary(active_challenges),
@@ -84,6 +102,9 @@ class HomeService:
         latest_health: ChronicHealthInput | None,
         latest_prediction: PredictionResult | None,
         metric_assessment: MetricAssessmentResponse,
+        latest_bp: VitalRecord | None = None,
+        latest_glucose: VitalRecord | None = None,
+        latest_renal: RenalRecord | None = None,
     ) -> HomeHealthScoreResponse:
         if latest_health is None:
             return HomeHealthScoreResponse(
@@ -120,6 +141,42 @@ class HomeService:
             elif item.status == "UNAVAILABLE":
                 score -= 5
                 basis.append(f"{label} 수치 미입력")
+
+        if latest_bp is not None and latest_bp.sbp is not None and latest_bp.dbp is not None:
+            if latest_bp.sbp >= 140 or latest_bp.dbp >= 90:
+                score -= 15
+                basis.append("최근 혈압 수치 위험")
+            elif latest_bp.sbp >= 130 or latest_bp.dbp >= 80:
+                score -= 8
+                basis.append("최근 혈압 수치 주의")
+            else:
+                basis.append("최근 혈압 수치 정상")
+
+        if latest_glucose is not None and latest_glucose.glucose is not None:
+            if latest_glucose.glucose >= 200:
+                score -= 15
+                basis.append("최근 혈당 수치 위험")
+            elif latest_glucose.glucose >= 126:
+                score -= 12
+                basis.append("최근 혈당 수치 주의")
+            elif latest_glucose.glucose >= 100:
+                score -= 8
+                basis.append("최근 혈당 수치 경계")
+            else:
+                basis.append("최근 혈당 수치 정상")
+
+        if latest_renal is not None:
+            egfr = float(latest_renal.egfr) if latest_renal.egfr is not None else None
+            creatinine = float(latest_renal.creatinine) if latest_renal.creatinine is not None else None
+            if (
+                (egfr is not None and egfr < 60)
+                or (creatinine is not None and creatinine >= 1.3)
+                or latest_renal.urine_protein_pos
+            ):
+                score -= 15
+                basis.append("최근 신장 지표 위험")
+            elif egfr is not None or creatinine is not None or latest_renal.urine_protein_pos is not None:
+                basis.append("최근 신장 지표 입력 완료")
 
         score = max(score, 0)
         if score < 60:

@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 
 import type { AppRoute } from "../../App";
-import { getActivityLogs, saveActivity } from "../../api/activity";
+import { getActivityLogs, saveActivity, updateActivityLog, type DailyActivity } from "../../api/activity";
 import { getStoredAccessToken } from "../../api/auth";
 import {
   EXERCISE_TYPE_ICONS,
@@ -9,11 +9,13 @@ import {
   EXERCISE_TYPES,
   createExerciseLog,
   getExerciseLogs,
+  updateExerciseLog,
   type CreateExerciseBody,
+  type ExerciseLog,
   type ExerciseTypeCode,
 } from "../../api/exercise";
-import { createKidneyRecord, getKidneyRecords, type CreateKidneyBody } from "../../api/kidney";
-import { createLipidRecord, getLipidRecords, type CreateLipidBody } from "../../api/lipid";
+import { createKidneyRecord, getKidneyRecords, updateKidneyRecord, type CreateKidneyBody, type KidneyRecord } from "../../api/kidney";
+import { createLipidRecord, getLipidRecords, updateLipidRecord, type CreateLipidBody, type LipidRecord } from "../../api/lipid";
 import { createVital, getVitals, updateVital, type CreateVitalBody, type MeasureType, type VitalRecord } from "../../api/vitals";
 import { localDateString } from "../../utils/date";
 
@@ -37,6 +39,20 @@ function nonNegativeValue(value: string): string {
   if (Number.isNaN(n)) return "";
   return String(Math.max(0, n));
 }
+
+function readEditingRecord<T>(type: TypeFilter): T | null {
+  const raw = sessionStorage.getItem("editingHealthRecordData");
+  if (!raw) return null;
+  try {
+    const data = JSON.parse(raw) as { type?: TypeFilter; record?: T };
+    return data.type === type ? data.record ?? null : null;
+  } catch {
+    sessionStorage.removeItem("editingHealthRecordData");
+    return null;
+  }
+}
+
+type TypeFilter = "ALL" | "BP" | "BG" | "LIPID" | "KIDNEY" | "EXERCISE" | "ACTIVITY";
 
 type VitalsInputPageProps = {
   onNavigate?: (route: AppRoute) => void;
@@ -74,6 +90,18 @@ export function VitalsInputPage({ onNavigate }: VitalsInputPageProps) {
 
   useEffect(() => {
     refreshTodayRecordCount();
+    const raw = sessionStorage.getItem("editingHealthRecordData");
+    if (!raw) return;
+    try {
+      const data = JSON.parse(raw) as { type?: TypeFilter };
+      if (data.type === "LIPID") setTab("lipid");
+      else if (data.type === "KIDNEY") setTab("kidney");
+      else if (data.type === "EXERCISE") setTab("exercise");
+      else if (data.type === "ACTIVITY") setTab("activity");
+      else if (data.type === "BP" || data.type === "BG") setTab("bp");
+    } catch {
+      sessionStorage.removeItem("editingHealthRecordData");
+    }
   }, []);
 
   return (
@@ -240,6 +268,7 @@ function BpForm({
         const body = requests[0];
         await updateVital(editingVital.id, body, token ?? undefined);
         sessionStorage.removeItem("editingVitalData");
+        sessionStorage.removeItem("editingHealthRecordData");
       } else {
         await Promise.all(requests.map((body) => createVital(body, token ?? undefined)));
       }
@@ -434,6 +463,20 @@ function LipidForm({ onNavigate, onSaved }: { onNavigate?: (r: AppRoute) => void
   const [source, setSource] = useState("");
   const [memo, setMemo] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [editingLipid, setEditingLipid] = useState<LipidRecord | null>(null);
+
+  useEffect(() => {
+    const record = readEditingRecord<LipidRecord>("LIPID");
+    if (!record) return;
+    setEditingLipid(record);
+    setTotalCholesterol(String(record.total_cholesterol ?? ""));
+    setLdl(String(record.ldl ?? record.ldl_cholesterol ?? ""));
+    setHdl(String(record.hdl ?? record.hdl_cholesterol ?? ""));
+    setTriglycerides(String(record.triglycerides ?? ""));
+    setWaist(String(record.waist_cm ?? record.waist_circumference ?? ""));
+    setDate(record.record_date ?? todayStr());
+    setMemo(record.memo ?? "");
+  }, []);
 
   async function handleSave() {
     const token = getStoredAccessToken();
@@ -448,7 +491,12 @@ function LipidForm({ onNavigate, onSaved }: { onNavigate?: (r: AppRoute) => void
 
     setIsSaving(true);
     try {
-      await createLipidRecord(body, token ?? undefined);
+      if (editingLipid) {
+        await updateLipidRecord(editingLipid.id, body, token ?? undefined);
+        sessionStorage.removeItem("editingHealthRecordData");
+      } else {
+        await createLipidRecord(body, token ?? undefined);
+      }
       onSaved();
       onNavigate?.("/health/vitals");
     } catch {
@@ -504,7 +552,7 @@ function LipidForm({ onNavigate, onSaved }: { onNavigate?: (r: AppRoute) => void
 
       <div className="goal-edit-actions">
         <button type="button" className="green-button" onClick={handleSave} disabled={isSaving}>
-          {isSaving ? "저장 중..." : "저장"}
+          {isSaving ? "저장 중..." : editingLipid ? "수정 저장" : "저장"}
         </button>
         <button type="button" className="wide-subtle-button" onClick={() => onNavigate?.("/health/vitals")}>
           취소
@@ -524,6 +572,19 @@ function KidneyForm({ onNavigate, onSaved }: { onNavigate?: (r: AppRoute) => voi
   const [source, setSource] = useState("");
   const [memo, setMemo] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [editingKidney, setEditingKidney] = useState<KidneyRecord | null>(null);
+
+  useEffect(() => {
+    const record = readEditingRecord<KidneyRecord>("KIDNEY");
+    if (!record) return;
+    setEditingKidney(record);
+    setCreatinine(String(record.creatinine ?? ""));
+    setBun(String(record.bun ?? ""));
+    setEgfr(String(record.egfr ?? ""));
+    setProteinuria(record.urine_protein_pos !== true);
+    setDate(record.record_date ?? record.measured_date ?? todayStr());
+    setMemo(record.memo ?? "");
+  }, []);
 
   const calculatedEgfr =
     creatinine
@@ -546,7 +607,12 @@ function KidneyForm({ onNavigate, onSaved }: { onNavigate?: (r: AppRoute) => voi
 
     setIsSaving(true);
     try {
-      await createKidneyRecord(body, token ?? undefined);
+      if (editingKidney) {
+        await updateKidneyRecord(editingKidney.id, body, token ?? undefined);
+        sessionStorage.removeItem("editingHealthRecordData");
+      } else {
+        await createKidneyRecord(body, token ?? undefined);
+      }
       onSaved();
       onNavigate?.("/health/vitals");
     } catch {
@@ -662,7 +728,7 @@ function KidneyForm({ onNavigate, onSaved }: { onNavigate?: (r: AppRoute) => voi
 
       <div className="goal-edit-actions">
         <button type="button" className="green-button" onClick={handleSave} disabled={isSaving}>
-          {isSaving ? "저장 중..." : "저장"}
+          {isSaving ? "저장 중..." : editingKidney ? "수정 저장" : "저장"}
         </button>
         <button type="button" className="wide-subtle-button" onClick={() => onNavigate?.("/health/vitals")}>
           취소
@@ -679,6 +745,18 @@ function ExerciseInputPanel({ onNavigate, onSaved }: { onNavigate?: (r: AppRoute
   const [calories, setCalories] = useState("");
   const [memo, setMemo] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [editingExercise, setEditingExercise] = useState<ExerciseLog | null>(null);
+
+  useEffect(() => {
+    const record = readEditingRecord<ExerciseLog>("EXERCISE");
+    if (!record) return;
+    setEditingExercise(record);
+    setSelectedType(record.exercise_type);
+    setDate(record.exercise_date ?? todayStr());
+    setMinutes(record.duration_minutes);
+    setCalories(String(record.calories_burned ?? ""));
+    setMemo(record.memo ?? "");
+  }, []);
 
   async function handleSave() {
     const token = getStoredAccessToken();
@@ -692,7 +770,12 @@ function ExerciseInputPanel({ onNavigate, onSaved }: { onNavigate?: (r: AppRoute
 
     setIsSaving(true);
     try {
-      await createExerciseLog(body, token ?? undefined);
+      if (editingExercise) {
+        await updateExerciseLog(editingExercise.id, body, token ?? undefined);
+        sessionStorage.removeItem("editingHealthRecordData");
+      } else {
+        await createExerciseLog(body, token ?? undefined);
+      }
       onSaved();
       onNavigate?.("/health/vitals");
     } catch {
@@ -748,7 +831,7 @@ function ExerciseInputPanel({ onNavigate, onSaved }: { onNavigate?: (r: AppRoute
       </section>
       <div className="goal-edit-actions">
         <button type="button" className="wide-subtle-button" onClick={() => onNavigate?.("/health/vitals")}>취소</button>
-        <button type="button" className="green-button" onClick={handleSave} disabled={isSaving}>{isSaving ? "저장 중..." : "저장"}</button>
+        <button type="button" className="green-button" onClick={handleSave} disabled={isSaving}>{isSaving ? "저장 중..." : editingExercise ? "수정 저장" : "저장"}</button>
       </div>
     </div>
   );
@@ -761,21 +844,37 @@ function ActivityInputPanel({ onNavigate, onSaved }: { onNavigate?: (r: AppRoute
   const [waterMl, setWaterMl] = useState("");
   const [stressLevel, setStressLevel] = useState(3);
   const [isSaving, setIsSaving] = useState(false);
+  const [editingActivity, setEditingActivity] = useState<DailyActivity | null>(null);
+
+  useEffect(() => {
+    const record = readEditingRecord<DailyActivity>("ACTIVITY");
+    if (!record) return;
+    setEditingActivity(record);
+    setSteps(String(record.steps ?? ""));
+    setExerciseMinutes(String(record.exercise_minutes ?? ""));
+    setSleepHours(String(record.sleep_hours ?? ""));
+    setWaterMl(String(record.water_ml ?? ""));
+    setStressLevel(record.stress_level ?? 3);
+  }, []);
 
   async function handleSave() {
     const token = getStoredAccessToken();
+    const body = {
+      steps: steps ? Number(steps) : undefined,
+      exercise_minutes: exerciseMinutes ? Number(exerciseMinutes) : undefined,
+      sleep_hours: sleepHours ? Number(sleepHours) : undefined,
+      water_ml: waterMl ? Number(waterMl) : undefined,
+      stress_level: stressLevel,
+    };
     setIsSaving(true);
     try {
-      await saveActivity(
-        {
-          steps: steps ? Number(steps) : undefined,
-          exercise_minutes: exerciseMinutes ? Number(exerciseMinutes) : undefined,
-          sleep_hours: sleepHours ? Number(sleepHours) : undefined,
-          water_ml: waterMl ? Number(waterMl) : undefined,
-          stress_level: stressLevel,
-        },
-        token ?? undefined,
-      );
+      const activityId = editingActivity?.id ?? editingActivity?.activity_log_id;
+      if (activityId) {
+        await updateActivityLog(activityId, body, token ?? undefined);
+        sessionStorage.removeItem("editingHealthRecordData");
+      } else {
+        await saveActivity(body, token ?? undefined);
+      }
       onSaved();
       onNavigate?.("/health/vitals");
     } catch {
@@ -822,7 +921,7 @@ function ActivityInputPanel({ onNavigate, onSaved }: { onNavigate?: (r: AppRoute
       </section>
       <div className="goal-edit-actions">
         <button type="button" className="wide-subtle-button" onClick={() => onNavigate?.("/health/vitals")}>취소</button>
-        <button type="button" className="green-button" onClick={handleSave} disabled={isSaving}>{isSaving ? "저장 중..." : "저장"}</button>
+        <button type="button" className="green-button" onClick={handleSave} disabled={isSaving}>{isSaving ? "저장 중..." : editingActivity ? "수정 저장" : "저장"}</button>
       </div>
     </div>
   );

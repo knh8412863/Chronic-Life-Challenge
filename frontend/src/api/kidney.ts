@@ -24,7 +24,9 @@ export type CreateKidneyBody = {
   memo?: string;
 };
 
-function toApiKidneyBody(body: CreateKidneyBody) {
+export type UpdateKidneyBody = Partial<CreateKidneyBody>;
+
+function toApiKidneyBody(body: CreateKidneyBody | UpdateKidneyBody) {
   return {
     record_date: body.record_date ?? body.measured_date,
     creatinine: body.creatinine,
@@ -61,4 +63,16 @@ export async function getKidneyRecords(query: { limit?: number } = {}, token?: s
   const qs = params.toString();
   const response = await apiRequest<{ data: ApiKidneyRecord[] }>(`/health/renal-records${qs ? `?${qs}` : ""}`, { token });
   return { data: response.data.map(toKidneyRecord) };
+}
+
+export async function updateKidneyRecord(id: number, body: UpdateKidneyBody, token?: string) {
+  return apiRequest<{ data: KidneyRecord }>(`/health/renal-records/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(toApiKidneyBody(body)),
+    token,
+  });
+}
+
+export async function deleteKidneyRecord(id: number, token?: string) {
+  return apiRequest<void>(`/health/renal-records/${id}`, { method: "DELETE", token });
 }

@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 
 import type { AppRoute } from "../../App";
+import { getActivityLogs } from "../../api/activity";
 import { getStoredAccessToken } from "../../api/auth";
 import { getExerciseLogs } from "../../api/exercise";
+import { getKidneyRecords } from "../../api/kidney";
+import { getLipidRecords } from "../../api/lipid";
 import { createPredictionTask, getLatestHealthSurveyInput } from "../../api/predictions";
 import { getVitals, type VitalRecord } from "../../api/vitals";
 
@@ -12,8 +15,16 @@ type PredictionRequestPageProps = {
 
 const diseases = ["당뇨병", "고혈압", "만성신장질환"];
 
-function latestRecord(items: VitalRecord[], predicate: (item: VitalRecord) => boolean) {
-  return items.find(predicate);
+function latestByDate<T>(items: T[], getDate: (item: T) => string | undefined | null) {
+  return [...items].sort((a, b) => String(getDate(b) ?? "").localeCompare(String(getDate(a) ?? "")))[0];
+}
+
+function latestVital(items: VitalRecord[], predicate: (item: VitalRecord) => boolean) {
+  return latestByDate(items.filter(predicate), (item) => item.measured_at || item.created_at);
+}
+
+function formatCompleteWithDate(date?: string | null) {
+  return date ? `입력됨 · ${date.slice(0, 10)}` : "입력됨";
 }
 
 export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps) {
@@ -47,15 +58,25 @@ export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps
     setIsDataLoading(true);
     Promise.allSettled([
       getLatestHealthSurveyInput(token),
-      getVitals({ limit: 50 }, token),
-      getExerciseLogs({ limit: 50 }, token),
+      getVitals({ limit: 100 }, token),
+      getLipidRecords({ limit: 100 }, token),
+      getKidneyRecords({ limit: 100 }, token),
+      getExerciseLogs({ limit: 100 }, token),
+      getActivityLogs({ limit: 100 }, token),
     ])
-      .then(([surveyRes, vitalsRes, exerciseRes]) => {
+      .then(([surveyRes, vitalsRes, lipidRes, kidneyRes, exerciseRes, activityRes]) => {
         const survey = surveyRes.status === "fulfilled" ? surveyRes.value.data : null;
         const vitals = vitalsRes.status === "fulfilled" ? vitalsRes.value.data.items : [];
+        const lipids = lipidRes.status === "fulfilled" ? lipidRes.value.data : [];
+        const kidneys = kidneyRes.status === "fulfilled" ? kidneyRes.value.data : [];
         const exercises = exerciseRes.status === "fulfilled" ? exerciseRes.value.data : null;
-        const latestBp = latestRecord(vitals, (item) => item.measure_type.startsWith("BP_"));
-        const latestGlucose = latestRecord(vitals, (item) => item.measure_type.startsWith("GLUCOSE_"));
+        const activities = activityRes.status === "fulfilled" ? activityRes.value.data : [];
+        const latestBp = latestVital(vitals, (item) => item.measure_type.startsWith("BP_"));
+        const latestGlucose = latestVital(vitals, (item) => item.measure_type.startsWith("GLUCOSE_"));
+        const latestLipid = latestByDate(lipids, (item) => item.record_date || item.created_at);
+        const latestKidney = latestByDate(kidneys, (item) => item.record_date || item.measured_date || item.created_at);
+        const latestExercise = latestByDate(exercises?.items ?? [], (item) => item.exercise_date || item.created_at);
+        const latestActivity = latestByDate(activities, (item) => item.activity_date || item.record_date);
         const hasFamilyHistory = Boolean(
           survey?.fh_diabetes_father ||
             survey?.fh_diabetes_mother ||
@@ -72,25 +93,61 @@ export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps
             survey?.exercise_frequency != null ||
             survey?.sleep_hours != null ||
             survey?.stress_level != null ||
-            survey?.diet_score != null,
+            survey?.diet_score != null ||
+            latestActivity?.steps != null ||
+            latestActivity?.exercise_minutes != null ||
+            latestActivity?.sleep_hours != null ||
+            latestActivity?.water_ml != null ||
+            latestActivity?.stress_level != null,
         );
+        const profileSummary = survey
+          ? `${Math.round(survey.height)}cm / ${Math.round(survey.weight)}kg`
+          : latestLipid?.height || latestLipid?.weight
+            ? `${latestLipid.height ?? "—"}cm / ${latestLipid.weight ?? "—"}kg`
+            : "미입력";
+        const exerciseSummary = latestExercise
+          ? `최근 ${latestExercise.duration_minutes}분`
+          : latestActivity?.exercise_minutes != null
+            ? `최근 ${latestActivity.exercise_minutes}분`
+            : "미입력";
+        const lipidSummary = latestLipid
+          ? [
+              latestLipid.total_cholesterol != null ? `총 ${latestLipid.total_cholesterol}` : "",
+              latestLipid.ldl != null ? `LDL ${latestLipid.ldl}` : "",
+              latestLipid.hdl != null ? `HDL ${latestLipid.hdl}` : "",
+              latestLipid.triglycerides != null ? `TG ${latestLipid.triglycerides}` : "",
+            ].filter(Boolean).join(" / ") || formatCompleteWithDate(latestLipid.record_date)
+          : "미입력";
+        const kidneySummary = latestKidney
+          ? [
+              latestKidney.creatinine != null ? `Cr ${latestKidney.creatinine}` : "",
+              latestKidney.egfr != null ? `eGFR ${latestKidney.egfr}` : "",
+            ].filter(Boolean).join(" / ") || formatCompleteWithDate(latestKidney.record_date || latestKidney.measured_date)
+          : "미입력";
 
         setDataRows([
-          ["건강 프로필", survey ? "완료" : "미입력"],
+          ["건강 프로필", profileSummary],
           [
             "혈압 기록",
-            latestBp ? `최근 ${latestBp.sbp ?? latestBp.systolic}/${latestBp.dbp ?? latestBp.diastolic}` : "미입력",
+            latestBp
+              ? `최근 ${latestBp.sbp ?? latestBp.systolic}/${latestBp.dbp ?? latestBp.diastolic}`
+              : survey?.sbp != null && survey?.dbp != null
+                ? `설문 ${survey.sbp}/${survey.dbp}`
+                : "미입력",
           ],
           [
             "혈당 기록",
-            latestGlucose ? `최근 ${latestGlucose.glucose ?? latestGlucose.glucose_value}mg/dL` : "미입력",
+            latestGlucose
+              ? `최근 ${latestGlucose.glucose ?? latestGlucose.glucose_value}mg/dL`
+              : survey?.glucose_fasting != null
+                ? `설문 ${survey.glucose_fasting}mg/dL`
+                : "미입력",
           ],
-          [
-            "운동 기록",
-            exercises && exercises.total > 0 ? `${exercises.total}개 · 최근 ${exercises.items[0]?.duration_minutes ?? 0}분` : "미입력",
-          ],
+          ["운동 기록", exerciseSummary],
           ["생활 습관", hasLifestyle ? "완료" : "미입력"],
           ["가족력", hasFamilyHistory ? "입력됨" : "미입력"],
+          ["지질 지표", lipidSummary],
+          ["신장 지표", kidneySummary],
         ]);
       })
       .finally(() => setIsDataLoading(false));

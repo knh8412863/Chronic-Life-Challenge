@@ -34,6 +34,7 @@ from app.dtos.predictions import (
     LifestyleGoalResponse,
     LipidObesityRecordCreateRequest,
     LipidObesityRecordResponse,
+    LipidObesityRecordUpdateRequest,
     MealDailySummaryResponse,
     MealLogCreateRequest,
     MealLogCreateResponse,
@@ -54,6 +55,7 @@ from app.dtos.predictions import (
     PredictionTaskStatusResponse,
     RenalRecordCreateRequest,
     RenalRecordResponse,
+    RenalRecordUpdateRequest,
     VitalMeasureType,
     VitalRecordCreateRequest,
     VitalRecordDetailResponse,
@@ -275,6 +277,61 @@ class HealthInputService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="지질·비만 기록을 찾을 수 없습니다.")
         return self._to_lipid_obesity_record(record)
 
+    async def update_lipid_obesity_record(
+        self,
+        user: User,
+        record_id: int,
+        data: LipidObesityRecordUpdateRequest,
+    ) -> LipidObesityRecordResponse:
+        record = await LipidObesityRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="지질·비만 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+
+        update_data = data.model_dump(exclude_unset=True)
+        next_record_date = update_data.get("record_date", record.record_date)
+        if next_record_date != self._today():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="당일 기록만 수정할 수 있습니다.")
+
+        for request_field, model_field in [
+            ("record_date", "record_date"),
+            ("total_cholesterol", "total_cholesterol"),
+            ("hdl_cholesterol", "hdl_cholesterol"),
+            ("ldl_cholesterol", "ldl_cholesterol"),
+            ("triglycerides", "triglycerides"),
+            ("waist_circumference", "waist_circumference"),
+            ("memo", "memo"),
+        ]:
+            if request_field in update_data:
+                setattr(record, model_field, update_data[request_field])
+
+        if "height" in update_data:
+            record.height_cm = self._optional_decimal(update_data["height"])
+        if "weight" in update_data:
+            record.weight_kg = self._optional_decimal(update_data["weight"])
+        if "height" in update_data or "weight" in update_data:
+            record.bmi = (
+                _calculate_bmi(float(record.height_cm), float(record.weight_kg))
+                if record.height_cm is not None and record.weight_kg is not None
+                else None
+            )
+            if record.bmi is not None:
+                await UserProfile.filter(user_id=user.id).update(
+                    height_cm=record.height_cm,
+                    weight_kg=record.weight_kg,
+                    bmi=record.bmi,
+                )
+
+        await record.save()
+        return self._to_lipid_obesity_record(record)
+
+    async def delete_lipid_obesity_record(self, user: User, record_id: int) -> None:
+        record = await LipidObesityRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="지질·비만 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+        await record.delete()
+
     async def get_renal_records(self, user: User, limit: int = 20) -> list[RenalRecordResponse]:
         records = await RenalRecord.filter(user_id=user.id).order_by("-record_date", "-created_at").limit(limit)
         return [self._to_renal_record(record) for record in records]
@@ -284,6 +341,41 @@ class HealthInputService:
         if record is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신장 기록을 찾을 수 없습니다.")
         return self._to_renal_record(record)
+
+    async def update_renal_record(
+        self,
+        user: User,
+        record_id: int,
+        data: RenalRecordUpdateRequest,
+    ) -> RenalRecordResponse:
+        record = await RenalRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신장 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+
+        update_data = data.model_dump(exclude_unset=True)
+        next_record_date = update_data.get("record_date", record.record_date)
+        if next_record_date != self._today():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="당일 기록만 수정할 수 있습니다.")
+
+        if "record_date" in update_data:
+            record.record_date = update_data["record_date"]
+        for field in ["creatinine", "egfr", "bun"]:
+            if field in update_data:
+                setattr(record, field, self._optional_decimal(update_data[field]))
+        for field in ["urine_protein_pos", "memo"]:
+            if field in update_data:
+                setattr(record, field, update_data[field])
+
+        await record.save()
+        return self._to_renal_record(record)
+
+    async def delete_renal_record(self, user: User, record_id: int) -> None:
+        record = await RenalRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신장 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+        await record.delete()
 
     async def create_vital_record(self, user: User, data: VitalRecordCreateRequest) -> OptionalRecordCreateResponse:
         await self._ensure_daily_health_record_limit(user.id, data.measured_at.date())
