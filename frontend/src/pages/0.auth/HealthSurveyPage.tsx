@@ -176,8 +176,8 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   // 기본 정보
   const [birthDate, setBirthDate] = useState("");
   const [gender, setGender] = useState<"MALE" | "FEMALE" | "">("");
-  const [height, setHeight] = useState("170");
-  const [weight, setWeight] = useState("65");
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
   const [waist, setWaist] = useState("");
   const [bmi, setBmi] = useState<number | null>(null);
 
@@ -293,12 +293,12 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>신장 (cm)<RequiredMark /></label>
-                <input type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder="170"
+                <input type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder="예시: 170"
                   style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
               </div>
               <div>
                 <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>체중 (kg)<RequiredMark /></label>
-                <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="65"
+                <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="예시: 65"
                   style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
               </div>
             </div>

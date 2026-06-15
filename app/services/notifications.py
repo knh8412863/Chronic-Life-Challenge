@@ -136,9 +136,11 @@ class NotificationService:
     ) -> NotificationPreferenceResponse:
         preference = await self._get_or_create_preference(user)
         payload = self._normalize_preference_update(data.model_dump(exclude_none=True))
+        if not payload:
+            return self._to_preference_response(preference)
         for field, value in payload.items():
             setattr(preference, field, value)
-        await preference.save(update_fields=[*payload.keys(), "updated_at"] if payload else ["updated_at"])
+        await preference.save(update_fields=[*payload.keys(), "updated_at"])
         return self._to_preference_response(preference)
 
     @staticmethod

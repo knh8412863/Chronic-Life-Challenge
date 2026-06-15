@@ -47,8 +47,8 @@ export type HomeSummary = {
 
 export type MetricAssessment = {
   status: string;
-  label: string;
-  message: string;
+  reasons: string[];
+  missing_fields: string[];
 };
 
 export async function getHomeSummary(token?: string) {

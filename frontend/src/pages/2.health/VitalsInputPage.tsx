@@ -103,6 +103,12 @@ export function VitalsInputPage({ onNavigate }: VitalsInputPageProps) {
 
   useEffect(() => {
     refreshTodayRecordCount();
+    const requestedTab = new URLSearchParams(window.location.search).get("tab");
+    if (requestedTab === "exercise") {
+      setTab("exercise");
+      window.history.replaceState({}, "", "/health/vitals/input");
+    }
+
     const raw = sessionStorage.getItem("editingHealthRecordData");
     if (!raw) return;
     try {
@@ -808,7 +814,7 @@ const ExerciseInputPanel = forwardRef<HealthRecordFormHandle, {
 function ExerciseInputPanel({ onNavigate, onSaveAll, isSavingAll }, ref) {
   const [selectedType, setSelectedType] = useState<ExerciseTypeCode>("RUNNING");
   const [date, setDate] = useState(todayStr());
-  const [minutes, setMinutes] = useState(30);
+  const [minutes, setMinutes] = useState("");
   const [calories, setCalories] = useState("");
   const [memo, setMemo] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -825,7 +831,7 @@ function ExerciseInputPanel({ onNavigate, onSaveAll, isSavingAll }, ref) {
     setEditingExercise(record);
     setSelectedType(record.exercise_type);
     setDate(record.exercise_date ?? todayStr());
-    setMinutes(record.duration_minutes);
+    setMinutes(String(record.duration_minutes));
     setCalories(String(record.calories_burned ?? ""));
     setIsCaloriesManual(record.calories_burned != null);
     setMemo(record.memo ?? "");
@@ -845,22 +851,24 @@ function ExerciseInputPanel({ onNavigate, onSaveAll, isSavingAll }, ref) {
 
   useEffect(() => {
     if (isCaloriesManual) return;
-    const estimated = estimateCaloriesBurned(selectedType, minutes, weightKg);
+    const duration = Number(minutes || 0);
+    const estimated = duration > 0 ? estimateCaloriesBurned(selectedType, duration, weightKg) : null;
     setCalories(estimated === null ? "" : String(estimated));
   }, [isCaloriesManual, minutes, selectedType, weightKg]);
 
-  const hasInput = () => Boolean(editingExercise || hasEdited || calories || memo.trim());
+  const hasInput = () => Boolean(editingExercise || minutes || calories || memo.trim());
 
   async function saveDraft() {
     const token = getStoredAccessToken();
     if (!hasInput()) return false;
+    if (!minutes || Number(minutes) <= 0) return false;
     if (!calories && !hasWeightProfile) {
       setShowWeightRequiredModal(true);
       throw new Error("WEIGHT_REQUIRED");
     }
     const body: CreateExerciseBody = {
       exercise_type: selectedType,
-      duration_minutes: minutes,
+      duration_minutes: Number(minutes),
       exercise_date: date,
     };
     if (calories) body.calories_burned = Number(calories);
@@ -904,9 +912,9 @@ function ExerciseInputPanel({ onNavigate, onSaveAll, isSavingAll }, ref) {
           <div className="vi-field">
             <span className="field-label">운동 시간 (분)</span>
             <div className="ex-stepper">
-              <button type="button" className="ex-stepper-btn" onClick={() => { setMinutes((m) => Math.max(1, m - 5)); setHasEdited(true); }}>−</button>
+              <button type="button" className="ex-stepper-btn" onClick={() => { setMinutes((m) => String(Math.max(0, Number(m || 0) - 5))); setHasEdited(true); }}>−</button>
               <span className="ex-stepper-val">{minutes}</span>
-              <button type="button" className="ex-stepper-btn" onClick={() => { setMinutes((m) => Math.min(720, m + 5)); setHasEdited(true); }}>+</button>
+              <button type="button" className="ex-stepper-btn" onClick={() => { setMinutes((m) => String(Math.min(720, Number(m || 0) + 5))); setHasEdited(true); }}>+</button>
               <span className="field-label">분</span>
             </div>
           </div>

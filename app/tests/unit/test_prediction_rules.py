@@ -274,7 +274,7 @@ def test_health_score_can_use_latest_vitals_without_health_survey():
     assert score.score is not None
     assert score.status == "CAUTION"
     assert "건강 수치 입력 완료" in score.calculation_basis
-    assert "최근 혈압 수치 위험" in score.calculation_basis
+    assert "최근 혈압 수치 심각" in score.calculation_basis
 
 
 @pytest.mark.asyncio

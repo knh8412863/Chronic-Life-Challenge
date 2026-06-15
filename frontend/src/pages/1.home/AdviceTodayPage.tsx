@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import type { AppRoute } from "../../App";
 import { generateTodayAdvice, getTodayAdvice, type DailyAdvice } from "../../api/advices";
 import { getStoredAccessToken } from "../../api/auth";
+import { ApiError } from "../../api/client";
 import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingState } from "../../components/common/LoadingState";
 
@@ -15,6 +16,7 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState("");
+  const [isLimitExceeded, setIsLimitExceeded] = useState(false);
 
   useEffect(() => {
     const token = getStoredAccessToken();
@@ -27,6 +29,7 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
       .then((response) => {
         setAdvice(response.data);
         setMessage("");
+        setIsLimitExceeded(response.data.remaining_regeneration_count <= 0);
       })
       .catch(() => setMessage("오늘의 조언을 불러오지 못했습니다. 새로 받아보세요."))
       .finally(() => setIsLoading(false));
@@ -44,7 +47,12 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
     try {
       const response = await generateTodayAdvice(token);
       setAdvice(response.data);
-    } catch {
+      setIsLimitExceeded(response.data.remaining_regeneration_count <= 0);
+    } catch (error) {
+      if (error instanceof ApiError && error.status === 429) {
+        setIsLimitExceeded(true);
+        return;
+      }
       setMessage("조언을 새로 받지 못했습니다. 건강 기록 입력 여부와 서버 연결을 확인해 주세요.");
     } finally {
       setIsGenerating(false);
@@ -53,6 +61,9 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
 
   if (isLoading) return <LoadingState message="오늘의 조언을 불러오는 중입니다." />;
 
+  const remainingCount = advice?.remaining_regeneration_count ?? 0;
+  const generateDisabled = isGenerating || isLimitExceeded || remainingCount <= 0;
+
   return (
     <div className="page-stack">
       <section className="section-header-row">
@@ -60,9 +71,9 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
         <div className="button-row">
           <div
             className="advice-regenerate-tooltip-wrap"
-            data-tooltip={`조언은 하루 최대 2회 생성 가능합니다.\n오늘 ${advice?.remaining_regeneration_count ?? 0}회 생성 가능합니다.`}
+            data-tooltip={`조언은 하루 최대 2회 생성 가능합니다.\n오늘 ${remainingCount}회 생성 가능합니다.`}
           >
-            <button className="green-button" type="button" onClick={handleGenerate} disabled={isGenerating}>
+            <button className="green-button" type="button" onClick={handleGenerate} disabled={generateDisabled}>
               {isGenerating ? "생성 중..." : "조언 새로 받기"}
             </button>
           </div>
@@ -71,6 +82,13 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
           </button>
         </div>
       </section>
+      {(isLimitExceeded || remainingCount <= 0) && (
+        <p className="advice-limit-message">
+          조언은 하루에 2번만 받을 수 있습니다.
+          <br />
+          내일 다시 시도해주세요.
+        </p>
+      )}
       <section className="dashboard-card advice-detail-card">
         <div className="advice-title-row">
           <span>AI</span>

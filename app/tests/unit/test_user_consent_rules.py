@@ -67,4 +67,5 @@ def test_default_policy_document_returns_modal_content():
     assert result.policy_type == "MARKETING"
     assert result.title == "마케팅 정보 수신 동의"
     assert result.policy_version == "v1.1"
-    assert "전문" in result.content
+    assert "마케팅 목적 개인정보 이용" in result.content
+    assert "동의를 거부할 권리" in result.content

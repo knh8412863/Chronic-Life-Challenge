@@ -34,13 +34,13 @@ const emptyHomeSummary: HomeSummary = {
   health_metric_summary: {
     dyslipidemia: {
       status: "NEEDS_INPUT",
-      label: "미입력",
-      message: "건강 수치를 입력해 주세요.",
+      reasons: ["지질 수치가 입력되지 않았습니다."],
+      missing_fields: [],
     },
     obesity: {
       status: "NEEDS_INPUT",
-      label: "미입력",
-      message: "신장/체중 정보를 입력해 주세요.",
+      reasons: ["BMI와 허리둘레가 입력되지 않았습니다."],
+      missing_fields: [],
     },
   },
   vital_summary: {
@@ -87,10 +87,25 @@ function progressPercent(current: number | null | undefined, target: number) {
 }
 
 function metricCardClass(status: string) {
-  if (status === "HIGH") return "metric-card metric-warning";
-  if (status === "CAUTION") return "metric-card metric-warning";
+  if (status === "HIGH") return "metric-card metric-critical";
+  if (status === "CAUTION") return "metric-card metric-risk";
   if (status === "NORMAL") return "metric-card metric-normal";
-  return "metric-card metric-good";
+  return "metric-card metric-missing";
+}
+
+function combinedMetricStatus(statuses: string[]) {
+  if (statuses.includes("UNAVAILABLE") || statuses.includes("NEEDS_INPUT")) return "NEEDS_INPUT";
+  if (statuses.includes("HIGH")) return "HIGH";
+  if (statuses.includes("CAUTION")) return "CAUTION";
+  if (statuses.includes("NORMAL")) return "NORMAL";
+  return "NEEDS_INPUT";
+}
+
+function metricStatusLabel(status: string) {
+  if (status === "HIGH") return "심각";
+  if (status === "CAUTION") return "위험";
+  if (status === "NORMAL") return "정상";
+  return "미입력";
 }
 
 function bestBadgeIcon(
@@ -320,10 +335,17 @@ export function HomePage({ onNavigate }: HomePageProps) {
             <strong>{summary.vital_summary.glucose_label}</strong>
             <small>{summary.vital_summary.glucose_value ?? "오늘 기록 없음"}</small>
           </div>
-          <div className="metric-card metric-good">
+          <div
+            className={metricCardClass(
+              combinedMetricStatus([
+                summary.health_metric_summary.obesity.status,
+                summary.health_metric_summary.dyslipidemia.status,
+              ]),
+            )}
+          >
             <span>지질/비만</span>
-            <strong>{summary.health_metric_summary.obesity.label}</strong>
-            <small>{summary.health_metric_summary.dyslipidemia.label}</small>
+            <strong>{metricStatusLabel(summary.health_metric_summary.obesity.status)}</strong>
+            <small>고지혈증 {metricStatusLabel(summary.health_metric_summary.dyslipidemia.status)}</small>
           </div>
         </div>
         <p className="mini-label">최근 건강 수치 최근 7일</p>
@@ -355,10 +377,13 @@ export function HomePage({ onNavigate }: HomePageProps) {
         <div className="quick-record-grid">
           {[
             ["건강 수치 기록", "/health/vitals/input"],
-            ["운동 기록", "/health/vitals/input"],
+            ["운동 기록", "/health/vitals/input?tab=exercise"],
             ["식단 기록", "/food/analyze"],
           ].map(([label, route]) => (
-            <button key={label} type="button" onClick={() => onNavigate?.(route as AppRoute)}>
+            <button key={label} type="button" onClick={() => {
+              window.history.pushState({}, "", route);
+              onNavigate?.(route.split("?")[0] as AppRoute);
+            }}>
               <span>+</span>
               {label}
             </button>

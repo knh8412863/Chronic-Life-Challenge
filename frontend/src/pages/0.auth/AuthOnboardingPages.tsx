@@ -278,7 +278,7 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
         </p>
       </div>
       {policyModal && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.35)", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, zIndex: 1000 }}>
           <div style={{ width: "100%", maxWidth: 560, maxHeight: "80vh", background: "#fff", borderRadius: 12, padding: 24, overflow: "auto" }}>
             <h3 style={{ fontSize: 16, fontWeight: 700, margin: "0 0 12px" }}>{policyModal.title}</h3>
             <div style={{ whiteSpace: "pre-wrap", fontSize: 15, lineHeight: 1.7, color: "#444", minHeight: 120 }}>

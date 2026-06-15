@@ -84,6 +84,26 @@ def test_push_disabled_turns_off_push_detail_settings():
     assert result["virtual_pet_enabled"] is False
 
 
+def test_empty_notification_preference_update_keeps_payload_empty():
+    result = NotificationService._normalize_preference_update({})
+
+    assert result == {}
+
+
+def test_push_enabled_does_not_force_push_detail_settings():
+    payload = {
+        "push_enabled": True,
+        "health_data_reminder_enabled": False,
+        "challenge_mission_enabled": True,
+    }
+
+    result = NotificationService._normalize_preference_update(payload)
+
+    assert result["push_enabled"] is True
+    assert result["health_data_reminder_enabled"] is False
+    assert result["challenge_mission_enabled"] is True
+
+
 def test_notification_preference_allows_prediction_when_enabled():
     preference = SimpleNamespace(
         push_enabled=True,

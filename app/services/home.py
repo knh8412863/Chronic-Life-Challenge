@@ -132,21 +132,21 @@ class HomeService:
         if bp is None or bp.sbp is None or bp.dbp is None:
             return "미입력", "NEEDS_INPUT"
         if bp.sbp >= 140 or bp.dbp >= 90:
-            return "위험", "HIGH"
-        if bp.sbp >= 130 or bp.dbp >= 80:
-            return "주의", "CAUTION"
+            return "심각", "HIGH"
+        if bp.sbp < 120 and bp.dbp < 80:
+            return "정상", "NORMAL"
+        if bp.sbp <= 139 or bp.dbp <= 89:
+            return "위험", "CAUTION"
         return "정상", "NORMAL"
 
     @staticmethod
     def _glucose_label_status(glucose: VitalRecord | None) -> tuple[str, str]:
         if glucose is None or glucose.glucose is None:
             return "미입력", "NEEDS_INPUT"
-        if glucose.glucose >= 200:
-            return "위험", "HIGH"
         if glucose.glucose >= 126:
-            return "주의", "CAUTION"
+            return "심각", "HIGH"
         if glucose.glucose >= 100:
-            return "경계", "CAUTION"
+            return "위험", "CAUTION"
         return "정상", "NORMAL"
 
     @staticmethod
@@ -262,21 +262,21 @@ class HomeService:
         if latest_bp is None or latest_bp.sbp is None or latest_bp.dbp is None:
             return 0, None
         if latest_bp.sbp >= 140 or latest_bp.dbp >= 90:
-            return 15, "최근 혈압 수치 위험"
-        if latest_bp.sbp >= 130 or latest_bp.dbp >= 80:
-            return 8, "최근 혈압 수치 주의"
+            return 15, "최근 혈압 수치 심각"
+        if latest_bp.sbp < 120 and latest_bp.dbp < 80:
+            return 0, "최근 혈압 수치 정상"
+        if latest_bp.sbp <= 139 or latest_bp.dbp <= 89:
+            return 8, "최근 혈압 수치 위험"
         return 0, "최근 혈압 수치 정상"
 
     @staticmethod
     def _glucose_score_adjustment(latest_glucose: VitalRecord | None) -> tuple[int, str | None]:
         if latest_glucose is None or latest_glucose.glucose is None:
             return 0, None
-        if latest_glucose.glucose >= 200:
-            return 15, "최근 공복혈당 수치 위험"
         if latest_glucose.glucose >= 126:
-            return 12, "최근 공복혈당 수치 주의"
+            return 15, "최근 공복혈당 수치 심각"
         if latest_glucose.glucose >= 100:
-            return 8, "최근 공복혈당 수치 경계"
+            return 8, "최근 공복혈당 수치 위험"
         return 0, "최근 공복혈당 수치 정상"
 
     @staticmethod

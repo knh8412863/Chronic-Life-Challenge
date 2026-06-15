@@ -34,6 +34,30 @@ type FoodMeal = MealLog & {
   isToday: boolean;
 };
 
+type FoodInputItem = {
+  food: string;
+  amount: string;
+  calories: string;
+  carbs: string;
+  protein: string;
+  fat: string;
+  sodium: string;
+  sugar: string;
+  fiberG: string;
+};
+
+const emptyFoodInputItem = (): FoodInputItem => ({
+  food: "",
+  amount: "",
+  calories: "",
+  carbs: "",
+  protein: "",
+  fat: "",
+  sodium: "",
+  sugar: "",
+  fiberG: "",
+});
+
 function todayString() {
   return localDateString();
 }
@@ -70,6 +94,12 @@ function numberOrNull(value: string) {
   return Number(value);
 }
 
+function sumFoodItemNumber(items: FoodInputItem[], key: keyof Pick<FoodInputItem, "calories" | "carbs" | "protein" | "fat" | "sodium" | "sugar" | "fiberG">) {
+  const values = items.map(item => numberOrNull(item[key])).filter((value): value is number => value !== null);
+  if (values.length === 0) return null;
+  return Number(values.reduce((sum, value) => sum + value, 0).toFixed(2));
+}
+
 export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
   const isFixedInput = view === "input";
   const [tab, setTab] = useState<TabType>(view);
@@ -84,16 +114,9 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
 
   // 식단 직접 입력 상태
   const [inputMealType, setInputMealType] = useState<MealType>("BREAKFAST");
-  const [foodItems, setFoodItems] = useState([{ food: "", amount: "" }]);
+  const [foodItems, setFoodItems] = useState<FoodInputItem[]>([emptyFoodInputItem()]);
   const [inputDate, setInputDate] = useState(todayString());
   const [inputTime, setInputTime] = useState("08:00");
-  const [calories, setCalories] = useState("");
-  const [carbs, setCarbs] = useState("");
-  const [protein, setProtein] = useState("");
-  const [fat, setFat] = useState("");
-  const [sodium, setSodium] = useState("");
-  const [sugar, setSugar] = useState("");
-  const [fiberG, setFiberG] = useState("");
   const [memo, setMemo] = useState("");
   const [showValidation, setShowValidation] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
@@ -159,13 +182,13 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
           amount: foodItems.map(f => f.amount.trim()).filter(Boolean).join(", ") || null,
           meal_type: inputMealType,
           meal_date: inputDate,
-          calories: numberOrNull(calories),
-          carbs_g: numberOrNull(carbs),
-          protein_g: numberOrNull(protein),
-          fat_g: numberOrNull(fat),
-          sodium_mg: numberOrNull(sodium),
-          sugar_g: numberOrNull(sugar),
-          fiber_g: numberOrNull(fiberG),
+          calories: sumFoodItemNumber(foodItems, "calories"),
+          carbs_g: sumFoodItemNumber(foodItems, "carbs"),
+          protein_g: sumFoodItemNumber(foodItems, "protein"),
+          fat_g: sumFoodItemNumber(foodItems, "fat"),
+          sodium_mg: sumFoodItemNumber(foodItems, "sodium"),
+          sugar_g: sumFoodItemNumber(foodItems, "sugar"),
+          fiber_g: sumFoodItemNumber(foodItems, "fiberG"),
           memo: memo.trim() || null,
         },
         token,
@@ -264,25 +287,50 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
             {showValidation && <p style={{ fontSize: 11, color: "#E24B4A", marginBottom: 8 }}>음식명을 입력해주세요</p>}
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {foodItems.map((item, i) => (
-                <div key={i} style={{ display: "flex", gap: 10, alignItems: "center" }}>
-                  <input value={item.food} onChange={e => setFoodItems(prev => prev.map((f, j) => j === i ? { ...f, food: e.target.value } : f))}
-                    placeholder="음식명"
-                    style={{ flex: 2, height: 36, border: `1.5px solid ${showValidation && !item.food ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 12px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-                  <input value={item.amount} onChange={e => setFoodItems(prev => prev.map((f, j) => j === i ? { ...f, amount: e.target.value } : f))}
-                    placeholder="섭취량 (예: 1인분)"
-                    style={{ flex: 1, height: 36, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 12px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-                  {foodItems.length > 1 && (
-                    <button onClick={() => setFoodItems(prev => prev.filter((_, j) => j !== i))}
-                      style={{ width: 32, height: 32, border: "1px solid #ddd", borderRadius: "50%", background: "#fff", cursor: "pointer", fontSize: 14 }}>🗑️</button>
-                  )}
+                <div key={i} style={{ border: "1px solid #eee", borderRadius: 8, padding: 12, background: "#fff" }}>
+                  <div style={{ display: "flex", gap: 10, alignItems: "center", marginBottom: 10 }}>
+                    <input value={item.food} onChange={e => setFoodItems(prev => prev.map((f, j) => j === i ? { ...f, food: e.target.value } : f))}
+                      placeholder="음식명"
+                      style={{ flex: 2, height: 36, border: `1.5px solid ${showValidation && !item.food ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 12px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                    <input value={item.amount} onChange={e => setFoodItems(prev => prev.map((f, j) => j === i ? { ...f, amount: e.target.value } : f))}
+                      placeholder="섭취량 (예: 1인분)"
+                      style={{ flex: 1, height: 36, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 12px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
+                    {foodItems.length > 1 && (
+                      <button onClick={() => setFoodItems(prev => prev.filter((_, j) => j !== i))}
+                        style={{ width: 32, height: 32, border: "1px solid #ddd", borderRadius: "50%", background: "#fff", cursor: "pointer", fontSize: 14 }}>🗑️</button>
+                    )}
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8 }}>
+                    {[
+                      { key: "calories" as const, label: "칼로리", unit: "kcal" },
+                      { key: "carbs" as const, label: "탄수화물", unit: "g" },
+                      { key: "protein" as const, label: "단백질", unit: "g" },
+                      { key: "fat" as const, label: "지방", unit: "g" },
+                      { key: "sodium" as const, label: "나트륨", unit: "mg" },
+                      { key: "sugar" as const, label: "당류", unit: "g" },
+                      { key: "fiberG" as const, label: "식이섬유", unit: "g" },
+                    ].map(({ key, label, unit }) => (
+                      <div key={key}>
+                        <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>{label} ({unit})</label>
+                        <input
+                          type="number"
+                          value={item[key]}
+                          onChange={e => setFoodItems(prev => prev.map((f, j) => j === i ? { ...f, [key]: e.target.value } : f))}
+                          placeholder="0"
+                          style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 12, outline: "none", boxSizing: "border-box" }}
+                        />
+                      </div>
+                    ))}
+                  </div>
                 </div>
               ))}
               {foodItems.length < 10 && (
-                <button onClick={() => setFoodItems(prev => [...prev, { food: "", amount: "" }])}
+                <button onClick={() => setFoodItems(prev => [...prev, emptyFoodInputItem()])}
                   style={{ padding: 10, border: "1.5px dashed #aaa", borderRadius: 5, background: "#fafafa", cursor: "pointer", fontSize: 12, color: "#888" }}>
                   + 음식 추가
                 </button>
               )}
+              <p style={{ fontSize: 10, color: "#aaa", margin: 0 }}>음식이 여러 개면 각 항목의 영양정보를 합산해 한 끼 식단으로 저장합니다.</p>
             </div>
           </div>
 
@@ -297,35 +345,6 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
             </div>
           </div>
 
-          {/* 칼로리 */}
-          <div style={{ marginBottom: 20 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>칼로리 (선택)</h3>
-            <input type="number" value={calories} onChange={e => setCalories(e.target.value)} placeholder="0"
-              style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 12px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-          </div>
-
-          {/* 영양 성분 */}
-          <div style={{ marginBottom: 20 }}>
-            <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>영양 성분 (선택)</h3>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 10 }}>
-              {[
-                { label: "탄수화물 (g)", val: carbs, set: setCarbs },
-                { label: "단백질 (g)", val: protein, set: setProtein },
-                { label: "지방 (g)", val: fat, set: setFat },
-                { label: "나트륨 (mg)", val: sodium, set: setSodium },
-                { label: "당류 (g)", val: sugar, set: setSugar },
-                { label: "식이섬유 (g)", val: fiberG, set: setFiberG },
-              ].map(({ label, val, set }) => (
-                <div key={label}>
-                  <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>{label}</label>
-                  <input type="number" value={val} onChange={e => set(e.target.value)} placeholder="0"
-                    style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-                </div>
-              ))}
-            </div>
-            <p style={{ fontSize: 10, color: "#aaa", marginTop: 6 }}>입력하지 않으면 0으로 저장됩니다.</p>
-          </div>
-
           {/* 메모 */}
           <div style={{ marginBottom: 20 }}>
             <h3 style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>메모</h3>
@@ -335,7 +354,7 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
           </div>
 
           <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => { setFoodItems([{ food: "", amount: "" }]); setCalories(""); setMemo(""); setShowValidation(false); }}
+            <button onClick={() => { setFoodItems([emptyFoodInputItem()]); setMemo(""); setShowValidation(false); }}
               style={{ flex: 1, height: 40, border: "1.5px solid #ddd", borderRadius: 8, background: "#fff", fontSize: 13, cursor: "pointer" }}>
               초기화
             </button>

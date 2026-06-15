@@ -1552,6 +1552,35 @@ button {
   font-size: 11px;
 }
 
+.notification-toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  z-index: 1000;
+  display: grid;
+  gap: 4px;
+  width: min(420px, calc(100vw - 40px));
+  padding: 14px 18px;
+  border: 1px solid #b9e4c0;
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: 0 16px 40px rgba(15, 23, 42, 0.18);
+  color: #1f2937;
+  text-align: left;
+  transform: translateX(-50%);
+}
+
+.notification-toast strong {
+  color: var(--brand-green);
+  font-size: 14px;
+}
+
+.notification-toast span {
+  color: #4b5563;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
 .warning-banner {
   display: flex;
   align-items: center;
@@ -1850,13 +1879,19 @@ button {
   color: var(--brand-green);
 }
 
-.metric-warning {
+.metric-risk {
   border-color: #e4b92e;
   background: #fff4c7;
   color: #be8b00;
 }
 
-.metric-good {
+.metric-critical {
+  border-color: #e57373;
+  background: #fff0f0;
+  color: #c0392b;
+}
+
+.metric-missing {
   border-color: #5f94d5;
   background: #edf4ff;
   color: var(--brand-blue);
@@ -2575,6 +2610,15 @@ button {
   border-radius: 8px;
   background: #ffffff;
   line-height: 1.8;
+}
+
+.advice-limit-message {
+  margin: 0;
+  color: #c0392b;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1.7;
+  text-align: center;
 }
 
 .feedback-week-grid {

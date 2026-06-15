@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from types import SimpleNamespace
 
 from fastapi import HTTPException, status
 from tortoise.transactions import in_transaction
@@ -270,13 +271,26 @@ class ChallengeService:
     ) -> ChallengeWeeklyLeaderboardResponse:
         target_week_start = week_start or self._current_week_start(date.today())
         week_end = target_week_start + timedelta(days=6)
-        await self._rebuild_weekly_leaderboard(target_week_start)
-        entries = (
-            await ChallengeLeaderboard.filter(week_start_date=target_week_start)
-            .order_by("rank_no", "-total_points", "user_id")
-            .limit(limit)
+        challenge_ids = await ChallengeParticipation.filter(
+            user_id=user.id,
+            status=ChallengeParticipationStatus.JOINED.value,
+        ).values_list("challenge_id", flat=True)
+        if not challenge_ids:
+            return self._build_weekly_leaderboard(
+                entries=[],
+                my_entry=None,
+                current_user_id=user.id,
+                week_start=target_week_start,
+                week_end=week_end,
+            )
+
+        all_entries = await self._build_shared_challenge_leaderboard_entries(
+            challenge_ids=list(challenge_ids),
+            week_start=target_week_start,
+            week_end=week_end,
         )
-        my_entry = await ChallengeLeaderboard.get_or_none(user_id=user.id, week_start_date=target_week_start)
+        entries = all_entries[:limit]
+        my_entry = next((entry for entry in all_entries if entry.user_id == user.id), None)
         return self._build_weekly_leaderboard(
             entries=entries,
             my_entry=my_entry,
@@ -284,6 +298,47 @@ class ChallengeService:
             week_start=target_week_start,
             week_end=week_end,
         )
+
+    @staticmethod
+    async def _build_shared_challenge_leaderboard_entries(
+        challenge_ids: list[int],
+        week_start: date,
+        week_end: date,
+    ) -> list[SimpleNamespace]:
+        user_ids = (
+            await ChallengeParticipation.filter(
+                challenge_id__in=challenge_ids,
+                status__in=[
+                    ChallengeParticipationStatus.JOINED.value,
+                    ChallengeParticipationStatus.COMPLETED.value,
+                ],
+            )
+            .distinct()
+            .values_list("user_id", flat=True)
+        )
+        users = await User.filter(id__in=list(user_ids))
+        entries = []
+        for participant in users:
+            completed_count = await ChallengeCheckin.filter(
+                user_id=participant.id,
+                participation__challenge_id__in=challenge_ids,
+                checkin_date__gte=week_start,
+                checkin_date__lte=week_end,
+            ).count()
+            entries.append(
+                SimpleNamespace(
+                    user_id=participant.id,
+                    nickname_masked=ChallengeService._mask_name(participant.name),
+                    total_points=completed_count * 10,
+                    completed_mission_count=completed_count,
+                    rank_no=0,
+                )
+            )
+
+        entries.sort(key=lambda item: (-item.total_points, -item.completed_mission_count, item.user_id))
+        for rank, entry in enumerate(entries, start=1):
+            entry.rank_no = rank
+        return entries
 
     async def checkin_today(
         self,
@@ -737,8 +792,8 @@ class ChallengeService:
 
     @staticmethod
     def _build_weekly_leaderboard(
-        entries: list[ChallengeLeaderboard],
-        my_entry: ChallengeLeaderboard | None,
+        entries: list[ChallengeLeaderboard | SimpleNamespace],
+        my_entry: ChallengeLeaderboard | SimpleNamespace | None,
         current_user_id: int,
         week_start: date,
         week_end: date,
@@ -761,7 +816,7 @@ class ChallengeService:
         )
 
     @staticmethod
-    def _build_leaderboard_item(entry: ChallengeLeaderboard) -> ChallengeLeaderboardItemResponse:
+    def _build_leaderboard_item(entry: ChallengeLeaderboard | SimpleNamespace) -> ChallengeLeaderboardItemResponse:
         return ChallengeLeaderboardItemResponse(
             rank=entry.rank_no or 0,
             user_id=entry.user_id,

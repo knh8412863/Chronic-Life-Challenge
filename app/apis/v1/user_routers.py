@@ -11,6 +11,8 @@ from app.dtos.users import (
     PolicyDocumentResponse,
     UserConsentItemResponse,
     UserConsentListResponse,
+    UserEmailChangeConfirmRequest,
+    UserEmailChangeRequest,
     UserInfoResponse,
     UserPasswordVerificationRequest,
     UserUpdateRequest,
@@ -60,6 +62,26 @@ async def change_user_me_password(
 ) -> EmptyResponse:
     await user_manage_service.change_password(user=user, data=request)
     return EmptyResponse(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@user_router.post("/me/email-change-requests", status_code=status.HTTP_204_NO_CONTENT)
+async def request_user_me_email_change(
+    request: UserEmailChangeRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    user_manage_service: Annotated[UserManageService, Depends(UserManageService)],
+) -> EmptyResponse:
+    await user_manage_service.request_email_change(user=user, data=request)
+    return EmptyResponse(status_code=status.HTTP_204_NO_CONTENT)
+
+
+@user_router.patch("/me/email", response_model=UserInfoResponse, status_code=status.HTTP_200_OK)
+async def confirm_user_me_email_change(
+    request: UserEmailChangeConfirmRequest,
+    user: Annotated[User, Depends(get_request_user)],
+    user_manage_service: Annotated[UserManageService, Depends(UserManageService)],
+) -> Response:
+    result = await user_manage_service.confirm_email_change(user=user, data=request)
+    return Response(result.model_dump(mode="json"), status_code=status.HTTP_200_OK)
 
 
 @user_router.delete("/me", status_code=status.HTTP_204_NO_CONTENT)

@@ -63,6 +63,8 @@ class AdviceService:
                 )
 
         context = await self._build_context(user)
+        if data.trigger_type == AdviceTriggerType.MANUAL:
+            context["manual_generation_no"] = MAX_DAILY_MANUAL_REGENERATIONS - remaining + 1
         llm_result = await self._generate_llm_advice(context)
         advice_text = llm_result.advice_text if llm_result else self._build_rule_based_advice(context)
         advice = await LLMAdvice.create(
@@ -217,6 +219,7 @@ class AdviceService:
             parts.append("지질 수치 관리를 위해 튀김·가공식품 섭취를 줄여보세요.")
 
         today_records = context.get("today_records", {})
+        manual_generation_no = context.get("manual_generation_no", 1)
         if today_records.get("vitals"):
             parts.append("오늘 입력한 혈압·혈당 기록을 기준으로 수치 변화를 확인했습니다.")
         else:
@@ -225,6 +228,9 @@ class AdviceService:
             parts.append("오늘은 30분 걷기나 가벼운 운동을 우선 목표로 잡아보세요.")
         if today_records.get("meals"):
             parts.append("오늘 식단 기록을 기준으로 저염·저당 선택을 이어가 보세요.")
+
+        if manual_generation_no == 2:
+            parts.append("두 번째 조언에서는 오늘 남은 시간 동안 가장 실천하기 쉬운 한 가지부터 선택해 보세요.")
 
         shingles = AdviceService._shingles_vaccination_advice(context)
         if shingles:
@@ -271,9 +277,11 @@ class AdviceService:
     @staticmethod
     def _prompt_summary(context: dict[str, Any]) -> str:
         at_risk = AdviceService._disease_names(context.get("at_risk_diseases", []))
+        generation_no = context.get("manual_generation_no")
+        suffix = f" / 수동 생성 {generation_no}회차" if generation_no else ""
         if at_risk:
-            return f"위험 신호: {', '.join(at_risk)}"
-        return "위험 신호 없음 또는 예측 결과 없음"
+            return f"위험 신호: {', '.join(at_risk)}{suffix}"
+        return f"위험 신호 없음 또는 예측 결과 없음{suffix}"
 
     @staticmethod
     async def _generate_llm_advice(context: dict[str, Any]) -> AdviceLLMResult | None:

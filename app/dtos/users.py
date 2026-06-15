@@ -1,7 +1,7 @@
 from datetime import date, datetime
 from typing import Annotated
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
 
 from app.core.validators import optional_after_validator, validate_password, validate_phone_number
 from app.dtos.base import BaseSerializerModel
@@ -84,6 +84,14 @@ class UserWithdrawalRequest(BaseModel):
 
 class UserPasswordVerificationRequest(BaseModel):
     password: Annotated[str, Field(min_length=8, max_length=128)]
+
+
+class UserEmailChangeRequest(BaseModel):
+    new_email: EmailStr
+
+
+class UserEmailChangeConfirmRequest(BaseModel):
+    token: Annotated[str, Field(min_length=20)]
 
 
 class PasswordChangeRequest(BaseModel):

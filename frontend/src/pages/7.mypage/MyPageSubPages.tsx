@@ -164,6 +164,7 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
   const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadedPreference, setLoadedPreference] = useState<NotificationPreference | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -186,6 +187,7 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
           important_notice_enabled: data.important_notice_enabled,
           promotion_enabled: data.promotion_enabled,
         });
+        setLoadedPreference(data);
       } catch {
         if (!ignore) setErrorMessage("");
       } finally {
@@ -204,10 +206,21 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
     setErrorMessage("");
     setSuccessMessage("");
     try {
-      const payload: Partial<NotificationPreference> = {
+      const currentPreference: NotificationPreference = {
         ...push,
         ...email,
+        quiet_start_time: loadedPreference?.quiet_start_time ?? "09:00:00",
+        quiet_end_time: loadedPreference?.quiet_end_time ?? "21:00:00",
       };
+      const payload = Object.fromEntries(
+        Object.entries(currentPreference).filter(
+          ([key, value]) => loadedPreference?.[key as keyof NotificationPreference] !== value,
+        ),
+      ) as Partial<NotificationPreference>;
+      if (Object.keys(payload).length === 0) {
+        setSuccessMessage("변경된 알림 설정이 없습니다.");
+        return;
+      }
       const { data } = await updateNotificationPreferences(payload, getStoredAccessToken());
       setPush({
         push_enabled: data.push_enabled,
@@ -223,6 +236,7 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
         important_notice_enabled: data.important_notice_enabled,
         promotion_enabled: data.promotion_enabled,
       });
+      setLoadedPreference(data);
       setSuccessMessage("알림 설정이 저장되었습니다.");
     } catch (error) {
       const detail = error instanceof ApiError && typeof error.detail === "string" ? error.detail : "";
@@ -233,7 +247,21 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
   };
 
   const togglePush = (key: keyof typeof push) => {
-    setPush(prev => ({ ...prev, [key]: !prev[key] }));
+    setPush(prev => {
+      if (key === "push_enabled") {
+        const nextEnabled = !prev.push_enabled;
+        return {
+          ...prev,
+          push_enabled: nextEnabled,
+          health_data_reminder_enabled: nextEnabled ? true : prev.health_data_reminder_enabled,
+          challenge_mission_enabled: nextEnabled ? true : prev.challenge_mission_enabled,
+          prediction_result_enabled: nextEnabled ? true : prev.prediction_result_enabled,
+          advice_update_enabled: nextEnabled ? true : prev.advice_update_enabled,
+          virtual_pet_enabled: nextEnabled ? true : prev.virtual_pet_enabled,
+        };
+      }
+      return { ...prev, [key]: !prev[key] };
+    });
   };
 
   const toggleEmail = (key: keyof typeof email) => {

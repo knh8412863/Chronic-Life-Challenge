@@ -52,7 +52,7 @@ export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps
       return dataRows.slice(0, 3);
     }
     return dataRows;
-  }, [analysisMode]);
+  }, [analysisMode, dataRows]);
 
   useEffect(() => {
     const token = getStoredAccessToken();
