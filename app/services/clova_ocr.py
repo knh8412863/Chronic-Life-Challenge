@@ -178,7 +178,14 @@ class ClovaOcrService:
                 500,
                 int,
             ),
-            ("lipid", "total_cholesterol", [r"총\s*콜레스테롤", r"총\s*콜레스테롤\s*\(total\)", r"total\s*cholesterol", r"\btc\b"], 80, 400, int),
+            (
+                "lipid",
+                "total_cholesterol",
+                [r"총\s*콜레스테롤", r"총\s*콜레스테롤\s*\(total\)", r"total\s*cholesterol", r"\btc\b"],
+                80,
+                400,
+                int,
+            ),
             (
                 "lipid",
                 "ldl_cholesterol",
@@ -209,7 +216,14 @@ class ClovaOcrService:
                 120,
                 int,
             ),
-            ("lipid", "triglycerides", [r"중성\s*지방", r"트리글리세라이드", r"triglyceride", r"\btg\b"], 30, 1000, int),
+            (
+                "lipid",
+                "triglycerides",
+                [r"중성\s*지방", r"트리글리세라이드", r"triglyceride", r"\btg\b"],
+                30,
+                1000,
+                int,
+            ),
             ("lipid", "waist_circumference", [r"허리\s*둘레", r"waist"], 50, 150, float),
             ("lipid", "height", [r"\b키\b", r"신장\s*\(cm\)", r"height"], 130, 210, float),
             ("lipid", "weight", [r"몸무게", r"체중", r"weight"], 30, 200, float),
@@ -287,7 +301,9 @@ class ClovaOcrService:
 
     @staticmethod
     def _extract_urine_protein(text: str) -> bool | None:
-        match = re.search(r"(?:요\s*단백|요단백|단백뇨|소변\s*단백|urine\s*protein|proteinuria)[^\n]{0,30}", text, flags=re.IGNORECASE)
+        match = re.search(
+            r"(?:요\s*단백|요단백|단백뇨|소변\s*단백|urine\s*protein|proteinuria)[^\n]{0,30}", text, flags=re.IGNORECASE
+        )
         if not match:
             return None
         value = match.group(0)
