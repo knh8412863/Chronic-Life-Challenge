@@ -1,7 +1,7 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
 
 import type { AppRoute } from "../../App";
-import { getActivityLogs, saveActivity, updateActivityLog, type DailyActivity } from "../../api/activity";
+import { getActivityLogs, saveActivity, updateActivityLog, type DailyActivity, type SaveActivityBody } from "../../api/activity";
 import { getStoredAccessToken } from "../../api/auth";
 import {
   EXERCISE_TYPE_ICONS,
@@ -15,6 +15,7 @@ import {
   type ExerciseLog,
   type ExerciseTypeCode,
 } from "../../api/exercise";
+import { analyzeHealthCheckupFile, type HealthCheckupOcrData } from "../../api/healthOcr";
 import { getCurrentUser } from "../../api/users";
 import { createKidneyRecord, getKidneyRecords, updateKidneyRecord, type CreateKidneyBody, type KidneyRecord } from "../../api/kidney";
 import { createLipidRecord, getLipidRecords, updateLipidRecord, type CreateLipidBody, type LipidRecord } from "../../api/lipid";
@@ -65,10 +66,30 @@ type HealthRecordFormHandle = {
   saveDraft: () => Promise<boolean>;
 };
 
+const HEALTH_CHECKUP_OCR_EVENT = "all4health:health-checkup-ocr";
+
+function valueString(value?: number | null) {
+  return value == null ? "" : String(value);
+}
+
+function dispatchHealthCheckupOcr(data: HealthCheckupOcrData) {
+  window.dispatchEvent(new CustomEvent<HealthCheckupOcrData>(HEALTH_CHECKUP_OCR_EVENT, { detail: data }));
+}
+
+function addHealthCheckupOcrListener(handler: (data: HealthCheckupOcrData) => void) {
+  const listener = (event: Event) => handler((event as CustomEvent<HealthCheckupOcrData>).detail);
+  window.addEventListener(HEALTH_CHECKUP_OCR_EVENT, listener);
+  return () => window.removeEventListener(HEALTH_CHECKUP_OCR_EVENT, listener);
+}
+
 export function VitalsInputPage({ onNavigate }: VitalsInputPageProps) {
   const [tab, setTab] = useState<Tab>("bp");
   const [todayRecordCount, setTodayRecordCount] = useState(0);
   const [isSavingAll, setIsSavingAll] = useState(false);
+  const [isOcrLoading, setIsOcrLoading] = useState(false);
+  const [ocrMessage, setOcrMessage] = useState("");
+  const [showOcrNotice, setShowOcrNotice] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const bpRef = useRef<HealthRecordFormHandle>(null);
   const lipidRef = useRef<HealthRecordFormHandle>(null);
   const kidneyRef = useRef<HealthRecordFormHandle>(null);
@@ -150,6 +171,41 @@ export function VitalsInputPage({ onNavigate }: VitalsInputPageProps) {
     }
   };
 
+  const handleHealthCheckupFile = async (file?: File | null) => {
+    if (!file) return;
+    const token = getStoredAccessToken();
+    if (!token) {
+      setOcrMessage("로그인 후 건강검진 파일을 불러올 수 있습니다.");
+      return;
+    }
+    setIsOcrLoading(true);
+    setOcrMessage("");
+    try {
+      const response = await analyzeHealthCheckupFile(file, token);
+      dispatchHealthCheckupOcr(response.data);
+      if (response.data.matched_fields.some((field) => ["sbp", "dbp", "glucose_fasting", "glucose_postprandial"].includes(field))) {
+        setTab("bp");
+      } else if (response.data.matched_fields.some((field) => ["total_cholesterol", "ldl_cholesterol", "hdl_cholesterol", "triglycerides", "waist_circumference"].includes(field))) {
+        setTab("lipid");
+      } else if (response.data.matched_fields.some((field) => ["creatinine", "egfr", "bun", "urine_protein_pos"].includes(field))) {
+        setTab("kidney");
+      } else if (response.data.matched_fields.length > 0) {
+        setTab("activity");
+      }
+      setOcrMessage(
+        response.data.matched_fields.length > 0
+          ? `건강검진 파일에서 ${response.data.matched_fields.length}개 항목을 불러왔습니다. 수치를 확인한 뒤 저장해 주세요.`
+          : "OCR은 완료됐지만 자동으로 매칭된 건강 수치가 없습니다. 인식 결과를 확인하고 직접 입력해 주세요.",
+      );
+      setShowOcrNotice(true);
+    } catch {
+      setOcrMessage("건강검진 파일을 분석하지 못했습니다. 파일 형식과 OCR 설정을 확인해 주세요.");
+    } finally {
+      setIsOcrLoading(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   return (
     <div className="vitals-input-page page-stack">
       <section className="section-header-row page-heading-row">
@@ -158,7 +214,36 @@ export function VitalsInputPage({ onNavigate }: VitalsInputPageProps) {
           <h1>건강 기록 입력</h1>
           <p className="goal-section-note">오늘 건강 기록 3회 중 {todayRecordCount}회 입력 완료</p>
         </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/png,image/jpeg,application/pdf"
+            style={{ display: "none" }}
+            onChange={(event) => handleHealthCheckupFile(event.target.files?.[0])}
+          />
+          <button
+            type="button"
+            className="green-button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isOcrLoading}
+          >
+            {isOcrLoading ? "분석 중..." : "건강검진 파일 불러오기"}
+          </button>
+        </div>
       </section>
+
+      {showOcrNotice && (
+        <div className="app-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="app-modal-card">
+            <p>글씨가 너무 작거나 흐릿하여 인식하지 못할 수 있습니다.</p>
+            <p>수치를 확인한 뒤 저장해 주세요.</p>
+            <button type="button" className="green-button" onClick={() => setShowOcrNotice(false)}>
+              확인
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* 탭 */}
       <div className="vi-tabs">
@@ -269,6 +354,17 @@ function BpForm({ onSaveAll, isSavingAll, todayBpCount }, ref) {
       sessionStorage.removeItem("editingVitalData");
     }
   }, []);
+
+  useEffect(() => addHealthCheckupOcrListener((data) => {
+    const vitals = data.vitals;
+    if (vitals.sbp != null) setSystolic(valueString(vitals.sbp));
+    if (vitals.dbp != null) setDiastolic(valueString(vitals.dbp));
+    if (vitals.glucose_fasting != null) setFastingGlucose(valueString(vitals.glucose_fasting));
+    if (vitals.glucose_postprandial != null) setPostprandialGlucose(valueString(vitals.glucose_postprandial));
+    if (vitals.glucose_fasting != null || vitals.glucose_postprandial != null) setCategory("BG");
+    else if (vitals.sbp != null || vitals.dbp != null) setCategory("BP");
+    if (data.matched_fields.length > 0) setMemo((current) => current || "건강검진 OCR로 불러온 수치입니다.");
+  }), []);
 
   const hasInput = () => Boolean(editingVital || systolic || diastolic || fastingGlucose || postprandialGlucose || memo.trim());
 
@@ -545,8 +641,20 @@ function LipidForm({ onNavigate, onSaveAll, isSavingAll }, ref) {
     setMemo(record.memo ?? "");
   }, []);
 
+  useEffect(() => addHealthCheckupOcrListener((data) => {
+    const lipid = data.lipid;
+    if (lipid.total_cholesterol != null) setTotalCholesterol(valueString(lipid.total_cholesterol));
+    if (lipid.ldl_cholesterol != null) setLdl(valueString(lipid.ldl_cholesterol));
+    if (lipid.hdl_cholesterol != null) setHdl(valueString(lipid.hdl_cholesterol));
+    if (lipid.triglycerides != null) setTriglycerides(valueString(lipid.triglycerides));
+    if (lipid.waist_circumference != null) setWaist(valueString(lipid.waist_circumference));
+    if (Object.values(lipid).some((value) => value != null)) {
+      setSource("건강검진 OCR");
+    }
+  }), []);
+
   const hasInput = () => Boolean(
-    editingLipid || totalCholesterol || ldl || hdl || triglycerides || waist || source.trim() || memo.trim(),
+    editingLipid || totalCholesterol || ldl || hdl || triglycerides || waist,
   );
 
   async function saveDraft() {
@@ -581,11 +689,11 @@ function LipidForm({ onNavigate, onSaveAll, isSavingAll }, ref) {
             <input type="number" min={0} className="vi-lipid-input vi-lipid-neutral" placeholder="예: 200" value={totalCholesterol} onChange={(e) => setTotalCholesterol(nonNegativeValue(e.target.value))} />
           </div>
           <div className="vi-lipid-field">
-            <label className="field-label">LDL 콜레스테롤 (mg/dL)</label>
+            <label className="field-label">LDL 콜레스테롤 (저밀도 콜레스테롤, mg/dL)</label>
             <input type="number" min={0} className="vi-lipid-input vi-lipid-neutral" placeholder="예: 100" value={ldl} onChange={(e) => setLdl(nonNegativeValue(e.target.value))} />
           </div>
           <div className="vi-lipid-field">
-            <label className="field-label">HDL 콜레스테롤 (mg/dL)</label>
+            <label className="field-label">HDL 콜레스테롤 (고밀도 콜레스테롤, mg/dL)</label>
             <input type="number" min={0} className="vi-lipid-input vi-lipid-neutral" placeholder="예: 50" value={hdl} onChange={(e) => setHdl(nonNegativeValue(e.target.value))} />
           </div>
           <div className="vi-lipid-field">
@@ -637,7 +745,7 @@ function KidneyForm({ onNavigate, onSaveAll, isSavingAll }, ref) {
   const [creatinine, setCreatinine] = useState("");
   const [bun, setBun] = useState("");
   const [egfr, setEgfr] = useState("");
-  const [proteinuria, setProteinuria] = useState<boolean>(true);
+  const [proteinuria, setProteinuria] = useState<boolean | null>(null);
   const [date, setDate] = useState(todayStr());
   const [source, setSource] = useState("");
   const [memo, setMemo] = useState("");
@@ -651,10 +759,21 @@ function KidneyForm({ onNavigate, onSaveAll, isSavingAll }, ref) {
     setCreatinine(String(record.creatinine ?? ""));
     setBun(String(record.bun ?? ""));
     setEgfr(String(record.egfr ?? ""));
-    setProteinuria(record.urine_protein_pos !== true);
+    setProteinuria(record.urine_protein_pos == null ? null : record.urine_protein_pos !== true);
     setDate(record.record_date ?? record.measured_date ?? todayStr());
     setMemo(record.memo ?? "");
   }, []);
+
+  useEffect(() => addHealthCheckupOcrListener((data) => {
+    const renal = data.renal;
+    if (renal.creatinine != null) setCreatinine(valueString(renal.creatinine));
+    if (renal.bun != null) setBun(valueString(renal.bun));
+    if (renal.egfr != null) setEgfr(valueString(renal.egfr));
+    if (renal.urine_protein_pos != null) setProteinuria(!renal.urine_protein_pos);
+    if (Object.values(renal).some((value) => value != null)) {
+      setSource("건강검진 OCR");
+    }
+  }), []);
 
   const calculatedEgfr =
     creatinine
@@ -662,7 +781,7 @@ function KidneyForm({ onNavigate, onSaveAll, isSavingAll }, ref) {
       : null;
 
   const hasInput = () => Boolean(
-    editingKidney || creatinine || bun || egfr || !proteinuria || source.trim() || memo.trim(),
+    editingKidney || creatinine || bun || egfr || proteinuria !== null,
   );
 
   async function saveDraft() {
@@ -671,12 +790,12 @@ function KidneyForm({ onNavigate, onSaveAll, isSavingAll }, ref) {
     const body: CreateKidneyBody = {
       measured_date: date,
       record_date: date,
-      urine_protein_pos: !proteinuria,
     };
     if (creatinine) body.creatinine = Number(creatinine);
     if (bun) body.bun = Number(bun);
     if (egfr) body.egfr = Number(egfr);
     else if (calculatedEgfr) body.egfr = Number(calculatedEgfr);
+    if (proteinuria !== null) body.urine_protein_pos = !proteinuria;
     const memoText = [source.trim() ? `측정 출처: ${source.trim()}` : "", memo.trim()].filter(Boolean).join("\n");
     if (memoText) body.memo = memoText;
 
@@ -758,14 +877,14 @@ function KidneyForm({ onNavigate, onSaveAll, isSavingAll }, ref) {
           <div className="vi-time-grid" style={{ marginTop: "8px" }}>
             <button
               type="button"
-              className={`vi-time-btn ${proteinuria ? "vi-time-btn--active" : ""}`}
+              className={`vi-time-btn ${proteinuria === true ? "vi-time-btn--active" : ""}`}
               onClick={() => setProteinuria(true)}
             >
               음성
             </button>
             <button
               type="button"
-              className={`vi-time-btn ${!proteinuria ? "vi-time-btn--active" : ""}`}
+              className={`vi-time-btn ${proteinuria === false ? "vi-time-btn--active" : ""}`}
               onClick={() => setProteinuria(false)}
             >
               양성
@@ -980,6 +1099,7 @@ function ActivityInputPanel({ onNavigate, onSaveAll, isSavingAll }, ref) {
   const [isSaving, setIsSaving] = useState(false);
   const [editingActivity, setEditingActivity] = useState<DailyActivity | null>(null);
   const [hasEdited, setHasEdited] = useState(false);
+  const [hasStressEdited, setHasStressEdited] = useState(false);
 
   useEffect(() => {
     const record = readEditingRecord<DailyActivity>("ACTIVITY");
@@ -990,20 +1110,43 @@ function ActivityInputPanel({ onNavigate, onSaveAll, isSavingAll }, ref) {
     setSleepHours(String(record.sleep_hours ?? ""));
     setWaterMl(String(record.water_ml ?? ""));
     setStressLevel(record.stress_level ?? 3);
+    setHasStressEdited(record.stress_level != null);
   }, []);
+
+  useEffect(() => addHealthCheckupOcrListener((data) => {
+    const activity = data.activity;
+    let changed = false;
+    if (activity.steps != null) {
+      setSteps(valueString(activity.steps));
+      changed = true;
+    }
+    if (activity.exercise_minutes != null) {
+      setExerciseMinutes(valueString(activity.exercise_minutes));
+      changed = true;
+    }
+    if (activity.sleep_hours != null) {
+      setSleepHours(valueString(activity.sleep_hours));
+      changed = true;
+    }
+    if (activity.water_ml != null) {
+      setWaterMl(valueString(activity.water_ml));
+      changed = true;
+    }
+    if (changed) setHasEdited(true);
+  }), []);
 
   const hasInput = () => Boolean(editingActivity || hasEdited || steps || exerciseMinutes || sleepHours || waterMl);
 
   async function saveDraft() {
     const token = getStoredAccessToken();
     if (!hasInput()) return false;
-    const body = {
+    const body: SaveActivityBody = {
       steps: steps ? Number(steps) : undefined,
       exercise_minutes: exerciseMinutes ? Number(exerciseMinutes) : undefined,
       sleep_hours: sleepHours ? Number(sleepHours) : undefined,
       water_ml: waterMl ? Number(waterMl) : undefined,
-      stress_level: stressLevel,
     };
+    if (hasStressEdited) body.stress_level = stressLevel;
     const activityId = editingActivity?.id ?? editingActivity?.activity_log_id;
     if (activityId) {
       await updateActivityLog(activityId, body, token ?? undefined);
@@ -1046,7 +1189,7 @@ function ActivityInputPanel({ onNavigate, onSaveAll, isSavingAll }, ref) {
         <div className="act-slider-row">
           <div className="act-slider-item" style={{ flex: 1 }}>
             <label className="field-label">스트레스 수준 {stressLevel} / 5</label>
-            <input type="range" className="act-slider" min={1} max={5} step={1} value={stressLevel} onChange={(e) => { setStressLevel(Number(e.target.value)); setHasEdited(true); }} />
+            <input type="range" className="act-slider" min={1} max={5} step={1} value={stressLevel} onChange={(e) => { setStressLevel(Number(e.target.value)); setHasEdited(true); setHasStressEdited(true); }} />
           </div>
         </div>
       </section>

@@ -216,6 +216,48 @@ class VitalRecordUpdateRequest(BaseModel):
     memo: Annotated[str | None, Field(default=None, max_length=255)] = None
 
 
+class HealthCheckupOcrVitalsResponse(BaseModel):
+    sbp: int | None = None
+    dbp: int | None = None
+    glucose_fasting: int | None = None
+    glucose_postprandial: int | None = None
+
+
+class HealthCheckupOcrLipidResponse(BaseModel):
+    total_cholesterol: int | None = None
+    ldl_cholesterol: int | None = None
+    hdl_cholesterol: int | None = None
+    triglycerides: int | None = None
+    waist_circumference: float | None = None
+    height: float | None = None
+    weight: float | None = None
+
+
+class HealthCheckupOcrRenalResponse(BaseModel):
+    creatinine: float | None = None
+    egfr: float | None = None
+    bun: float | None = None
+    urine_protein_pos: bool | None = None
+
+
+class HealthCheckupOcrActivityResponse(BaseModel):
+    steps: int | None = None
+    exercise_minutes: int | None = None
+    water_ml: int | None = None
+    sleep_hours: float | None = None
+
+
+class HealthCheckupOcrResponse(BaseModel):
+    file_name: str
+    content_type: str
+    extracted_text: str
+    vitals: HealthCheckupOcrVitalsResponse
+    lipid: HealthCheckupOcrLipidResponse
+    renal: HealthCheckupOcrRenalResponse
+    activity: HealthCheckupOcrActivityResponse
+    matched_fields: list[str] = Field(default_factory=list)
+
+
 class ActivityLogCreateRequest(BaseModel):
     record_date: date
     steps: Annotated[int | None, Field(default=None, ge=0, le=100000)]

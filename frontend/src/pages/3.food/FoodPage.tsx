@@ -1,13 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
 import {
   createMealLog,
   deleteMealLog,
+  analyzeFoodNutritionLabel,
   getMealLogs,
   updateMealLog,
   type MealLog,
   type MealType,
+  type FoodNutritionOcrData,
 } from "../../api/foods";
 import { EmptyState } from "../../components/common/EmptyState";
 import { ErrorState } from "../../components/common/ErrorState";
@@ -103,6 +105,33 @@ function sumFoodItemNumber(items: FoodInputItem[], key: keyof Pick<FoodInputItem
   return Number(values.reduce((sum, value) => sum + value, 0).toFixed(2));
 }
 
+function nutritionValueString(value?: number | null) {
+  if (value == null) return "";
+  return String(value);
+}
+
+function isEmptyFoodInputItem(item: FoodInputItem) {
+  return Object.values(item).every((value) => value.trim() === "");
+}
+
+function fileNameWithoutExtension(fileName: string) {
+  return fileName.replace(/\.[^.]+$/, "");
+}
+
+function toFoodInputItemFromNutritionOcr(data: FoodNutritionOcrData): FoodInputItem {
+  return {
+    food: data.food_name?.trim() || fileNameWithoutExtension(data.file_name) || "영양성분표",
+    amount: data.amount ?? "",
+    calories: nutritionValueString(data.nutrition.calories),
+    carbs: nutritionValueString(data.nutrition.carbs_g),
+    protein: nutritionValueString(data.nutrition.protein_g),
+    fat: nutritionValueString(data.nutrition.fat_g),
+    sodium: nutritionValueString(data.nutrition.sodium_mg),
+    sugar: nutritionValueString(data.nutrition.sugar_g),
+    fiberG: nutritionValueString(data.nutrition.fiber_g),
+  };
+}
+
 export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
   const isFixedInput = view === "input";
   const [tab, setTab] = useState<TabType>(view);
@@ -123,6 +152,10 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
   const [memo, setMemo] = useState("");
   const [showValidation, setShowValidation] = useState(false);
   const [showSaveSuccess, setShowSaveSuccess] = useState(false);
+  const [isNutritionOcrLoading, setIsNutritionOcrLoading] = useState(false);
+  const [showNutritionOcrNotice, setShowNutritionOcrNotice] = useState(false);
+  const [nutritionOcrMessage, setNutritionOcrMessage] = useState("");
+  const nutritionFileInputRef = useRef<HTMLInputElement>(null);
 
   // 상세/수정 상태
   const [isEditMode, setIsEditMode] = useState(false);
@@ -208,6 +241,41 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
     }
   };
 
+  const handleNutritionLabelFile = async (file?: File | null) => {
+    if (!file) return;
+    const token = getStoredAccessToken();
+    if (!token) {
+      setHasError(true);
+      return;
+    }
+
+    setIsNutritionOcrLoading(true);
+    setNutritionOcrMessage("");
+    try {
+      const response = await analyzeFoodNutritionLabel(file, token);
+      const item = toFoodInputItemFromNutritionOcr(response.data);
+      setFoodItems((prev) => {
+        if (prev.length === 1 && isEmptyFoodInputItem(prev[0])) {
+          return [item];
+        }
+        return [...prev, item];
+      });
+      setShowValidation(false);
+      setNutritionOcrMessage(
+        response.data.matched_fields.length > 0
+          ? "영양성분표에서 값을 불러왔습니다."
+          : "OCR은 완료됐지만 자동으로 매칭된 영양성분이 없습니다.",
+      );
+      setShowNutritionOcrNotice(true);
+    } catch {
+      setNutritionOcrMessage("영양성분표를 분석하지 못했습니다. 파일 형식과 OCR 설정을 확인해 주세요.");
+      setShowNutritionOcrNotice(true);
+    } finally {
+      setIsNutritionOcrLoading(false);
+      if (nutritionFileInputRef.current) nutritionFileInputRef.current.value = "";
+    }
+  };
+
   const handleDelete = async (id: number) => {
     const token = getStoredAccessToken();
     if (!token) return;
@@ -270,6 +338,24 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
               식단이 저장되었습니다.
             </div>
           )}
+
+          <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+            <input
+              ref={nutritionFileInputRef}
+              type="file"
+              accept="image/png,image/jpeg,application/pdf"
+              style={{ display: "none" }}
+              onChange={(event) => handleNutritionLabelFile(event.target.files?.[0])}
+            />
+            <button
+              type="button"
+              className="green-button"
+              onClick={() => nutritionFileInputRef.current?.click()}
+              disabled={isNutritionOcrLoading}
+            >
+              {isNutritionOcrLoading ? "분석 중..." : "영양성분표 불러오기"}
+            </button>
+          </div>
 
           {/* 식사 유형 선택 */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12, marginBottom: 20 }}>
@@ -364,6 +450,19 @@ export function FoodPage({ onNavigate, view = "list" }: FoodPageProps) {
             <button onClick={handleSaveInput}
               style={{ flex: 1, height: 40, border: "none", borderRadius: 8, background: "#1a1a1a", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
               저장
+            </button>
+          </div>
+        </div>
+      )}
+
+      {showNutritionOcrNotice && (
+        <div className="app-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="app-modal-card">
+            <p>글씨가 너무 작거나 흐릿하여 인식하지 못할 수 있습니다.</p>
+            <p>수치를 확인한 뒤 저장해 주세요.</p>
+            {nutritionOcrMessage && <p>{nutritionOcrMessage}</p>}
+            <button type="button" className="green-button" onClick={() => setShowNutritionOcrNotice(false)}>
+              확인
             </button>
           </div>
         </div>

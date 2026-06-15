@@ -127,6 +127,20 @@ export type FoodPeriodMealSummary = {
   daily_summaries: FoodDailyMealSummary[];
 };
 
+export type FoodNutritionOcrData = {
+  file_name: string;
+  content_type: string;
+  extracted_text: string;
+  food_name: string | null;
+  amount: string | null;
+  serving_basis: "TOTAL" | "PER_100G" | "PER_AMOUNT_G" | "PER_SERVING" | "UNKNOWN";
+  total_amount_g: number | null;
+  basis_amount_g: number | null;
+  serving_amount_g: number | null;
+  nutrition: FoodNutrition;
+  matched_fields: string[];
+};
+
 export type MealLogQuery = {
   from?: string;
   to?: string;
@@ -174,6 +188,16 @@ export async function createFoodAnalysis(body: FoodAnalysisBody, token?: string)
   return apiRequest<{ data: FoodAnalysisResult }>("/food/analyze", {
     method: "POST",
     body: JSON.stringify(body),
+    token,
+  });
+}
+
+export async function analyzeFoodNutritionLabel(file: File, token?: string) {
+  const formData = new FormData();
+  formData.append("file", file);
+  return apiRequest<{ data: FoodNutritionOcrData }>("/food/nutrition-ocr", {
+    method: "POST",
+    body: formData,
     token,
   });
 }

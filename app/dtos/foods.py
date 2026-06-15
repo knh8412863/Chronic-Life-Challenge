@@ -30,6 +30,20 @@ class FoodNutritionResponse(BaseModel):
     fiber_g: float | None = None
 
 
+class FoodNutritionOcrResponse(BaseModel):
+    file_name: str
+    content_type: str
+    extracted_text: str
+    food_name: str | None = None
+    amount: str | None = None
+    serving_basis: Literal["TOTAL", "PER_100G", "PER_AMOUNT_G", "PER_SERVING", "UNKNOWN"]
+    total_amount_g: float | None = None
+    basis_amount_g: float | None = None
+    serving_amount_g: float | None = None
+    nutrition: FoodNutritionResponse
+    matched_fields: list[str]
+
+
 class FoodAnalysisResponse(BaseModel):
     food_analysis_result_id: int
     task_uuid: str

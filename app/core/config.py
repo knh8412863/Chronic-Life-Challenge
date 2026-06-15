@@ -88,5 +88,9 @@ class Config(BaseSettings):
     OPENAI_MODEL: str = "gpt-4o-mini"
     OPENAI_TIMEOUT_SECONDS: float = 10.0
 
+    CLOVA_OCR_INVOKE_URL: str | None = None
+    CLOVA_OCR_SECRET_KEY: str | None = None
+    CLOVA_OCR_TIMEOUT_SECONDS: float = 10.0
+
     def get_cors_allow_origins(self) -> list[str]:
         return [origin.strip() for origin in self.CORS_ALLOW_ORIGINS.split(",") if origin.strip()]
