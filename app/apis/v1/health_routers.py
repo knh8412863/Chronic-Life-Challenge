@@ -1,7 +1,7 @@
 from datetime import date
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile, status
 from fastapi.responses import ORJSONResponse as Response
 from starlette.responses import Response as EmptyResponse
 
@@ -17,6 +17,7 @@ from app.dtos.predictions import (
     ExerciseLogResponse,
     ExerciseLogUpdateRequest,
     ExerciseType,
+    HealthCheckupOcrResponse,
     HealthGoalResponse,
     HealthGoalUpdateRequest,
     HealthStatisticsResponse,
@@ -45,6 +46,7 @@ from app.dtos.predictions import (
     VitalRecordUpdateRequest,
 )
 from app.models.users import User
+from app.services.clova_ocr import ClovaOcrService
 from app.services.predictions import HealthInputService
 
 health_router = APIRouter(tags=["health"])
@@ -56,6 +58,25 @@ def ensure_valid_date_range(from_date: date | None, to_date: date | None) -> Non
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             detail="조회 시작일은 종료일보다 늦을 수 없습니다.",
         )
+
+
+@health_router.post(
+    "/health/checkup-ocr",
+    response_model=DataResponse[HealthCheckupOcrResponse],
+    status_code=status.HTTP_200_OK,
+)
+async def analyze_health_checkup_file(
+    user: Annotated[User, Depends(get_request_user)],
+    service: Annotated[ClovaOcrService, Depends(ClovaOcrService)],
+    file: Annotated[UploadFile, File(...)],
+) -> Response:
+    content = await file.read()
+    result = await service.analyze_health_checkup_file(
+        file_name=file.filename or "health-checkup",
+        content_type=file.content_type or "application/octet-stream",
+        content=content,
+    )
+    return Response({"data": result.model_dump(mode="json")}, status_code=status.HTTP_200_OK)
 
 
 @health_router.post(
