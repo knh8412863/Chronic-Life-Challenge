@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
 import { ApiError } from "../../api/client";
+import { PasswordToggleButton } from "../../components/common/PasswordToggleButton";
 import {
   getNotificationPreferences,
   updateNotificationPreferences,
@@ -34,10 +35,7 @@ function PasswordField({ label, value, onChange }: { label: string; value: strin
       <div style={{ position: "relative" }}>
         <input type={show ? "text" : "password"} value={value} onChange={e => onChange(e.target.value)}
           style={{ width: "100%", height: 36, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 36px 0 10px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-        <button onClick={() => setShow(!show)}
-          style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 14, color: "#888" }}>
-          {show ? "🙈" : "👁"}
-        </button>
+        <PasswordToggleButton isVisible={show} onToggle={() => setShow(!show)} size={17} />
       </div>
     </div>
   );
@@ -163,8 +161,10 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
     // 월간 리포트는 MVP 제외
   });
   const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [loadedPreference, setLoadedPreference] = useState<NotificationPreference | null>(null);
 
   useEffect(() => {
     let ignore = false;
@@ -187,6 +187,7 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
           important_notice_enabled: data.important_notice_enabled,
           promotion_enabled: data.promotion_enabled,
         });
+        setLoadedPreference(data);
       } catch {
         if (!ignore) setErrorMessage("");
       } finally {
@@ -203,22 +204,64 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
   const handleSave = async () => {
     setIsSaving(true);
     setErrorMessage("");
+    setSuccessMessage("");
     try {
-      const payload: Partial<NotificationPreference> = {
+      const currentPreference: NotificationPreference = {
         ...push,
         ...email,
+        quiet_start_time: loadedPreference?.quiet_start_time ?? "09:00:00",
+        quiet_end_time: loadedPreference?.quiet_end_time ?? "21:00:00",
       };
-      await updateNotificationPreferences(payload, getStoredAccessToken());
+      const payload = Object.fromEntries(
+        Object.entries(currentPreference).filter(
+          ([key, value]) => loadedPreference?.[key as keyof NotificationPreference] !== value,
+        ),
+      ) as Partial<NotificationPreference>;
+      if (Object.keys(payload).length === 0) {
+        setSuccessMessage("변경된 알림 설정이 없습니다.");
+        return;
+      }
+      const { data } = await updateNotificationPreferences(payload, getStoredAccessToken());
+      setPush({
+        push_enabled: data.push_enabled,
+        health_data_reminder_enabled: data.health_data_reminder_enabled,
+        challenge_mission_enabled: data.challenge_mission_enabled,
+        prediction_result_enabled: data.prediction_result_enabled,
+        advice_update_enabled: data.advice_update_enabled,
+        virtual_pet_enabled: data.virtual_pet_enabled,
+      });
+      setEmail({
+        email_enabled: data.email_enabled,
+        weekly_report_enabled: data.weekly_report_enabled,
+        important_notice_enabled: data.important_notice_enabled,
+        promotion_enabled: data.promotion_enabled,
+      });
+      setLoadedPreference(data);
+      setSuccessMessage("알림 설정이 저장되었습니다.");
+    } catch (error) {
+      const detail = error instanceof ApiError && typeof error.detail === "string" ? error.detail : "";
+      setErrorMessage(detail || "알림 설정 저장에 실패했습니다.");
+    } finally {
       setIsSaving(false);
-      onNavigate("/mypage");
-    } catch {
-      setIsSaving(false);
-      setErrorMessage("알림 설정 저장에 실패했습니다.");
     }
   };
 
   const togglePush = (key: keyof typeof push) => {
-    setPush(prev => ({ ...prev, [key]: !prev[key] }));
+    setPush(prev => {
+      if (key === "push_enabled") {
+        const nextEnabled = !prev.push_enabled;
+        return {
+          ...prev,
+          push_enabled: nextEnabled,
+          health_data_reminder_enabled: nextEnabled ? true : prev.health_data_reminder_enabled,
+          challenge_mission_enabled: nextEnabled ? true : prev.challenge_mission_enabled,
+          prediction_result_enabled: nextEnabled ? true : prev.prediction_result_enabled,
+          advice_update_enabled: nextEnabled ? true : prev.advice_update_enabled,
+          virtual_pet_enabled: nextEnabled ? true : prev.virtual_pet_enabled,
+        };
+      }
+      return { ...prev, [key]: !prev[key] };
+    });
   };
 
   const toggleEmail = (key: keyof typeof email) => {
@@ -237,6 +280,7 @@ export function NotificationSettingsPage({ onNavigate }: NotificationSettingsPag
 
       {isLoading && <p style={{ fontSize: 13, color: "#888" }}>알림 설정을 불러오는 중입니다.</p>}
       {errorMessage && <p style={{ fontSize: 12, color: "#c62828" }}>{errorMessage}</p>}
+      {successMessage && <p style={{ fontSize: 12, color: "#2e7d32" }}>{successMessage}</p>}
 
       {/* 푸시 알림 */}
       <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 20, marginBottom: 14 }}>
@@ -556,10 +600,7 @@ export function WithdrawalPage({ onNavigate }: WithdrawalPageProps) {
           <input type={showPassword ? "text" : "password"} value={password} onChange={e => { setPassword(e.target.value); setPwError(""); }}
             placeholder="비밀번호를 입력하세요"
             style={{ width: "100%", height: 36, border: `1.5px solid ${pwError ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 12, outline: "none", boxSizing: "border-box" }} />
-          <button onClick={() => setShowPassword(!showPassword)}
-            style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 14 }}>
-            {showPassword ? "🙈" : "👁"}
-          </button>
+          <PasswordToggleButton isVisible={showPassword} onToggle={() => setShowPassword(!showPassword)} size={17} />
         </div>
         {pwError && <p style={{ fontSize: 11, color: "#E24B4A", margin: "0 0 10px" }}>{pwError}</p>}
 

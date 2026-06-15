@@ -8,6 +8,7 @@ import {
   EXERCISE_TYPES,
   createExerciseLog,
   deleteExerciseLog,
+  estimateCaloriesBurned,
   getExerciseLogs,
   type CreateExerciseBody,
   type ExerciseListData,
@@ -15,6 +16,7 @@ import {
   type ExerciseQuery,
   type ExerciseTypeCode,
 } from "../../api/exercise";
+import { getCurrentUser } from "../../api/users";
 import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingState } from "../../components/common/LoadingState";
 import { localDateString, localDaysAgoString } from "../../utils/date";
@@ -52,7 +54,7 @@ type ExercisePageProps = {
   onNavigate?: (route: AppRoute) => void;
 };
 
-export function ExercisePage({ onNavigate: _onNavigate }: ExercisePageProps) {
+export function ExercisePage({ onNavigate }: ExercisePageProps) {
   const [tab, setTab] = useState<Tab>("input");
   const [data, setData] = useState<ExerciseListData>(fallbackData);
   const [isLoading, setIsLoading] = useState(false);
@@ -137,6 +139,7 @@ export function ExercisePage({ onNavigate: _onNavigate }: ExercisePageProps) {
         <ExerciseInputForm
           onSave={() => { fetchData({ from: fromDate, to: toDate }); setTab("list"); }}
           onCancel={() => setTab("list")}
+          onNavigate={onNavigate}
         />
       )}
 
@@ -253,18 +256,45 @@ export function ExercisePage({ onNavigate: _onNavigate }: ExercisePageProps) {
 type ExerciseInputFormProps = {
   onSave: () => void;
   onCancel: () => void;
+  onNavigate?: (route: AppRoute) => void;
 };
 
-function ExerciseInputForm({ onSave, onCancel }: ExerciseInputFormProps) {
+function ExerciseInputForm({ onSave, onCancel, onNavigate }: ExerciseInputFormProps) {
   const [selectedType, setSelectedType] = useState<ExerciseTypeCode>("RUNNING");
   const [date, setDate] = useState(todayStr());
   const [minutes, setMinutes] = useState(30);
   const [calories, setCalories] = useState("");
   const [memo, setMemo] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [weightKg, setWeightKg] = useState<number | null>(null);
+  const [hasWeightProfile, setHasWeightProfile] = useState(true);
+  const [isCaloriesManual, setIsCaloriesManual] = useState(false);
+  const [showWeightRequiredModal, setShowWeightRequiredModal] = useState(false);
+
+  useEffect(() => {
+    getCurrentUser(getStoredAccessToken())
+      .then((user) => {
+        setWeightKg(user.weight);
+        setHasWeightProfile(user.weight != null);
+      })
+      .catch(() => {
+        setWeightKg(null);
+        setHasWeightProfile(false);
+      });
+  }, []);
+
+  useEffect(() => {
+    if (isCaloriesManual) return;
+    const estimated = estimateCaloriesBurned(selectedType, minutes, weightKg);
+    setCalories(estimated === null ? "" : String(estimated));
+  }, [isCaloriesManual, minutes, selectedType, weightKg]);
 
   async function handleSave() {
     const token = getStoredAccessToken();
+    if (!calories && !hasWeightProfile) {
+      setShowWeightRequiredModal(true);
+      return;
+    }
     const body: CreateExerciseBody = {
       exercise_type: selectedType,
       duration_minutes: minutes,
@@ -338,17 +368,20 @@ function ExerciseInputForm({ onSave, onCancel }: ExerciseInputFormProps) {
 
       {/* 소모 칼로리 */}
       <section className="dashboard-card vi-section">
-        <h2>소모 칼로리 (선택)</h2>
+        <h2>예상 소모 칼로리</h2>
         <div className="vi-field">
           <span className="field-label">칼로리 (kcal)</span>
           <input
             type="number"
             className="vi-date-input"
-            placeholder="예: 180"
+            placeholder="내 체중·운동종류·운동시간 기준 자동 계산"
             value={calories}
-            onChange={(e) => setCalories(e.target.value)}
+            onChange={(e) => {
+              setCalories(e.target.value);
+              setIsCaloriesManual(true);
+            }}
           />
-          <p className="goal-section-note">* 소모 칼로리를 알고 있다면 입력해주세요.</p>
+          <p className="goal-section-note">* MET 기준 예상값입니다. 자동 계산에는 건강 프로필의 체중이 필요합니다.</p>
         </div>
       </section>
 
@@ -369,6 +402,22 @@ function ExerciseInputForm({ onSave, onCancel }: ExerciseInputFormProps) {
           {isSaving ? "저장 중..." : "저장"}
         </button>
       </div>
+      {showWeightRequiredModal && (
+        <div className="app-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="app-modal-card">
+            <h2>체중 입력이 필요합니다</h2>
+            <p>운동 종류와 시간을 기준으로 예상 소모 칼로리를 계산하려면 건강 프로필에 체중이 필요합니다.</p>
+            <div className="button-row">
+              <button type="button" className="wide-subtle-button" onClick={() => setShowWeightRequiredModal(false)}>
+                닫기
+              </button>
+              <button type="button" className="green-button" onClick={() => onNavigate?.("/health/profile")}>
+                건강 프로필로 이동
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

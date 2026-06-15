@@ -35,7 +35,9 @@ export type CreateLipidBody = {
   memo?: string;
 };
 
-function toApiLipidBody(body: CreateLipidBody) {
+export type UpdateLipidBody = Partial<CreateLipidBody>;
+
+function toApiLipidBody(body: CreateLipidBody | UpdateLipidBody) {
   return {
     record_date: body.record_date,
     total_cholesterol: body.total_cholesterol,
@@ -77,4 +79,16 @@ export async function getLipidRecords(query: { limit?: number } = {}, token?: st
   const qs = params.toString();
   const response = await apiRequest<{ data: ApiLipidRecord[] }>(`/health/lipid-obesity-records${qs ? `?${qs}` : ""}`, { token });
   return { data: response.data.map(toLipidRecord) };
+}
+
+export async function updateLipidRecord(id: number, body: UpdateLipidBody, token?: string) {
+  return apiRequest<{ data: LipidRecord }>(`/health/lipid-obesity-records/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(toApiLipidBody(body)),
+    token,
+  });
+}
+
+export async function deleteLipidRecord(id: number, token?: string) {
+  return apiRequest<void>(`/health/lipid-obesity-records/${id}`, { method: "DELETE", token });
 }

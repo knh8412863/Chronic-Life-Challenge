@@ -186,6 +186,10 @@ export type PasswordChangePayload = {
   new_password_confirm: string;
 };
 
+export type EmailChangeRequestPayload = {
+  new_email: string;
+};
+
 export async function getCurrentUser(token?: string) {
   const response = await apiRequest<MaybeData<UserInfo>>("/users/me", { token });
   return unwrapData(response);
@@ -222,6 +226,23 @@ export async function changeCurrentUserPassword(payload: PasswordChangePayload, 
     body: JSON.stringify(payload),
     token,
   });
+}
+
+export async function requestCurrentUserEmailChange(payload: EmailChangeRequestPayload, token?: string) {
+  return apiRequest<void>("/users/me/email-change-requests", {
+    method: "POST",
+    body: JSON.stringify(payload),
+    token,
+  });
+}
+
+export async function confirmCurrentUserEmailChange(emailChangeToken: string, token?: string) {
+  const response = await apiRequest<MaybeData<UserInfo>>("/users/me/email", {
+    method: "PATCH",
+    body: JSON.stringify({ token: emailChangeToken }),
+    token,
+  });
+  return unwrapData(response);
 }
 
 export async function getUserConsents(token?: string) {

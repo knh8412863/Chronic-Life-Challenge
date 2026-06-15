@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 
 import type { AppRoute } from "../../App";
+import { getTodayActivity } from "../../api/activity";
 import { getStoredAccessToken } from "../../api/auth";
+import { getExerciseLogs } from "../../api/exercise";
 import {
   getHealthGoals,
   updateHealthGoals,
@@ -9,6 +11,10 @@ import {
   type HealthGoals,
   type LifestyleGoal,
 } from "../../api/goal";
+import { getKidneyRecords } from "../../api/kidney";
+import { getLipidRecords } from "../../api/lipid";
+import { getCurrentUser } from "../../api/users";
+import { getVitals } from "../../api/vitals";
 import { LoadingState } from "../../components/common/LoadingState";
 
 type CdgKey = keyof Omit<ChronicDiseaseGoal, "updated_at">;
@@ -46,6 +52,9 @@ const CURRENT_LABELS: Partial<Record<CdgKey | LgKey, string>> = {
   target_water_ml: "—",
   target_sleep_hours: "—",
 };
+
+type GoalSuggestionState = Partial<Record<CdgKey | LgKey, string>>;
+type GoalCurrentState = Partial<Record<CdgKey | LgKey, string>>;
 
 const fallbackGoals: HealthGoals = {
   chronic_disease_goal: {
@@ -87,6 +96,27 @@ function normalizeNonNegativeInput(value: string): string {
   return String(Math.max(0, n));
 }
 
+function latestByDate<T>(items: T[], getDate: (item: T) => string | undefined | null) {
+  return [...items].sort((a, b) => String(getDate(b) ?? "").localeCompare(String(getDate(a) ?? "")))[0];
+}
+
+function roundTo(value: number, digits = 0) {
+  const factor = 10 ** digits;
+  return Math.round(value * factor) / factor;
+}
+
+function achievableLower(current: number | null | undefined, ideal: number, stepDown: number, digits = 0) {
+  if (current == null || current <= 0) return "";
+  if (current <= ideal) return String(ideal);
+  return String(roundTo(Math.max(ideal, current - stepDown), digits));
+}
+
+function achievableHigher(current: number | null | undefined, ideal: number, stepUp: number, digits = 0) {
+  if (current == null || current <= 0) return "";
+  if (current >= ideal) return String(ideal);
+  return String(roundTo(Math.min(ideal, current + stepUp), digits));
+}
+
 type GoalEditPageProps = {
   onNavigate?: (route: AppRoute) => void;
 };
@@ -97,6 +127,8 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [cdgDraft, setCdgDraft] = useState<Partial<Record<CdgKey, string>>>({});
   const [lgDraft, setLgDraft] = useState<Partial<Record<LgKey, string>>>({});
+  const [currentLabels, setCurrentLabels] = useState<GoalCurrentState>(CURRENT_LABELS);
+  const [suggestions, setSuggestions] = useState<GoalSuggestionState>({});
 
   useEffect(() => {
     const token = getStoredAccessToken();
@@ -112,7 +144,77 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
       })
       .catch(() => initDraft(fallbackGoals))
       .finally(() => setIsLoading(false));
+    loadCurrentGoalContext(token);
   }, []);
+
+  async function loadCurrentGoalContext(token: string) {
+    const [userRes, vitalsRes, lipidRes, kidneyRes, activityRes, exerciseRes] = await Promise.allSettled([
+      getCurrentUser(token),
+      getVitals({ limit: 100 }, token),
+      getLipidRecords({ limit: 100 }, token),
+      getKidneyRecords({ limit: 100 }, token),
+      getTodayActivity(token),
+      getExerciseLogs({ limit: 30 }, token),
+    ]);
+
+    const user = userRes.status === "fulfilled" ? userRes.value : null;
+    const vitals = vitalsRes.status === "fulfilled" ? vitalsRes.value.data.items : [];
+    const lipids = lipidRes.status === "fulfilled" ? lipidRes.value.data : [];
+    const kidneys = kidneyRes.status === "fulfilled" ? kidneyRes.value.data : [];
+    const activity = activityRes.status === "fulfilled" ? activityRes.value.data : null;
+    const exercises = exerciseRes.status === "fulfilled" ? exerciseRes.value.data.items : [];
+
+    const latestBp = latestByDate(vitals.filter((item) => item.measure_type.startsWith("BP_")), (item) => item.measured_at);
+    const latestFasting = latestByDate(vitals.filter((item) => item.measure_type === "GLUCOSE_FASTING"), (item) => item.measured_at);
+    const latestPostprandial = latestByDate(
+      vitals.filter((item) => item.measure_type === "GLUCOSE_POSTPRANDIAL"),
+      (item) => item.measured_at,
+    );
+    const latestLipid = latestByDate(lipids, (item) => item.record_date || item.created_at);
+    const latestKidney = latestByDate(kidneys, (item) => item.record_date || item.measured_date || item.created_at);
+    const recentExerciseMinutes = exercises[0]?.duration_minutes ?? activity?.exercise_minutes ?? null;
+
+    const sbp = latestBp?.sbp ?? latestBp?.systolic ?? null;
+    const dbp = latestBp?.dbp ?? latestBp?.diastolic ?? null;
+    const fasting = latestFasting?.glucose ?? latestFasting?.glucose_value ?? null;
+    const postprandial = latestPostprandial?.glucose ?? latestPostprandial?.glucose_value ?? null;
+    const weight = user?.weight ?? latestLipid?.weight ?? null;
+    const egfr = latestKidney?.egfr ?? null;
+    const ldl = latestLipid?.ldl_cholesterol ?? latestLipid?.ldl ?? null;
+    const hdl = latestLipid?.hdl_cholesterol ?? latestLipid?.hdl ?? null;
+    const triglycerides = latestLipid?.triglycerides ?? null;
+
+    setCurrentLabels({
+      target_systolic_bp: sbp && dbp ? `${sbp}/${dbp}` : "—",
+      target_fasting_glucose: fasting != null ? String(fasting) : "—",
+      target_postprandial_glucose: postprandial != null ? String(postprandial) : "—",
+      target_ldl_cholesterol: ldl != null ? String(ldl) : "—",
+      target_hdl_cholesterol: hdl != null ? String(hdl) : "—",
+      target_triglycerides: triglycerides != null ? String(triglycerides) : "—",
+      target_weight_kg: weight != null ? String(weight) : "—",
+      target_egfr: egfr != null ? String(egfr) : "—",
+      target_steps: activity?.steps != null ? String(activity.steps) : "—",
+      target_exercise_minutes: recentExerciseMinutes != null ? String(recentExerciseMinutes) : "—",
+      target_water_ml: activity?.water_ml != null ? String(activity.water_ml) : "—",
+      target_sleep_hours: activity?.sleep_hours != null ? String(activity.sleep_hours) : "—",
+    });
+
+    setSuggestions({
+      target_systolic_bp: achievableLower(sbp, 120, 10),
+      target_diastolic_bp: achievableLower(dbp, 80, 5),
+      target_fasting_glucose: achievableLower(fasting, 95, 10),
+      target_postprandial_glucose: achievableLower(postprandial, 140, 20),
+      target_ldl_cholesterol: achievableLower(ldl, 100, 20),
+      target_hdl_cholesterol: achievableHigher(hdl, user?.gender === "MALE" ? 40 : 50, 5),
+      target_triglycerides: achievableLower(triglycerides, 150, 30),
+      target_weight_kg: weight != null && weight > 0 ? String(roundTo(Math.max(30, weight - Math.min(3, weight * 0.05)), 1)) : "",
+      target_egfr: achievableHigher(egfr, 90, 5, 1),
+      target_steps: String(Math.min(10000, Math.max(5000, (activity?.steps ?? 4000) + 1000))),
+      target_exercise_minutes: String(Math.min(60, Math.max(20, (recentExerciseMinutes ?? 10) + 10))),
+      target_water_ml: String(Math.min(2000, Math.max(1200, (activity?.water_ml ?? 900) + 300))),
+      target_sleep_hours: String(roundTo(Math.min(8, Math.max(6.5, Number(activity?.sleep_hours ?? 6) + 0.5)), 1)),
+    });
+  }
 
   function initDraft(g: HealthGoals) {
     const cdg: Partial<Record<CdgKey, string>> = {};
@@ -181,7 +283,7 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
             <div key={key} className="goal-edit-row">
               <span className="goal-edit-item-label">{label}</span>
               <span className="goal-edit-unit-col">{unit}</span>
-              <span className="goal-edit-current">{CURRENT_LABELS[key] ?? "—"}</span>
+              <span className="goal-edit-current">{currentLabels[key] ?? "—"}</span>
               <div className="goal-edit-input-wrap">
                 {key === "target_systolic_bp" ? (
                   <div className="goal-edit-bp-wrap">
@@ -191,7 +293,7 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
                       min={0}
                       className="goal-edit-input"
                       value={cdgDraft.target_systolic_bp ?? ""}
-                      placeholder="수축기"
+                      placeholder={suggestions.target_systolic_bp || "수축기"}
                       onChange={(e) =>
                         setCdgDraft((p) => ({ ...p, target_systolic_bp: normalizeNonNegativeInput(e.target.value) }))
                       }
@@ -203,7 +305,7 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
                       min={0}
                       className="goal-edit-input"
                       value={cdgDraft.target_diastolic_bp ?? ""}
-                      placeholder="이완기"
+                      placeholder={suggestions.target_diastolic_bp || "이완기"}
                       onChange={(e) =>
                         setCdgDraft((p) => ({ ...p, target_diastolic_bp: normalizeNonNegativeInput(e.target.value) }))
                       }
@@ -216,7 +318,7 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
                     min={0}
                     className="goal-edit-input"
                     value={cdgDraft[key] ?? ""}
-                    placeholder="미설정"
+                    placeholder={suggestions[key] || "미설정"}
                     onChange={(e) =>
                       setCdgDraft((p) => ({ ...p, [key]: normalizeNonNegativeInput(e.target.value) }))
                     }
@@ -245,7 +347,7 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
             <div key={key} className="goal-edit-row">
               <span className="goal-edit-item-label">{label}</span>
               <span className="goal-edit-unit-col">{unit}</span>
-              <span className="goal-edit-current">{CURRENT_LABELS[key] ?? "—"}</span>
+              <span className="goal-edit-current">{currentLabels[key] ?? "—"}</span>
               <div className="goal-edit-input-wrap">
                 <input
                   type="number"
@@ -253,7 +355,7 @@ export function GoalEditPage({ onNavigate }: GoalEditPageProps) {
                   min={0}
                   className="goal-edit-input"
                   value={lgDraft[key] ?? ""}
-                  placeholder="미설정"
+                  placeholder={suggestions[key] || "미설정"}
                   onChange={(e) => setLgDraft((p) => ({ ...p, [key]: normalizeNonNegativeInput(e.target.value) }))}
                 />
               </div>

@@ -47,11 +47,22 @@ class HomeHealthMetricSummaryResponse(BaseModel):
     obesity: MetricAssessmentItemResponse
 
 
+class HomeVitalSummaryResponse(BaseModel):
+    blood_pressure_label: str
+    blood_pressure_status: Literal["NORMAL", "CAUTION", "HIGH", "NEEDS_INPUT"]
+    blood_pressure_value: str | None = None
+    glucose_label: str
+    glucose_status: Literal["NORMAL", "CAUTION", "HIGH", "NEEDS_INPUT"]
+    glucose_value: str | None = None
+    has_today_health_record: bool = False
+
+
 class HomeSummaryResponse(BaseModel):
     today_score: HomeHealthScoreResponse
     recent_prediction: HomeRecentPredictionResponse | None
     today_advice: HomeTodayAdviceResponse
     challenge_summary: HomeChallengeSummaryResponse
     health_metric_summary: HomeHealthMetricSummaryResponse
+    vital_summary: HomeVitalSummaryResponse
     quick_record_status: HomeHealthRecordStatusResponse
     unread_notification_count: int = 0

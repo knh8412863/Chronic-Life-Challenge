@@ -28,6 +28,15 @@ export type HomeSummary = {
     dyslipidemia: MetricAssessment;
     obesity: MetricAssessment;
   };
+  vital_summary: {
+    blood_pressure_label: string;
+    blood_pressure_status: "NORMAL" | "CAUTION" | "HIGH" | "NEEDS_INPUT";
+    blood_pressure_value: string | null;
+    glucose_label: string;
+    glucose_status: "NORMAL" | "CAUTION" | "HIGH" | "NEEDS_INPUT";
+    glucose_value: string | null;
+    has_today_health_record: boolean;
+  };
   quick_record_status: {
     has_health_survey: boolean;
     has_lipid_obesity_record: boolean;
@@ -38,8 +47,8 @@ export type HomeSummary = {
 
 export type MetricAssessment = {
   status: string;
-  label: string;
-  message: string;
+  reasons: string[];
+  missing_fields: string[];
 };
 
 export async function getHomeSummary(token?: string) {

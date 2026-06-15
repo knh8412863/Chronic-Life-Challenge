@@ -26,6 +26,19 @@ export const EXERCISE_TYPES: ExerciseTypeCode[] = [
   "ETC",
 ];
 
+export const EXERCISE_MET_VALUES: Record<ExerciseTypeCode, number> = {
+  WALKING: 3.5,
+  RUNNING: 8.3,
+  CYCLING: 6.8,
+  SWIMMING: 8.0,
+  ETC: 4.0,
+};
+
+export function estimateCaloriesBurned(exerciseType: ExerciseTypeCode, durationMinutes: number, weightKg?: number | null) {
+  if (!weightKg || weightKg <= 0 || durationMinutes <= 0) return null;
+  return Math.round(EXERCISE_MET_VALUES[exerciseType] * weightKg * (durationMinutes / 60));
+}
+
 export type ExerciseLog = {
   id: number;
   exercise_log_id?: number;

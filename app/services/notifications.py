@@ -23,6 +23,78 @@ PUSH_DETAIL_FIELDS = {
 
 
 class NotificationService:
+    async def create_notification(
+        self,
+        user_id: int,
+        notification_type: NotificationType,
+        title: str,
+        message: str,
+        link_url: str | None = None,
+    ) -> Notification | None:
+        preference = await NotificationPreference.get_or_none(user_id=user_id)
+        if preference is not None and not self._preference_allows(preference, notification_type):
+            return None
+
+        return await Notification.create(
+            user_id=user_id,
+            notification_type=notification_type.value,
+            title=title,
+            message=message,
+            link_url=link_url,
+        )
+
+    async def notify_prediction_result(
+        self, user_id: int, result_id: int, overall_risk_level: str
+    ) -> Notification | None:
+        is_high = overall_risk_level == "HIGH"
+        return await self.create_notification(
+            user_id=user_id,
+            notification_type=NotificationType.PREDICTION,
+            title="예측 결과가 도착했습니다.",
+            message=(
+                "고위험 신호가 포함된 예측 결과가 있습니다. 결과를 확인해 주세요."
+                if is_high
+                else "새로운 질환 예측 결과를 확인할 수 있습니다."
+            ),
+            link_url=f"/prediction/result?result_id={result_id}",
+        )
+
+    async def notify_advice_created(self, user_id: int, advice_id: int) -> Notification | None:
+        return await self.create_notification(
+            user_id=user_id,
+            notification_type=NotificationType.ADVICE,
+            title="오늘의 조언이 생성되었습니다.",
+            message="오늘 입력한 건강 데이터를 바탕으로 맞춤 조언을 확인해 보세요.",
+            link_url=f"/advices/today?advice_id={advice_id}",
+        )
+
+    async def notify_challenge_checkin(
+        self,
+        user_id: int,
+        challenge_title: str,
+        completed: bool = False,
+    ) -> Notification | None:
+        return await self.create_notification(
+            user_id=user_id,
+            notification_type=NotificationType.CHALLENGE,
+            title="챌린지 완료!" if completed else "챌린지 체크인이 완료되었습니다.",
+            message=(
+                f"{challenge_title} 챌린지를 모두 완료했습니다."
+                if completed
+                else f"{challenge_title} 오늘 미션을 완료했습니다."
+            ),
+            link_url="/challenges/my",
+        )
+
+    async def notify_weekly_report_created(self, user_id: int, report_id: int) -> Notification | None:
+        return await self.create_notification(
+            user_id=user_id,
+            notification_type=NotificationType.REPORT,
+            title="주간 건강 리포트가 생성되었습니다.",
+            message="이번 주 건강 기록과 챌린지 실천 현황을 확인해 보세요.",
+            link_url=f"/reports/detail?report_id={report_id}",
+        )
+
     async def get_notifications(
         self, user: User, limit: int = 20, unread_only: bool = False
     ) -> list[NotificationResponse]:
@@ -64,9 +136,11 @@ class NotificationService:
     ) -> NotificationPreferenceResponse:
         preference = await self._get_or_create_preference(user)
         payload = self._normalize_preference_update(data.model_dump(exclude_none=True))
+        if not payload:
+            return self._to_preference_response(preference)
         for field, value in payload.items():
             setattr(preference, field, value)
-        await preference.save(update_fields=[*payload.keys(), "updated_at"] if payload else ["updated_at"])
+        await preference.save(update_fields=[*payload.keys(), "updated_at"])
         return self._to_preference_response(preference)
 
     @staticmethod
@@ -105,6 +179,20 @@ class NotificationService:
             for field in PUSH_DETAIL_FIELDS:
                 payload[field] = False
         return payload
+
+    @staticmethod
+    def _preference_allows(preference: NotificationPreference, notification_type: NotificationType) -> bool:
+        if notification_type == NotificationType.PREDICTION:
+            return preference.push_enabled and preference.prediction_result_enabled
+        if notification_type == NotificationType.CHALLENGE:
+            return preference.push_enabled and preference.challenge_mission_enabled
+        if notification_type == NotificationType.ADVICE:
+            return preference.push_enabled and preference.advice_update_enabled
+        if notification_type == NotificationType.REPORT:
+            return preference.weekly_report_enabled
+        if notification_type == NotificationType.GENERAL:
+            return preference.important_notice_enabled
+        return True
 
     @staticmethod
     def _to_preference_response(preference: NotificationPreference) -> NotificationPreferenceResponse:

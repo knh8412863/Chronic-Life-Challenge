@@ -15,6 +15,26 @@ def test_week_range_starts_on_monday_and_ends_on_sunday():
     assert week_end == date(2026, 6, 7)
 
 
+def test_weekly_report_trend_uses_previous_week_source_data_without_report():
+    previous_source_summary = {
+        "health_survey_count": 0,
+        "lipid_obesity_record_count": 0,
+        "renal_record_count": 0,
+        "vital_record_count": 1,
+        "activity_log_count": 0,
+        "exercise_log_count": 0,
+        "meal_log_count": 0,
+        "prediction_count": 0,
+        "challenge_checkin_count": 0,
+    }
+
+    trend = WeeklyReportService._build_trend_summary(None, previous_source_summary)
+
+    assert trend["status"] == "UNCHANGED"
+    assert trend["previous_week_report_id"] is None
+    assert "전주 건강 기록 1건" in trend["message"]
+
+
 def test_rule_based_report_text_describes_missing_records():
     source_summary = {
         "health_survey_count": 0,

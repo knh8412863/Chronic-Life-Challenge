@@ -4,6 +4,7 @@ import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
 import { ApiError } from "../../api/client";
 import { verifyCurrentUserPassword } from "../../api/users";
+import { PasswordToggleButton } from "../../components/common/PasswordToggleButton";
 
 interface MyPagePasswordVerifyPageProps {
   onNavigate: (route: AppRoute) => void;
@@ -66,13 +67,7 @@ export function MyPagePasswordVerifyPage({ onNavigate, onVerified, targetRoute }
               autoFocus
               style={{ width: "100%", height: 44, border: "1.5px solid #ddd", borderRadius: 8, padding: "0 44px 0 12px", fontSize: 16, boxSizing: "border-box", outline: "none" }}
             />
-            <button
-              type="button"
-              onClick={() => setShowPassword((prev) => !prev)}
-              style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", border: "none", background: "none", cursor: "pointer", fontSize: 15, color: "#777" }}
-            >
-              {showPassword ? "숨김" : "보기"}
-            </button>
+            <PasswordToggleButton isVisible={showPassword} onToggle={() => setShowPassword((prev) => !prev)} />
           </div>
 
           {message && <p style={{ fontSize: 14, color: "#c62828", margin: "0 0 14px" }}>{message}</p>}

@@ -2,6 +2,7 @@ import { apiRequest } from "./client";
 
 const ACCESS_TOKEN_KEY = "access_token";
 const LEGACY_ACCESS_TOKEN_KEY = "accessToken";
+const ONBOARDING_ACCESS_TOKEN_KEY = "auth.onboardingAccessToken";
 const MYPAGE_VERIFIED_AT_KEY = "mypage_verified_at";
 
 export type LoginPayload = {
@@ -50,6 +51,7 @@ export type SignUpPayload = {
 export function getStoredAccessToken() {
   return (
     sessionStorage.getItem(ACCESS_TOKEN_KEY) ??
+    localStorage.getItem(ONBOARDING_ACCESS_TOKEN_KEY) ??
     localStorage.getItem(ACCESS_TOKEN_KEY) ??
     localStorage.getItem(LEGACY_ACCESS_TOKEN_KEY) ??
     undefined
@@ -60,9 +62,18 @@ export function storeAccessToken(accessToken: string, persist = false) {
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
+  localStorage.removeItem(ONBOARDING_ACCESS_TOKEN_KEY);
 
   const storage = persist ? localStorage : sessionStorage;
   storage.setItem(ACCESS_TOKEN_KEY, accessToken);
+}
+
+export function storeOnboardingAccessToken(accessToken: string) {
+  localStorage.setItem(ONBOARDING_ACCESS_TOKEN_KEY, accessToken);
+}
+
+export function clearOnboardingAccessToken() {
+  localStorage.removeItem(ONBOARDING_ACCESS_TOKEN_KEY);
 }
 
 export function clearStoredAccessToken() {
@@ -70,6 +81,7 @@ export function clearStoredAccessToken() {
   sessionStorage.removeItem(MYPAGE_VERIFIED_AT_KEY);
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(LEGACY_ACCESS_TOKEN_KEY);
+  localStorage.removeItem(ONBOARDING_ACCESS_TOKEN_KEY);
 }
 
 export function login(payload: LoginPayload) {

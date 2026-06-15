@@ -17,6 +17,7 @@ from app.models.advices import AdviceFeedback, LLMAdvice
 from app.models.predictions import ActivityLog, ChronicHealthInput, ExerciseLog, MealLog, PredictionResult, VitalRecord
 from app.models.users import User
 from app.services.llm_advice import OPENAI_PROVIDER, AdviceLLMError, AdviceLLMResult, OpenAIAdviceClient
+from app.services.notifications import NotificationService
 from app.services.predictions import HealthInputService
 
 RULE_BASED_PROVIDER = "RULE_BASED"
@@ -29,15 +30,21 @@ MAX_DAILY_MANUAL_REGENERATIONS = 2
 
 class AdviceService:
     async def get_today(self, user: User) -> DailyAdviceResponse:
-        today = date.today()
+        today = HealthInputService._today()
         advice = await self._latest_advice(user.id, today)
         if advice is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="오늘 생성된 조언이 없습니다.")
+        latest_record_at = await self._latest_today_record_at(user.id, today)
+        if latest_record_at is not None and advice.created_at < latest_record_at:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="오늘 건강 기록이 갱신되었습니다. 조언을 새로 받아보세요.",
+            )
         remaining = await self._remaining_manual_regeneration_count(user.id, today)
         return self._to_response(advice, generated=False, remaining_regeneration_count=remaining)
 
     async def generate_today(self, user: User, data: AdviceGenerateRequest) -> DailyAdviceResponse:
-        today = date.today()
+        today = HealthInputService._today()
         if data.trigger_type == AdviceTriggerType.AUTO:
             existing = await LLMAdvice.filter(
                 user_id=user.id,
@@ -56,6 +63,8 @@ class AdviceService:
                 )
 
         context = await self._build_context(user)
+        if data.trigger_type == AdviceTriggerType.MANUAL:
+            context["manual_generation_no"] = MAX_DAILY_MANUAL_REGENERATIONS - remaining + 1
         llm_result = await self._generate_llm_advice(context)
         advice_text = llm_result.advice_text if llm_result else self._build_rule_based_advice(context)
         advice = await LLMAdvice.create(
@@ -71,6 +80,7 @@ class AdviceService:
             cache_read_tokens=llm_result.cache_read_tokens if llm_result else 0,
             trigger_type=data.trigger_type.value,
         )
+        await NotificationService().notify_advice_created(user_id=user.id, advice_id=advice.id)
         remaining = await self._remaining_manual_regeneration_count(user.id, today)
         return self._to_response(advice, generated=True, remaining_regeneration_count=remaining)
 
@@ -129,7 +139,7 @@ class AdviceService:
             await PredictionResult.filter(user_id=user.id).order_by("-created_at").prefetch_related("items").first()
         )
         metric_assessment = await HealthInputService().get_metric_assessments(user)
-        today = date.today()
+        today = HealthInputService._today()
         today_vitals = await VitalRecord.filter(user_id=user.id, record_date=today).order_by("-measured_at", "-id")
         today_activity = await ActivityLog.filter(user_id=user.id, record_date=today).order_by("-created_at", "-id")
         today_exercises = await ExerciseLog.filter(user_id=user.id, exercise_date=today).order_by("-created_at", "-id")
@@ -209,12 +219,18 @@ class AdviceService:
             parts.append("지질 수치 관리를 위해 튀김·가공식품 섭취를 줄여보세요.")
 
         today_records = context.get("today_records", {})
-        if not today_records.get("vitals"):
+        manual_generation_no = context.get("manual_generation_no", 1)
+        if today_records.get("vitals"):
+            parts.append("오늘 입력한 혈압·혈당 기록을 기준으로 수치 변화를 확인했습니다.")
+        else:
             parts.append("오늘 혈압 또는 혈당 기록을 입력하면 조언 정확도가 높아집니다.")
         if today_records.get("exercise_minutes", 0) < 30:
             parts.append("오늘은 30분 걷기나 가벼운 운동을 우선 목표로 잡아보세요.")
         if today_records.get("meals"):
             parts.append("오늘 식단 기록을 기준으로 저염·저당 선택을 이어가 보세요.")
+
+        if manual_generation_no == 2:
+            parts.append("두 번째 조언에서는 오늘 남은 시간 동안 가장 실천하기 쉬운 한 가지부터 선택해 보세요.")
 
         shingles = AdviceService._shingles_vaccination_advice(context)
         if shingles:
@@ -222,6 +238,32 @@ class AdviceService:
 
         parts.append("본 조언은 진단이 아니며, 증상이나 우려가 있으면 전문의와 상담하세요.")
         return AdviceService._limit_text(" ".join(parts), MAX_ADVICE_LENGTH)
+
+    @staticmethod
+    async def _latest_today_record_at(user_id: int, today: date):
+        latest_vital = (
+            await VitalRecord.filter(user_id=user_id, record_date=today).order_by("-updated_at", "-created_at").first()
+        )
+        latest_activity = (
+            await ActivityLog.filter(user_id=user_id, record_date=today).order_by("-updated_at", "-created_at").first()
+        )
+        latest_exercise = (
+            await ExerciseLog.filter(user_id=user_id, exercise_date=today)
+            .order_by("-updated_at", "-created_at")
+            .first()
+        )
+        latest_meal = await MealLog.filter(user_id=user_id, meal_date=today).order_by("-created_at").first()
+        datetimes = [
+            value
+            for value in [
+                latest_vital.updated_at if latest_vital else None,
+                latest_activity.updated_at if latest_activity else None,
+                latest_exercise.updated_at if latest_exercise else None,
+                latest_meal.created_at if latest_meal else None,
+            ]
+            if value is not None
+        ]
+        return max(datetimes) if datetimes else None
 
     @staticmethod
     def _shingles_vaccination_advice(context: dict[str, Any]) -> str | None:
@@ -235,9 +277,11 @@ class AdviceService:
     @staticmethod
     def _prompt_summary(context: dict[str, Any]) -> str:
         at_risk = AdviceService._disease_names(context.get("at_risk_diseases", []))
+        generation_no = context.get("manual_generation_no")
+        suffix = f" / 수동 생성 {generation_no}회차" if generation_no else ""
         if at_risk:
-            return f"위험 신호: {', '.join(at_risk)}"
-        return "위험 신호 없음 또는 예측 결과 없음"
+            return f"위험 신호: {', '.join(at_risk)}{suffix}"
+        return f"위험 신호 없음 또는 예측 결과 없음{suffix}"
 
     @staticmethod
     async def _generate_llm_advice(context: dict[str, Any]) -> AdviceLLMResult | None:

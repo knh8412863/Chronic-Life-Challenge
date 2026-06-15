@@ -124,3 +124,15 @@ export async function saveActivity(body: SaveActivityBody, token?: string) {
     token,
   });
 }
+
+export async function updateActivityLog(id: number, body: SaveActivityBody, token?: string) {
+  return apiRequest<{ data: DailyActivity }>(`/health/activity-logs/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(toApiActivityBody(body)),
+    token,
+  });
+}
+
+export async function deleteActivityLog(id: number, token?: string) {
+  return apiRequest<void>(`/health/activity-logs/${id}`, { method: "DELETE", token });
+}

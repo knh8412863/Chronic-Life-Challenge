@@ -2,6 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppRoute } from "../../App";
 import { ApiError } from "../../api/client";
 import { googleLogin, login, storeAccessToken } from "../../api/auth";
+import { getLatestHealthSurveyInput } from "../../api/predictions";
+import { getCurrentUser } from "../../api/users";
+import { PasswordToggleButton } from "../../components/common/PasswordToggleButton";
 import { icons } from "../../utils/iconAssets";
 
 interface LoginPageProps {
@@ -14,6 +17,7 @@ type GoogleCredentialResponse = {
 };
 
 const GOOGLE_SIGNUP_DRAFT_KEY = "auth.googleSignupDraft";
+const ONBOARDING_PROFILE_KEY = "auth.onboardingProfile";
 
 function extractRemainingAttempts(detail: unknown): number | null {
   if (typeof detail !== "string") return null;
@@ -34,6 +38,14 @@ function decodeGoogleCredential(credential: string): { email?: string; name?: st
   } catch {
     return {};
   }
+}
+
+function toSignupName(value?: string) {
+  const normalized = (value ?? "")
+    .replace(/[^\uAC00-\uD7A3a-zA-Z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized.length >= 2 ? normalized.slice(0, 20) : "";
 }
 
 declare global {
@@ -117,6 +129,22 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
           remember_me: rememberMe,
         });
         storeAccessToken(loginResponse.access_token, rememberMe);
+        try {
+          await getLatestHealthSurveyInput(loginResponse.access_token);
+        } catch (error) {
+          if (error instanceof ApiError && error.status === 404) {
+            const user = await getCurrentUser(loginResponse.access_token);
+            const onboardingProfile = JSON.stringify({
+              birth_date: user.birthday,
+              gender: user.gender,
+              managed_diseases: user.managed_diseases,
+            });
+            sessionStorage.setItem(ONBOARDING_PROFILE_KEY, onboardingProfile);
+            localStorage.setItem(ONBOARDING_PROFILE_KEY, onboardingProfile);
+            onNavigate?.("/health-survey");
+            return;
+          }
+        }
         setErrorCount(0);
         onLogin();
       } catch (error) {
@@ -128,7 +156,7 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
               JSON.stringify({
                 id_token: response.credential,
                 email: profile.email ?? "",
-                name: profile.name ?? "",
+                name: toSignupName(profile.name),
                 picture: profile.picture ?? "",
                 remember_me: rememberMe,
               }),
@@ -290,10 +318,7 @@ export function LoginPage({ onLogin, onNavigate }: LoginPageProps) {
                 placeholder="비밀번호 입력"
                 style={{ width: "100%", height: 34, border: `1.5px solid ${errorCount > 0 ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }}
               />
-              <button onClick={() => setShowPassword(!showPassword)}
-                style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 15, color: "#888" }}>
-                {showPassword ? "🙈" : "👁"}
-              </button>
+              <PasswordToggleButton isVisible={showPassword} onToggle={() => setShowPassword(!showPassword)} />
             </div>
             {errorMessage && errorCount !== 1 && (
               <p style={{ fontSize: 15, color: "#E24B4A", margin: "4px 0 0" }}>{errorMessage}</p>

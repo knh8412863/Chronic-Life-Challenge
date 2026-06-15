@@ -34,6 +34,7 @@ from app.dtos.predictions import (
     LifestyleGoalResponse,
     LipidObesityRecordCreateRequest,
     LipidObesityRecordResponse,
+    LipidObesityRecordUpdateRequest,
     MealDailySummaryResponse,
     MealLogCreateRequest,
     MealLogCreateResponse,
@@ -54,6 +55,7 @@ from app.dtos.predictions import (
     PredictionTaskStatusResponse,
     RenalRecordCreateRequest,
     RenalRecordResponse,
+    RenalRecordUpdateRequest,
     VitalMeasureType,
     VitalRecordCreateRequest,
     VitalRecordDetailResponse,
@@ -86,6 +88,7 @@ from app.models.predictions import (
     VitalRecord,
 )
 from app.models.users import Gender, User
+from app.services.notifications import NotificationService
 
 DISCLAIMER = "본 결과는 의료 진단이 아닌 참고 지표입니다. 증상이나 우려가 있다면 전문의와 상담해 주세요."
 MODELS_DIR = Path(__file__).resolve().parents[2] / "ai_worker" / "models"
@@ -116,6 +119,13 @@ DEFAULT_LIFESTYLE_GOAL = {
     "target_exercise_minutes": 30,
     "target_sleep_hours": None,
     "target_diet_score": None,
+}
+EXERCISE_MET_VALUES = {
+    "WALKING": Decimal("3.5"),
+    "RUNNING": Decimal("8.3"),
+    "CYCLING": Decimal("6.8"),
+    "SWIMMING": Decimal("8.0"),
+    "ETC": Decimal("4.0"),
 }
 
 
@@ -274,6 +284,61 @@ class HealthInputService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="지질·비만 기록을 찾을 수 없습니다.")
         return self._to_lipid_obesity_record(record)
 
+    async def update_lipid_obesity_record(
+        self,
+        user: User,
+        record_id: int,
+        data: LipidObesityRecordUpdateRequest,
+    ) -> LipidObesityRecordResponse:
+        record = await LipidObesityRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="지질·비만 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+
+        update_data = data.model_dump(exclude_unset=True)
+        next_record_date = update_data.get("record_date", record.record_date)
+        if next_record_date != self._today():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="당일 기록만 수정할 수 있습니다.")
+
+        for request_field, model_field in [
+            ("record_date", "record_date"),
+            ("total_cholesterol", "total_cholesterol"),
+            ("hdl_cholesterol", "hdl_cholesterol"),
+            ("ldl_cholesterol", "ldl_cholesterol"),
+            ("triglycerides", "triglycerides"),
+            ("waist_circumference", "waist_circumference"),
+            ("memo", "memo"),
+        ]:
+            if request_field in update_data:
+                setattr(record, model_field, update_data[request_field])
+
+        if "height" in update_data:
+            record.height_cm = self._optional_decimal(update_data["height"])
+        if "weight" in update_data:
+            record.weight_kg = self._optional_decimal(update_data["weight"])
+        if "height" in update_data or "weight" in update_data:
+            record.bmi = (
+                _calculate_bmi(float(record.height_cm), float(record.weight_kg))
+                if record.height_cm is not None and record.weight_kg is not None
+                else None
+            )
+            if record.bmi is not None:
+                await UserProfile.filter(user_id=user.id).update(
+                    height_cm=record.height_cm,
+                    weight_kg=record.weight_kg,
+                    bmi=record.bmi,
+                )
+
+        await record.save()
+        return self._to_lipid_obesity_record(record)
+
+    async def delete_lipid_obesity_record(self, user: User, record_id: int) -> None:
+        record = await LipidObesityRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="지질·비만 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+        await record.delete()
+
     async def get_renal_records(self, user: User, limit: int = 20) -> list[RenalRecordResponse]:
         records = await RenalRecord.filter(user_id=user.id).order_by("-record_date", "-created_at").limit(limit)
         return [self._to_renal_record(record) for record in records]
@@ -283,6 +348,41 @@ class HealthInputService:
         if record is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신장 기록을 찾을 수 없습니다.")
         return self._to_renal_record(record)
+
+    async def update_renal_record(
+        self,
+        user: User,
+        record_id: int,
+        data: RenalRecordUpdateRequest,
+    ) -> RenalRecordResponse:
+        record = await RenalRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신장 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+
+        update_data = data.model_dump(exclude_unset=True)
+        next_record_date = update_data.get("record_date", record.record_date)
+        if next_record_date != self._today():
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="당일 기록만 수정할 수 있습니다.")
+
+        if "record_date" in update_data:
+            record.record_date = update_data["record_date"]
+        for field in ["creatinine", "egfr", "bun"]:
+            if field in update_data:
+                setattr(record, field, self._optional_decimal(update_data[field]))
+        for field in ["urine_protein_pos", "memo"]:
+            if field in update_data:
+                setattr(record, field, update_data[field])
+
+        await record.save()
+        return self._to_renal_record(record)
+
+    async def delete_renal_record(self, user: User, record_id: int) -> None:
+        record = await RenalRecord.get_or_none(id=record_id, user_id=user.id)
+        if record is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="신장 기록을 찾을 수 없습니다.")
+        self._ensure_today_record(record.record_date)
+        await record.delete()
 
     async def create_vital_record(self, user: User, data: VitalRecordCreateRequest) -> OptionalRecordCreateResponse:
         await self._ensure_daily_health_record_limit(user.id, data.measured_at.date())
@@ -505,12 +605,18 @@ class HealthInputService:
 
     async def create_exercise_log(self, user: User, data: ExerciseLogCreateRequest) -> OptionalRecordCreateResponse:
         await self._ensure_daily_health_record_limit(user.id, data.exercise_date)
+        calories_burned = await self._resolve_exercise_calories(
+            user=user,
+            exercise_type=data.exercise_type.value,
+            duration_minutes=data.duration_minutes,
+            calories_burned=data.calories_burned,
+        )
         record = await ExerciseLog.create(
             user=user,
             exercise_date=data.exercise_date,
             exercise_type=data.exercise_type.value,
             duration_minutes=data.duration_minutes,
-            calories_burned=data.calories_burned,
+            calories_burned=calories_burned,
             memo=data.memo,
         )
         return OptionalRecordCreateResponse(record_id=record.id, created_at=record.created_at)
@@ -563,6 +669,16 @@ class HealthInputService:
 
         if "exercise_type" in update_data:
             record.exercise_type = update_data["exercise_type"].value
+        if "exercise_type" in update_data or "duration_minutes" in update_data or "calories_burned" in update_data:
+            exercise_type = update_data.get("exercise_type", ExerciseType(record.exercise_type))
+            exercise_type_value = exercise_type.value if isinstance(exercise_type, ExerciseType) else str(exercise_type)
+            duration_minutes = update_data.get("duration_minutes", record.duration_minutes)
+            update_data["calories_burned"] = await self._resolve_exercise_calories(
+                user=user,
+                exercise_type=exercise_type_value,
+                duration_minutes=duration_minutes,
+                calories_burned=update_data.get("calories_burned"),
+            )
         for field in ["exercise_date", "duration_minutes", "calories_burned", "memo"]:
             if field in update_data:
                 setattr(record, field, update_data[field])
@@ -959,6 +1075,31 @@ class HealthInputService:
         )
 
     @staticmethod
+    async def _resolve_exercise_calories(
+        user: User,
+        exercise_type: str,
+        duration_minutes: int,
+        calories_burned: int | None,
+    ) -> int:
+        if calories_burned is not None:
+            return calories_burned
+        weight_kg = await HealthInputService._exercise_weight_kg(user)
+        if weight_kg is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                detail="소모 칼로리 자동 계산을 위해 건강 프로필에서 체중을 먼저 입력해 주세요.",
+            )
+        met = EXERCISE_MET_VALUES.get(exercise_type, EXERCISE_MET_VALUES["ETC"])
+        return int((met * weight_kg * Decimal(duration_minutes) / Decimal(60)).to_integral_value())
+
+    @staticmethod
+    async def _exercise_weight_kg(user: User) -> Decimal | None:
+        profile = await UserProfile.get_or_none(user_id=user.id)
+        if profile and profile.weight_kg is not None:
+            return Decimal(str(profile.weight_kg))
+        return None
+
+    @staticmethod
     def _to_meal_log(record: MealLog) -> MealLogResponse:
         return MealLogResponse(
             meal_log_id=record.id,
@@ -1248,9 +1389,10 @@ class HealthInputService:
         exercise_count = await ExerciseLog.filter(user_id=user_id, exercise_date=record_date).count()
         activity_count = await ActivityLog.filter(user_id=user_id, record_date=record_date).count()
         total = vital_count + lipid_count + renal_count + exercise_count + activity_count
-        if total >= 3:
+        if total >= 15:
             raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT, detail="하루 건강 기록은 3회까지 입력할 수 있습니다."
+                status_code=status.HTTP_409_CONFLICT,
+                detail="하루 건강 기록 입력은 최대 3회까지 가능합니다.",
             )
 
     @staticmethod
@@ -1268,29 +1410,28 @@ class HealthInputService:
 
 class PredictionService:
     async def create_task(self, user: User, data: PredictionTaskCreateRequest) -> PredictionTaskCreateResponse:
-        survey_snapshot = await PredictionInputSnapshot.get_or_none(id=data.health_input_id, user_id=user.id)
-        if survey_snapshot is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="건강 설문 입력을 찾을 수 없습니다.")
+        (
+            lipid,
+            renal,
+            latest_bp,
+            latest_glucose,
+            latest_activity,
+            latest_exercise,
+        ) = await self._latest_prediction_records(user.id)
+        survey_snapshot = await self._get_prediction_survey_snapshot(user.id, data.health_input_id)
+        if survey_snapshot is not None:
+            snapshot = await self._create_snapshot_from_survey(user, survey_snapshot, lipid, renal)
+        else:
+            snapshot = await self._create_snapshot_from_records(
+                user,
+                lipid,
+                renal,
+                latest_bp,
+                latest_glucose,
+                latest_activity,
+                latest_exercise,
+            )
 
-        lipid = await LipidObesityRecord.filter(user_id=user.id).order_by("-record_date", "-created_at").first()
-        renal = await RenalRecord.filter(user_id=user.id).order_by("-record_date", "-created_at").first()
-        survey_health = await ChronicHealthInput.get_or_none(
-            id=survey_snapshot.chronic_health_input_id, user_id=user.id
-        )
-        if survey_health is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="건강 설문 입력을 찾을 수 없습니다.")
-        missing_fields = self._missing_optional_measurements(survey_health, lipid, renal)
-
-        snapshot = await PredictionInputSnapshot.create(
-            user=user,
-            input_mode=survey_snapshot.input_mode,
-            chronic_health_input_id=survey_snapshot.chronic_health_input_id,
-            lifestyle_input_id=survey_snapshot.lifestyle_input_id,
-            lipid_obesity_record=lipid,
-            renal_record=renal,
-            used_default_values=bool(missing_fields),
-            missing_fields=missing_fields,
-        )
         task = await PredictionTask.create(
             user=user,
             task_uuid=str(uuid.uuid4()),
@@ -1304,6 +1445,180 @@ class PredictionService:
             status=PredictionStatus.PENDING.value,
             prediction_mode=task.prediction_mode.value,
         )
+
+    async def _get_prediction_survey_snapshot(
+        self,
+        user_id: int,
+        health_input_id: int | None,
+    ) -> PredictionInputSnapshot | None:
+        if health_input_id is not None:
+            snapshot = await PredictionInputSnapshot.get_or_none(id=health_input_id, user_id=user_id)
+            if snapshot is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="건강 설문 입력을 찾을 수 없습니다.")
+            return snapshot
+        return await PredictionInputSnapshot.filter(user_id=user_id).order_by("-created_at", "-id").first()
+
+    async def _create_snapshot_from_survey(
+        self,
+        user: User,
+        survey_snapshot: PredictionInputSnapshot,
+        lipid: LipidObesityRecord | None,
+        renal: RenalRecord | None,
+    ) -> PredictionInputSnapshot:
+        survey_health = await ChronicHealthInput.get_or_none(
+            id=survey_snapshot.chronic_health_input_id, user_id=user.id
+        )
+        if survey_health is None:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="건강 설문 입력을 찾을 수 없습니다.")
+        missing_fields = self._missing_optional_measurements(survey_health, lipid, renal)
+        return await PredictionInputSnapshot.create(
+            user=user,
+            input_mode=survey_snapshot.input_mode,
+            chronic_health_input_id=survey_snapshot.chronic_health_input_id,
+            lifestyle_input_id=survey_snapshot.lifestyle_input_id,
+            lipid_obesity_record=lipid,
+            renal_record=renal,
+            used_default_values=bool(missing_fields),
+            missing_fields=missing_fields,
+        )
+
+    async def _create_snapshot_from_records(
+        self,
+        user: User,
+        lipid: LipidObesityRecord | None,
+        renal: RenalRecord | None,
+        latest_bp: VitalRecord | None,
+        latest_glucose: VitalRecord | None,
+        latest_activity: ActivityLog | None,
+        latest_exercise: ExerciseLog | None,
+    ) -> PredictionInputSnapshot:
+        if not any([lipid, renal, latest_bp, latest_glucose, latest_activity, latest_exercise]):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="예측에 사용할 건강 수치 또는 건강설문 입력을 찾을 수 없습니다.",
+            )
+
+        profile = await UserProfile.get_or_none(user_id=user.id)
+        height, height_defaulted = self._prediction_height(user.gender, profile, lipid)
+        weight, weight_defaulted = self._prediction_weight(user.gender, profile, lipid)
+        bmi = _calculate_bmi(height, weight)
+        missing_fields = ["health_survey", "family_history"]
+        if height_defaulted:
+            missing_fields.append("height")
+        if weight_defaulted:
+            missing_fields.append("weight")
+
+        health = await ChronicHealthInput.create(
+            user=user,
+            age=_calculate_age(user.birthday),
+            gender=user.gender,
+            height=Decimal(str(height)),
+            weight=Decimal(str(weight)),
+            bmi=Decimal(str(bmi)),
+            waist_circumference=lipid.waist_circumference if lipid else None,
+            sbp=latest_bp.sbp if latest_bp else None,
+            dbp=latest_bp.dbp if latest_bp else None,
+            glucose_fasting=latest_glucose.glucose if latest_glucose else None,
+            diagnosed_diseases=[],
+            medications=[],
+            last_checkup_period=None,
+            fh_diabetes_father=False,
+            fh_diabetes_mother=False,
+            fh_diabetes_sibling=False,
+            fh_hypertension_father=False,
+            fh_hypertension_mother=False,
+            fh_hypertension_sibling=False,
+            family_history_ckd=False,
+        )
+        lifestyle = await LifestyleInput.create(
+            user=user,
+            smoking_status=0,
+            alcohol_frequency=latest_activity.alcohol_frequency
+            if latest_activity and latest_activity.alcohol_frequency is not None
+            else 0,
+            alcohol_amount=latest_activity.alcohol_amount if latest_activity else None,
+            walking_days=latest_activity.walking_days if latest_activity else None,
+            sedentary_hours=latest_activity.sedentary_hours if latest_activity else None,
+            exercise_frequency=1 if latest_exercise or (latest_activity and latest_activity.exercise_minutes) else 0,
+            physical_activity_min=self._latest_activity_minutes(latest_activity, latest_exercise),
+            sleep_hours=latest_activity.sleep_hours if latest_activity else None,
+            stress_level=latest_activity.stress_level if latest_activity else None,
+            diet_score=latest_activity.diet_score if latest_activity else None,
+        )
+        missing_fields.extend(self._missing_optional_measurements(health, lipid, renal))
+        missing_fields = sorted(set(missing_fields))
+        return await PredictionInputSnapshot.create(
+            user=user,
+            input_mode="BASIC",
+            chronic_health_input=health,
+            lifestyle_input=lifestyle,
+            lipid_obesity_record=lipid,
+            renal_record=renal,
+            used_default_values=True,
+            missing_fields=missing_fields,
+        )
+
+    @staticmethod
+    def _prediction_height(
+        gender: Gender,
+        profile: UserProfile | None,
+        lipid: LipidObesityRecord | None,
+    ) -> tuple[float, bool]:
+        if lipid and lipid.height_cm is not None:
+            return float(lipid.height_cm), False
+        if profile:
+            return float(profile.height_cm), False
+        return (170.0 if gender == Gender.MALE else 160.0), True
+
+    @staticmethod
+    def _prediction_weight(
+        gender: Gender,
+        profile: UserProfile | None,
+        lipid: LipidObesityRecord | None,
+    ) -> tuple[float, bool]:
+        if lipid and lipid.weight_kg is not None:
+            return float(lipid.weight_kg), False
+        if profile:
+            return float(profile.weight_kg), False
+        return (70.0 if gender == Gender.MALE else 55.0), True
+
+    @staticmethod
+    def _latest_activity_minutes(
+        latest_activity: ActivityLog | None,
+        latest_exercise: ExerciseLog | None,
+    ) -> int | None:
+        if latest_exercise is not None:
+            return latest_exercise.duration_minutes
+        if latest_activity is not None:
+            return latest_activity.exercise_minutes
+        return None
+
+    @staticmethod
+    async def _latest_prediction_records(
+        user_id: int,
+    ) -> tuple[
+        LipidObesityRecord | None,
+        RenalRecord | None,
+        VitalRecord | None,
+        VitalRecord | None,
+        ActivityLog | None,
+        ExerciseLog | None,
+    ]:
+        lipid = await LipidObesityRecord.filter(user_id=user_id).order_by("-record_date", "-created_at").first()
+        renal = await RenalRecord.filter(user_id=user_id).order_by("-record_date", "-created_at").first()
+        latest_bp = (
+            await VitalRecord.filter(user_id=user_id, measure_type__startswith="BP_")
+            .order_by("-measured_at", "-id")
+            .first()
+        )
+        latest_glucose = (
+            await VitalRecord.filter(user_id=user_id, measure_type="GLUCOSE_FASTING")
+            .order_by("-measured_at", "-id")
+            .first()
+        )
+        latest_activity = await ActivityLog.filter(user_id=user_id).order_by("-record_date", "-created_at").first()
+        latest_exercise = await ExerciseLog.filter(user_id=user_id).order_by("-exercise_date", "-created_at").first()
+        return lipid, renal, latest_bp, latest_glucose, latest_activity, latest_exercise
 
     async def process_task(self, task_uuid: str, user_id: int) -> None:
         task = await PredictionTask.get_or_none(task_uuid=task_uuid, user_id=user_id)
@@ -1322,19 +1637,22 @@ class PredictionService:
                 user_id,
             )
             disease_predictions = await asyncio.to_thread(self._run_models, raw_input)
+            for disease, values in disease_predictions.items():
+                values["risk_factors"] = self._risk_factors(disease, health, lifestyle, lipid, renal)
+                self._apply_clinical_risk_overrides(disease, values)
             completeness = self._input_completeness(snapshot.missing_fields)
             at_risk = [disease for disease, values in disease_predictions.items() if values["is_at_risk"]]
+            overall_risk_level = self._overall_risk_level(disease_predictions)
             result = await PredictionResult.create(
                 task=task,
                 user_id=user_id,
-                overall_risk_level="HIGH" if at_risk else "LOW",
+                overall_risk_level=overall_risk_level,
                 lifestyle_priority=at_risk,
                 input_completeness=completeness,
                 inference_ms=int((time.perf_counter() - started) * 1000),
                 disclaimer=DISCLAIMER,
             )
             for disease, values in disease_predictions.items():
-                values["risk_factors"] = self._risk_factors(disease, health, lifestyle, lipid, renal)
                 model_version = await self._ensure_model_version(
                     disease_code=disease,
                     threshold=values["threshold"],
@@ -1346,6 +1664,11 @@ class PredictionService:
                     model_version_ref=model_version,
                     **values,
                 )
+            await NotificationService().notify_prediction_result(
+                user_id=user_id,
+                result_id=result.id,
+                overall_risk_level=overall_risk_level,
+            )
             task.status = PredictionStatus.SUCCESS
         except Exception as exc:
             task.status = PredictionStatus.FAILED
@@ -1379,6 +1702,7 @@ class PredictionService:
         return PredictionResultResponse(
             result_id=result.id,
             prediction_mode=result.task.prediction_mode.value,
+            created_at=result.created_at,
             disease_risks=self._to_disease_risks(result.items),
             input_completeness=InputCompletenessResponse(**result.input_completeness),
             disclaimer=result.disclaimer,
@@ -1453,7 +1777,7 @@ class PredictionService:
             response_code = response_codes.get(item.disease_code)
             if response_code is None:
                 continue
-            disease_risks[response_code] = {
+            values = {
                 "probability": float(item.probability),
                 "threshold": float(item.threshold),
                 "is_at_risk": item.is_at_risk,
@@ -1461,6 +1785,9 @@ class PredictionService:
                 "message": item.message,
                 "risk_factors": item.risk_factors or [],
             }
+            PredictionService._apply_clinical_risk_overrides(item.disease_code, values)
+            values["risk_score"] = PredictionService._display_risk_score(values)
+            disease_risks[response_code] = values
         return disease_risks
 
     def _to_result_list_item(
@@ -1469,14 +1796,16 @@ class PredictionService:
         feedback_result_ids: set[int],
     ) -> PredictionResultListItemResponse:
         disease_risks = self._to_disease_risks(result.items)
-        highest_risk = max(disease_risks.items(), key=lambda item: item[1]["probability"], default=None)
+        highest_risk = max(disease_risks.items(), key=lambda item: item[1]["risk_score"], default=None)
+        overall_risk_level = self._overall_risk_level(disease_risks)
         return PredictionResultListItemResponse(
             result_id=result.id,
             prediction_mode=result.task.prediction_mode.value,
             created_at=result.created_at,
-            overall_risk_level=result.overall_risk_level,
+            overall_risk_level=overall_risk_level,
             highest_risk_disease=highest_risk[0] if highest_risk else None,
             highest_risk_probability=highest_risk[1]["probability"] if highest_risk else None,
+            highest_risk_score=highest_risk[1]["risk_score"] if highest_risk else None,
             disease_risks=disease_risks,
             input_completeness=InputCompletenessResponse(**result.input_completeness),
             feedback_submitted=result.id in feedback_result_ids,
@@ -1511,6 +1840,8 @@ class PredictionService:
         factors: list[str] = []
         if health.glucose_fasting is not None and health.glucose_fasting >= 126:
             factors.append("공복혈당이 당뇨 의심 기준 이상입니다.")
+        elif health.glucose_fasting is not None and health.glucose_fasting >= 100:
+            factors.append("공복혈당이 경계 범위입니다.")
         if float(health.bmi) >= 25:
             factors.append("BMI가 비만 범위입니다.")
         if health.fh_diabetes_father or health.fh_diabetes_mother or health.fh_diabetes_sibling:
@@ -1650,20 +1981,17 @@ class PredictionService:
                 }
             )
         try:
-            today = self._today()
             latest_bp = (
-                await VitalRecord.filter(user_id=user_id, record_date=today, measure_type__startswith="BP_")
+                await VitalRecord.filter(user_id=user_id, measure_type__startswith="BP_")
                 .order_by("-measured_at", "-id")
                 .first()
             )
             latest_fasting_glucose = (
-                await VitalRecord.filter(user_id=user_id, record_date=today, measure_type="GLUCOSE_FASTING")
+                await VitalRecord.filter(user_id=user_id, measure_type="GLUCOSE_FASTING")
                 .order_by("-measured_at", "-id")
                 .first()
             )
-            latest_activity = (
-                await ActivityLog.filter(user_id=user_id, record_date=today).order_by("-created_at", "-id").first()
-            )
+            latest_activity = await ActivityLog.filter(user_id=user_id).order_by("-record_date", "-created_at").first()
             if latest_bp:
                 raw["sbp"] = latest_bp.sbp
                 raw["dbp"] = latest_bp.dbp
@@ -1675,7 +2003,7 @@ class PredictionService:
                 if latest_activity.sedentary_hours is not None:
                     raw["sedentary_hours"] = float(latest_activity.sedentary_hours)
         except Exception as exc:
-            default_logger.warning("daily prediction context skipped: %s", exc)
+            default_logger.warning("latest prediction context skipped: %s", exc)
         return (
             {key: value for key, value in raw.items() if value is not None},
             snapshot,
@@ -1756,3 +2084,50 @@ class PredictionService:
                 ),
             }
         return results
+
+    @staticmethod
+    def _apply_clinical_risk_overrides(disease_code: str, values: dict[str, Any]) -> None:
+        factors = values.get("risk_factors") or []
+        if disease_code == "DIABETES":
+            high = any("공복혈당이 당뇨 의심 기준 이상" in factor for factor in factors)
+            medium = any(
+                "공복혈당이 경계 범위" in factor or "BMI가 비만 범위" in factor or "당뇨 가족력" in factor
+                for factor in factors
+            )
+        elif disease_code == "HYPERTENSION":
+            high = any(
+                "혈압이 높은 범위" in factor or "수축기 혈압" in factor or "이완기 혈압" in factor for factor in factors
+            )
+            medium = any("고혈압 가족력" in factor for factor in factors)
+        elif disease_code == "CKD":
+            high = any("크레아티닌" in factor or "BUN" in factor or "소변 단백" in factor for factor in factors)
+            medium = any("당뇨 또는 고혈압 진단 이력" in factor for factor in factors)
+        else:
+            return
+
+        if high:
+            values["is_at_risk"] = True
+            values["risk_level"] = "HIGH"
+            values["message"] = "입력 수치가 고위험 기준에 해당합니다. 전문의와 상담해 보세요."
+        elif medium and values["risk_level"] == "LOW":
+            values["is_at_risk"] = True
+            values["risk_level"] = "MEDIUM"
+            values["message"] = "입력 수치상 주의가 필요합니다. 생활습관 관리와 추가 확인을 권장합니다."
+
+    @staticmethod
+    def _display_risk_score(values: dict[str, Any]) -> float:
+        probability = float(values["probability"])
+        if values["risk_level"] == "HIGH":
+            return round(min(max(probability, 0.8), 0.95), 6)
+        if values["risk_level"] == "MEDIUM":
+            return round(min(max(probability, 0.45), 0.79), 6)
+        return round(min(probability, 0.44), 6)
+
+    @staticmethod
+    def _overall_risk_level(disease_predictions: dict[str, dict[str, Any]]) -> str:
+        levels = {values["risk_level"] for values in disease_predictions.values()}
+        if "HIGH" in levels:
+            return "HIGH"
+        if "MEDIUM" in levels:
+            return "MEDIUM"
+        return "LOW"

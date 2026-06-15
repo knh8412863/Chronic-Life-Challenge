@@ -142,6 +142,24 @@ class LipidObesityRecordCreateRequest(BaseModel):
         return self
 
 
+class LipidObesityRecordUpdateRequest(BaseModel):
+    record_date: date | None = None
+    total_cholesterol: Annotated[int | None, Field(default=None, ge=80, le=400)]
+    hdl_cholesterol: Annotated[int | None, Field(default=None, ge=10, le=120)]
+    ldl_cholesterol: Annotated[int | None, Field(default=None, ge=30, le=300)]
+    triglycerides: Annotated[int | None, Field(default=None, ge=30, le=1000)]
+    waist_circumference: Annotated[float | None, Field(default=None, ge=50, le=150)]
+    height: Annotated[float | None, Field(default=None, ge=130, le=210)]
+    weight: Annotated[float | None, Field(default=None, ge=30, le=200)]
+    memo: Annotated[str | None, Field(default=None, max_length=255)] = None
+
+    @model_validator(mode="after")
+    def validate_height_weight_pair(self) -> "LipidObesityRecordUpdateRequest":
+        if (self.height is None) != (self.weight is None):
+            raise ValueError("height and weight must be submitted together to update BMI.")
+        return self
+
+
 class RenalRecordCreateRequest(BaseModel):
     record_date: date
     creatinine: Annotated[float | None, Field(default=None, ge=0.1, le=20)]
@@ -156,6 +174,15 @@ class RenalRecordCreateRequest(BaseModel):
         if all(value is None for value in fields):
             raise ValueError("At least one renal measurement is required.")
         return self
+
+
+class RenalRecordUpdateRequest(BaseModel):
+    record_date: date | None = None
+    creatinine: Annotated[float | None, Field(default=None, ge=0.1, le=20)]
+    egfr: Annotated[float | None, Field(default=None, ge=0, le=200)]
+    bun: Annotated[float | None, Field(default=None, ge=0, le=200)]
+    urine_protein_pos: bool | None = None
+    memo: Annotated[str | None, Field(default=None, max_length=255)] = None
 
 
 class VitalRecordCreateRequest(BaseModel):
@@ -589,7 +616,7 @@ class MetricAssessmentResponse(BaseModel):
 
 
 class PredictionTaskCreateRequest(BaseModel):
-    health_input_id: int
+    health_input_id: int | None = None
     prediction_mode: Literal["SCREENING"] = "SCREENING"
 
 
@@ -610,6 +637,7 @@ class PredictionTaskStatusResponse(BaseModel):
 
 class DiseaseRiskResponse(BaseModel):
     probability: float
+    risk_score: float
     threshold: float
     is_at_risk: bool
     risk_level: str
@@ -626,6 +654,7 @@ class InputCompletenessResponse(BaseModel):
 class PredictionResultResponse(BaseModel):
     result_id: int
     prediction_mode: str
+    created_at: datetime
     disease_risks: dict[str, DiseaseRiskResponse]
     input_completeness: InputCompletenessResponse
     disclaimer: str
@@ -638,6 +667,7 @@ class PredictionResultListItemResponse(BaseModel):
     overall_risk_level: str
     highest_risk_disease: str | None = None
     highest_risk_probability: float | None = None
+    highest_risk_score: float | None = None
     disease_risks: dict[str, DiseaseRiskResponse]
     input_completeness: InputCompletenessResponse
     feedback_submitted: bool

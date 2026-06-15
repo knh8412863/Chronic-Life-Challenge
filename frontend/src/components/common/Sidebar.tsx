@@ -8,6 +8,7 @@ type SidebarProps = {
   onNavigate: (route: AppRoute) => void;
   onToggle: () => void;
   userName?: string;
+  profileImageUrl?: string | null;
 };
 
 type MenuItem = {
@@ -92,7 +93,14 @@ function isActive(currentRoute: AppRoute, itemRoute: AppRoute) {
   return currentRoute === itemRoute || currentRoute.startsWith(`${itemRoute}/`);
 }
 
-export function Sidebar({ collapsed, currentRoute, onNavigate, onToggle, userName = "사용자" }: SidebarProps) {
+export function Sidebar({
+  collapsed,
+  currentRoute,
+  onNavigate,
+  onToggle,
+  userName = "사용자",
+  profileImageUrl,
+}: SidebarProps) {
   const handleLogout = async () => {
     await logout();
     onNavigate("/login");
@@ -153,7 +161,9 @@ export function Sidebar({ collapsed, currentRoute, onNavigate, onToggle, userNam
         onClick={() => onNavigate("/mypage/profile")}
         aria-label="내 정보 화면으로 이동"
       >
-        <span className="sidebar-profile-avatar" aria-hidden="true" />
+        <span className={`sidebar-profile-avatar ${profileImageUrl ? "has-image" : ""}`} aria-hidden="true">
+          {profileImageUrl && <img src={profileImageUrl} alt="" />}
+        </span>
         {!collapsed && (
           <span className="sidebar-profile-text">
             <strong>{userName}</strong>

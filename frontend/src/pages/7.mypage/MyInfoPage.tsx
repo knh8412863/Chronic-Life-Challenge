@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { AppRoute } from "../../App";
 import { getStoredAccessToken } from "../../api/auth";
 import { getCurrentUser, type UserInfo } from "../../api/users";
+import { getStoredProfileImage, profileImageUpdatedEvent } from "../../utils/profileImage";
 
 interface MyInfoPageProps {
   onNavigate: (route: AppRoute) => void;
@@ -21,6 +22,7 @@ function formatDate(value: string) {
 
 export function MyInfoPage({ onNavigate }: MyInfoPageProps) {
   const [user, setUser] = useState<UserInfo | null>(null);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -30,7 +32,10 @@ export function MyInfoPage({ onNavigate }: MyInfoPageProps) {
     async function loadUser() {
       try {
         const result = await getCurrentUser(getStoredAccessToken());
-        if (!ignore) setUser(result);
+        if (!ignore) {
+          setUser(result);
+          setProfileImageUrl(getStoredProfileImage(result.id) ?? result.profile_image_url);
+        }
       } catch {
         if (!ignore) setErrorMessage("내 정보를 불러오지 못했습니다.");
       } finally {
@@ -43,6 +48,18 @@ export function MyInfoPage({ onNavigate }: MyInfoPageProps) {
       ignore = true;
     };
   }, []);
+
+  useEffect(() => {
+    const handleProfileImageUpdated = (event: Event) => {
+      const detail = (event as CustomEvent<{ userId: number; profileImageUrl: string }>).detail;
+      if (user && detail?.userId === user.id) {
+        setProfileImageUrl(detail.profileImageUrl);
+      }
+    };
+
+    window.addEventListener(profileImageUpdatedEvent, handleProfileImageUpdated);
+    return () => window.removeEventListener(profileImageUpdatedEvent, handleProfileImageUpdated);
+  }, [user]);
 
   if (isLoading) {
     return <div className="page-container">내 정보를 불러오는 중입니다.</div>;
@@ -140,7 +157,7 @@ export function MyInfoPage({ onNavigate }: MyInfoPageProps) {
           <div style={{ background: "#fff", border: "1px solid #e0e0e0", borderRadius: 10, padding: 16, marginBottom: 14 }}>
             <h3 style={{ fontSize: 12, fontWeight: 600, margin: "0 0 12px" }}>프로필 사진</h3>
             <div style={{ width: "100%", height: 140, background: "#f5f5f5", borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 40, marginBottom: 10 }}>
-              {user.profile_image_url ? <img src={user.profile_image_url} alt="프로필" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} /> : "👤"}
+              {profileImageUrl ? <img src={profileImageUrl} alt="프로필" style={{ width: "100%", height: "100%", objectFit: "cover", borderRadius: 8 }} /> : "👤"}
             </div>
             <button onClick={() => onNavigate("/mypage/edit")}
               style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 6, background: "#fff", fontSize: 12, cursor: "pointer" }}>

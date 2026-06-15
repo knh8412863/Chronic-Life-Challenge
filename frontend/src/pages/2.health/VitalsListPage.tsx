@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 
 import type { AppRoute } from "../../App";
+import { deleteActivityLog, getActivityLogs, type DailyActivity } from "../../api/activity";
 import { getStoredAccessToken } from "../../api/auth";
-import { getActivityLogs } from "../../api/activity";
-import { EXERCISE_TYPE_LABELS, getExerciseLogs, type ExerciseTypeCode } from "../../api/exercise";
-import { getKidneyRecords } from "../../api/kidney";
-import { getLipidRecords } from "../../api/lipid";
+import { EXERCISE_TYPE_LABELS, deleteExerciseLog, getExerciseLogs, type ExerciseLog, type ExerciseTypeCode } from "../../api/exercise";
+import { deleteKidneyRecord, getKidneyRecords, type KidneyRecord } from "../../api/kidney";
+import { deleteLipidRecord, getLipidRecords, type LipidRecord } from "../../api/lipid";
 import {
   MEASURE_TYPE_LABELS,
   deleteVital,
@@ -23,12 +23,14 @@ type Period = "7D" | "30D" | "90D";
 type TypeFilter = "ALL" | "BP" | "BG" | "LIPID" | "KIDNEY" | "EXERCISE" | "ACTIVITY";
 type HealthRecordRow = {
   id: string;
+  recordId: number;
   date: string;
   type: TypeFilter;
   typeLabel: string;
   value: string;
   memo: string;
   vital?: VitalRecord;
+  record?: VitalRecord | LipidRecord | KidneyRecord | ExerciseLog | DailyActivity;
   canOpenDetail: boolean;
   canDelete: boolean;
 };
@@ -72,7 +74,7 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
   const [hasApiError, setHasApiError] = useState(false);
   const [period, setPeriod] = useState<Period>("30D");
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("ALL");
-  const [deleteTarget, setDeleteTarget] = useState<VitalRecord | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<HealthRecordRow | null>(null);
   const [deleteError, setDeleteError] = useState("");
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -97,17 +99,20 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
         const rows: HealthRecordRow[] = [
           ...(vitalsData?.items ?? []).map((rec): HealthRecordRow => ({
             id: `vital-${rec.id}`,
+            recordId: rec.id,
             date: rec.measured_at.slice(0, 10),
             type: isBpType(rec.measure_type) ? "BP" : "BG",
             typeLabel: MEASURE_TYPE_LABELS[rec.measure_type],
             value: measureVal(rec),
             memo: rec.memo ?? "—",
             vital: rec,
+            record: rec,
             canOpenDetail: true,
             canDelete: true,
           })),
           ...lipidData.map((rec): HealthRecordRow => ({
             id: `lipid-${rec.id}`,
+            recordId: rec.id,
             date: rec.record_date,
             type: "LIPID",
             typeLabel: "지질 지표",
@@ -118,11 +123,13 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
               rec.triglycerides != null ? `TG ${rec.triglycerides}` : "",
             ].filter(Boolean).join(" / ") || "—",
             memo: rec.memo ?? "—",
-            canOpenDetail: false,
-            canDelete: false,
+            record: rec,
+            canOpenDetail: true,
+            canDelete: true,
           })),
           ...kidneyData.map((rec): HealthRecordRow => ({
             id: `kidney-${rec.id}`,
+            recordId: rec.id,
             date: rec.record_date ?? rec.measured_date,
             type: "KIDNEY",
             typeLabel: "신장 지표",
@@ -132,21 +139,25 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
               rec.egfr != null ? `eGFR ${rec.egfr}` : "",
             ].filter(Boolean).join(" / ") || "—",
             memo: rec.memo ?? "—",
-            canOpenDetail: false,
-            canDelete: false,
+            record: rec,
+            canOpenDetail: true,
+            canDelete: true,
           })),
           ...exerciseData.map((log): HealthRecordRow => ({
             id: `exercise-${log.id}`,
+            recordId: log.id,
             date: log.exercise_date,
             type: "EXERCISE",
             typeLabel: "운동 기록",
             value: `${EXERCISE_TYPE_LABELS[log.exercise_type as ExerciseTypeCode] ?? log.exercise_type} · ${log.duration_minutes}분`,
             memo: log.memo ?? "—",
-            canOpenDetail: false,
-            canDelete: false,
+            record: log,
+            canOpenDetail: true,
+            canDelete: true,
           })),
           ...activityData.map((log): HealthRecordRow => ({
             id: `activity-${log.id ?? log.activity_log_id ?? log.activity_date}`,
+            recordId: log.id ?? log.activity_log_id ?? 0,
             date: log.activity_date,
             type: "ACTIVITY",
             typeLabel: "일일 활동",
@@ -156,8 +167,9 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
               log.water_ml != null ? `수분 ${log.water_ml}ml` : "",
             ].filter(Boolean).join(" / ") || "—",
             memo: log.memo ?? "—",
-            canOpenDetail: false,
-            canDelete: false,
+            record: log,
+            canOpenDetail: true,
+            canDelete: Boolean(log.id ?? log.activity_log_id),
           })),
         ];
         setRecordRows(rows.sort((a, b) => b.date.localeCompare(a.date) || a.typeLabel.localeCompare(b.typeLabel)));
@@ -171,12 +183,22 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
     fetchData({ period });
   }, [period, typeFilter]);
 
-  async function handleDelete(id: number) {
+  async function handleDelete(row: HealthRecordRow) {
     const token = getStoredAccessToken();
     setIsDeleting(true);
     setDeleteError("");
     try {
-      await deleteVital(id, token ?? undefined);
+      if (row.type === "BP" || row.type === "BG") {
+        await deleteVital(row.recordId, token ?? undefined);
+      } else if (row.type === "LIPID") {
+        await deleteLipidRecord(row.recordId, token ?? undefined);
+      } else if (row.type === "KIDNEY") {
+        await deleteKidneyRecord(row.recordId, token ?? undefined);
+      } else if (row.type === "EXERCISE") {
+        await deleteExerciseLog(row.recordId, token ?? undefined);
+      } else if (row.type === "ACTIVITY") {
+        await deleteActivityLog(row.recordId, token ?? undefined);
+      }
       setDeleteTarget(null);
       fetchData({ period });
     } catch {
@@ -192,8 +214,11 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
     onNavigate?.("/health/vitals/detail");
   }
 
-  function handleEdit(rec: VitalRecord) {
-    sessionStorage.setItem("editingVitalData", JSON.stringify(rec));
+  function handleEdit(row: HealthRecordRow) {
+    sessionStorage.setItem("editingHealthRecordData", JSON.stringify({ type: row.type, record: row.record }));
+    if (row.vital) {
+      sessionStorage.setItem("editingVitalData", JSON.stringify(row.vital));
+    }
     onNavigate?.("/health/vitals/input");
   }
 
@@ -309,8 +334,8 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
                 displayRows.map((row) => {
                   const isToday = isTodayRecord(row.date);
                   const canOpenDetail = row.canOpenDetail && Boolean(row.vital);
-                  const canEdit = canOpenDetail && isToday;
-                  const canDelete = row.canDelete && Boolean(row.vital) && isToday;
+                  const canEdit = row.canOpenDetail && isToday;
+                  const canDelete = row.canDelete && row.recordId > 0 && isToday;
                   return (
                     <tr
                       key={row.id}
@@ -325,12 +350,12 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
                         <div className="vl-action-row">
                           <span
                             className="health-record-action-tooltip"
-                            data-tooltip={!isToday ? "당일 기록만 수정할 수 있습니다." : !canOpenDetail ? "이 유형은 아직 상세 수정 화면이 없습니다." : undefined}
+                            data-tooltip={!isToday ? "당일 기록만 수정할 수 있습니다." : undefined}
                           >
                             <button
                               type="button"
                               className="vl-action-btn"
-                              onClick={(e) => { e.stopPropagation(); canEdit && row.vital && handleEdit(row.vital); }}
+                              onClick={(e) => { e.stopPropagation(); canEdit && handleEdit(row); }}
                               disabled={!canEdit}
                             >
                               수정
@@ -338,12 +363,12 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
                           </span>
                           <span
                             className="health-record-action-tooltip"
-                            data-tooltip={!isToday ? "당일 기록만 삭제할 수 있습니다." : !row.canDelete ? "이 유형은 아직 삭제 기능이 없습니다." : undefined}
+                            data-tooltip={!isToday ? "당일 기록만 삭제할 수 있습니다." : !row.canDelete ? "삭제 가능한 기록 ID가 없습니다." : undefined}
                           >
                             <button
                               type="button"
                               className="vl-action-btn vl-delete-btn"
-                              onClick={(e) => { e.stopPropagation(); canDelete && row.vital && setDeleteTarget(row.vital); }}
+                              onClick={(e) => { e.stopPropagation(); canDelete && setDeleteTarget(row); }}
                               disabled={!canDelete}
                             >
                               삭제
@@ -363,7 +388,7 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
         <div className="app-modal-backdrop" role="dialog" aria-modal="true">
           <div className="app-modal-card">
             <h2>건강 기록 삭제</h2>
-            <p>선택한 혈압/혈당 기록을 삭제하시겠습니까?</p>
+            <p>선택한 {deleteTarget.typeLabel} 기록을 삭제하시겠습니까?</p>
             <p style={{ color: "#888", fontSize: 13 }}>
               삭제한 기록은 복구할 수 없습니다.
             </p>
@@ -381,7 +406,7 @@ export function VitalsListPage({ onNavigate }: VitalsListPageProps) {
               <button
                 type="button"
                 className="vl-action-btn vl-delete-btn"
-                onClick={() => void handleDelete(deleteTarget.id)}
+                onClick={() => void handleDelete(deleteTarget)}
                 disabled={isDeleting}
                 style={{ flex: 1, height: 40 }}
               >

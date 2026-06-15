@@ -21,6 +21,10 @@ const riskLevelLabels: Record<string, string> = {
 };
 
 const missingFieldLabels: Record<string, string> = {
+  health_survey: "건강설문",
+  family_history: "가족력",
+  height: "키",
+  weight: "몸무게",
   total_cholesterol: "총콜레스테롤",
   hdl_cholesterol: "HDL 콜레스테롤",
   ldl_cholesterol: "LDL 콜레스테롤",
@@ -31,8 +35,14 @@ const missingFieldLabels: Record<string, string> = {
   urine_protein_pos: "단백뇨",
 };
 
+function displayMissingFields(fields: string[]) {
+  return fields
+    .map((field) => missingFieldLabels[field])
+    .filter((field): field is string => Boolean(field));
+}
+
 function toPercent(risk: DiseaseRisk) {
-  return Math.round(risk.probability * 1000) / 10;
+  return Math.round((risk.risk_score ?? risk.probability) * 1000) / 10;
 }
 
 function normalizeRiskFactorText(value: string) {
@@ -82,8 +92,8 @@ export function PredictionResultPage({ onNavigate }: PredictionResultPageProps) 
   const lowRiskCount = resultCards.filter(([, risk]) => risk.risk_level === "LOW").length;
   const topRisk = resultCards
     .slice()
-    .sort(([, first], [, second]) => second.probability - first.probability)[0];
-  const missingFields = result?.input_completeness.missing_fields ?? [];
+    .sort(([, first], [, second]) => (second.risk_score ?? second.probability) - (first.risk_score ?? first.probability))[0];
+  const missingFields = displayMissingFields(result?.input_completeness.missing_fields ?? []);
 
   return (
     <div className="page-stack">
@@ -128,7 +138,7 @@ export function PredictionResultPage({ onNavigate }: PredictionResultPageProps) 
           {missingFields.length > 0 ? (
             missingFields.slice(0, 4).map((field) => (
               <span className="chip" key={field}>
-                {missingFieldLabels[field] ?? field} 미입력
+                {field} 미입력
               </span>
             ))
           ) : (

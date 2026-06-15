@@ -36,6 +36,17 @@ class EmailService:
         )
         await self._send_or_log(user.email, subject, body, token)
 
+    async def send_email_change_verification(self, user: User, new_email: str, token: str) -> None:
+        verify_url = self._build_url("/mypage/edit", {"email_change_token": token})
+        subject = "[All4Health] 이메일 변경 인증 안내"
+        body = (
+            f"{user.name}님, All4Health 계정 이메일 변경을 완료해 주세요.\n\n"
+            f"변경할 이메일: {new_email}\n"
+            f"인증 링크: {verify_url}\n\n"
+            "본인이 요청하지 않았다면 이 메일을 무시해 주세요."
+        )
+        await self._send_or_log(new_email, subject, body, token)
+
     async def send_report_export(
         self,
         to_email: str,

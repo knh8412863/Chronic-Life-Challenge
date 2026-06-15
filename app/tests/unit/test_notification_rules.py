@@ -82,3 +82,52 @@ def test_push_disabled_turns_off_push_detail_settings():
     assert result["prediction_result_enabled"] is False
     assert result["advice_update_enabled"] is False
     assert result["virtual_pet_enabled"] is False
+
+
+def test_empty_notification_preference_update_keeps_payload_empty():
+    result = NotificationService._normalize_preference_update({})
+
+    assert result == {}
+
+
+def test_push_enabled_does_not_force_push_detail_settings():
+    payload = {
+        "push_enabled": True,
+        "health_data_reminder_enabled": False,
+        "challenge_mission_enabled": True,
+    }
+
+    result = NotificationService._normalize_preference_update(payload)
+
+    assert result["push_enabled"] is True
+    assert result["health_data_reminder_enabled"] is False
+    assert result["challenge_mission_enabled"] is True
+
+
+def test_notification_preference_allows_prediction_when_enabled():
+    preference = SimpleNamespace(
+        push_enabled=True,
+        prediction_result_enabled=True,
+        challenge_mission_enabled=False,
+        advice_update_enabled=False,
+        weekly_report_enabled=False,
+        important_notice_enabled=False,
+    )
+
+    assert NotificationService._preference_allows(preference, NotificationType.PREDICTION) is True
+    assert NotificationService._preference_allows(preference, NotificationType.CHALLENGE) is False
+
+
+def test_notification_preference_blocks_push_notifications_when_push_disabled():
+    preference = SimpleNamespace(
+        push_enabled=False,
+        prediction_result_enabled=True,
+        challenge_mission_enabled=True,
+        advice_update_enabled=True,
+        weekly_report_enabled=True,
+        important_notice_enabled=True,
+    )
+
+    assert NotificationService._preference_allows(preference, NotificationType.PREDICTION) is False
+    assert NotificationService._preference_allows(preference, NotificationType.ADVICE) is False
+    assert NotificationService._preference_allows(preference, NotificationType.REPORT) is True

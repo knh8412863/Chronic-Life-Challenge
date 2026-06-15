@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { AppRoute } from "../../App";
 import { checkSignupAvailability, type SignUpPayload } from "../../api/auth";
 import { ApiError } from "../../api/client";
+import { PasswordToggleButton } from "../../components/common/PasswordToggleButton";
 
 interface SignUpPageProps {
   onNavigate: (route: AppRoute) => void;
@@ -45,6 +46,14 @@ function validatePhoneNumber(value: string) {
   return /^(010-\d{4}-\d{4}|010\d{8}|\+8210\d{8})$/.test(value);
 }
 
+function toSignupName(value?: string) {
+  const normalized = (value ?? "")
+    .replace(/[^\uAC00-\uD7A3a-zA-Z0-9\s]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+  return normalized.length >= 2 ? normalized.slice(0, 20) : "";
+}
+
 export function SignUpPage({ onNavigate }: SignUpPageProps) {
   const [name, setName] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "">("");
@@ -68,10 +77,14 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
     if (rawGoogleDraft) {
       try {
         const draft = JSON.parse(rawGoogleDraft) as GoogleSignupDraft;
+        const safeName = toSignupName(draft.name);
         setGoogleDraft(draft);
-        setName(draft.name ?? "");
+        setName(safeName);
         setEmail(draft.email ?? "");
         setEmailChecked(Boolean(draft.email));
+        if (draft.name && !safeName) {
+          setFormMessage("Google 계정 이름을 회원가입 이름으로 사용할 수 없어 직접 입력해주세요.");
+        }
       } catch {
         sessionStorage.removeItem(GOOGLE_SIGNUP_DRAFT_KEY);
       }
@@ -91,10 +104,15 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
         setSelectedDiseases(draft.managed_diseases?.length ? draft.managed_diseases : []);
         if (draft.email) setEmailChecked(true);
         if (draft.auth_provider === "GOOGLE" && draft.id_token) {
+          const safeName = toSignupName(draft.name);
+          setName(safeName);
+          if (draft.name && !safeName) {
+            setFormMessage("Google 계정 이름을 회원가입 이름으로 사용할 수 없어 직접 입력해주세요.");
+          }
           setGoogleDraft({
             id_token: draft.id_token,
             email: draft.email ?? "",
-            name: draft.name,
+            name: safeName,
             remember_me: draft.remember_me,
           });
         }
@@ -328,9 +346,7 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
                 <input type={showPw ? "text" : "password"} value={password} onChange={e => setPassword(e.target.value)}
                   placeholder="영문+숫자+특수문자 조합 8자 이상"
                   style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 36px 0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }} />
-                <button onClick={() => setShowPw(!showPw)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 15 }}>
-                  {showPw ? "🙈" : "👁"}
-                </button>
+                <PasswordToggleButton isVisible={showPw} onToggle={() => setShowPw(!showPw)} />
               </div>
               {passwordError && <p style={{ fontSize: 17, color: "#E24B4A", margin: "4px 0 0" }}>{passwordError}</p>}
             </div>
@@ -344,9 +360,7 @@ export function SignUpPage({ onNavigate }: SignUpPageProps) {
                 <input type={showPwConfirm ? "text" : "password"} value={passwordConfirm} onChange={e => setPasswordConfirm(e.target.value)}
                   placeholder="동일하게 입력"
                   style={{ width: "100%", height: 34, border: `1.5px solid ${pwMismatch ? "#E24B4A" : "#ddd"}`, borderRadius: 5, padding: "0 36px 0 10px", fontSize: 17, boxSizing: "border-box", outline: "none" }} />
-                <button onClick={() => setShowPwConfirm(!showPwConfirm)} style={{ position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)", background: "none", border: "none", cursor: "pointer", fontSize: 15 }}>
-                  {showPwConfirm ? "🙈" : "👁"}
-                </button>
+                <PasswordToggleButton isVisible={showPwConfirm} onToggle={() => setShowPwConfirm(!showPwConfirm)} />
               </div>
               {pwMismatch && <p style={{ fontSize: 17, color: "#E24B4A", margin: "4px 0 0" }}>비밀번호가 일치하지 않습니다.</p>}
             </div>

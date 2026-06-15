@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from types import SimpleNamespace
 
 from fastapi import HTTPException, status
 from tortoise.transactions import in_transaction
@@ -33,6 +34,7 @@ from app.models.challenges import (
 from app.models.users import User
 from app.services.account_stats import sync_user_account_stats
 from app.services.managed_diseases import get_user_managed_disease_codes
+from app.services.notifications import NotificationService
 
 DEFAULT_CHALLENGES = [
     {
@@ -67,6 +69,14 @@ DEFAULT_CHALLENGES = [
         "goal_value": 30,
         "duration_days": 21,
     },
+    {
+        "title": "종합 건강 관리",
+        "description": "걷기, 수분 섭취, 식단, 운동 기록을 균형 있게 실천합니다.",
+        "category": "COMPREHENSIVE",
+        "target_metric": "DAILY_CHECKIN",
+        "goal_value": 1,
+        "duration_days": 28,
+    },
 ]
 DEFAULT_CHALLENGE_DISEASE_TAGS = {
     "30일 걷기 챌린지": {
@@ -88,6 +98,13 @@ DEFAULT_CHALLENGE_DISEASE_TAGS = {
         "HYPERTENSION": 20,
         "OBESITY": 30,
         "DYSLIPIDEMIA": 40,
+    },
+    "종합 건강 관리": {
+        "DIABETES": 10,
+        "HYPERTENSION": 20,
+        "CKD": 30,
+        "OBESITY": 40,
+        "DYSLIPIDEMIA": 50,
     },
 }
 
@@ -269,13 +286,27 @@ class ChallengeService:
     ) -> ChallengeWeeklyLeaderboardResponse:
         target_week_start = week_start or self._current_week_start(date.today())
         week_end = target_week_start + timedelta(days=6)
-        await self._rebuild_weekly_leaderboard(target_week_start)
-        entries = (
-            await ChallengeLeaderboard.filter(week_start_date=target_week_start)
-            .order_by("rank_no", "-total_points", "user_id")
-            .limit(limit)
+        challenge_ids = await ChallengeParticipation.filter(
+            user_id=user.id,
+            status=ChallengeParticipationStatus.JOINED.value,
+        ).values_list("challenge_id", flat=True)
+        if not challenge_ids:
+            return self._build_weekly_leaderboard(
+                entries=[],
+                my_entry=None,
+                current_user_id=user.id,
+                week_start=target_week_start,
+                week_end=week_end,
+            )
+
+        all_entries = await self._build_shared_challenge_leaderboard_entries(
+            current_user_id=user.id,
+            challenge_ids=list(challenge_ids),
+            week_start=target_week_start,
+            week_end=week_end,
         )
-        my_entry = await ChallengeLeaderboard.get_or_none(user_id=user.id, week_start_date=target_week_start)
+        entries = all_entries[:limit]
+        my_entry = next((entry for entry in all_entries if entry.user_id == user.id), None)
         return self._build_weekly_leaderboard(
             entries=entries,
             my_entry=my_entry,
@@ -283,6 +314,50 @@ class ChallengeService:
             week_start=target_week_start,
             week_end=week_end,
         )
+
+    @staticmethod
+    async def _build_shared_challenge_leaderboard_entries(
+        current_user_id: int,
+        challenge_ids: list[int],
+        week_start: date,
+        week_end: date,
+    ) -> list[SimpleNamespace]:
+        user_ids = (
+            await ChallengeParticipation.filter(
+                challenge_id__in=challenge_ids,
+                status__in=[
+                    ChallengeParticipationStatus.JOINED.value,
+                    ChallengeParticipationStatus.COMPLETED.value,
+                ],
+            )
+            .distinct()
+            .values_list("user_id", flat=True)
+        )
+        users = await User.filter(id__in=list(user_ids))
+        entries = []
+        for participant in users:
+            completed_count = await ChallengeCheckin.filter(
+                user_id=participant.id,
+                participation__challenge_id__in=challenge_ids,
+                checkin_date__gte=week_start,
+                checkin_date__lte=week_end,
+            ).count()
+            if participant.id != current_user_id and completed_count == 0:
+                continue
+            entries.append(
+                SimpleNamespace(
+                    user_id=participant.id,
+                    nickname_masked=ChallengeService._mask_name(participant.name),
+                    total_points=completed_count * 10,
+                    completed_mission_count=completed_count,
+                    rank_no=0,
+                )
+            )
+
+        entries.sort(key=lambda item: (-item.total_points, -item.completed_mission_count, item.user_id))
+        for rank, entry in enumerate(entries, start=1):
+            entry.rank_no = rank
+        return entries
 
     async def checkin_today(
         self,
@@ -323,6 +398,11 @@ class ChallengeService:
             await self._award_streak_badges(user=user, challenge=participation.challenge, current_streak=current_streak)
             await self._upsert_weekly_leaderboard(user=user, week_start=self._current_week_start(today))
 
+        await NotificationService().notify_challenge_checkin(
+            user_id=user.id,
+            challenge_title=participation.challenge.title,
+            completed=participation.status == ChallengeParticipationStatus.COMPLETED.value,
+        )
         return self._to_checkin_response(checkin, participation)
 
     async def cancel_participation(self, user: User, participation_id: int) -> ChallengeCancelResponse:
@@ -341,8 +421,13 @@ class ChallengeService:
 
     @staticmethod
     async def _ensure_default_challenges() -> None:
-        if not await Challenge.exists():
-            await Challenge.bulk_create([Challenge(**challenge) for challenge in DEFAULT_CHALLENGES])
+        default_titles = [challenge["title"] for challenge in DEFAULT_CHALLENGES]
+        existing_titles = set(await Challenge.filter(title__in=default_titles).values_list("title", flat=True))
+        missing_challenges = [
+            Challenge(**challenge) for challenge in DEFAULT_CHALLENGES if challenge["title"] not in existing_titles
+        ]
+        if missing_challenges:
+            await Challenge.bulk_create(missing_challenges)
         await ChallengeService._ensure_default_challenge_disease_tags()
 
     @staticmethod
@@ -731,8 +816,8 @@ class ChallengeService:
 
     @staticmethod
     def _build_weekly_leaderboard(
-        entries: list[ChallengeLeaderboard],
-        my_entry: ChallengeLeaderboard | None,
+        entries: list[ChallengeLeaderboard | SimpleNamespace],
+        my_entry: ChallengeLeaderboard | SimpleNamespace | None,
         current_user_id: int,
         week_start: date,
         week_end: date,
@@ -755,7 +840,7 @@ class ChallengeService:
         )
 
     @staticmethod
-    def _build_leaderboard_item(entry: ChallengeLeaderboard) -> ChallengeLeaderboardItemResponse:
+    def _build_leaderboard_item(entry: ChallengeLeaderboard | SimpleNamespace) -> ChallengeLeaderboardItemResponse:
         return ChallengeLeaderboardItemResponse(
             rank=entry.rank_no or 0,
             user_id=entry.user_id,

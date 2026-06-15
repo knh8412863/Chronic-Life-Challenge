@@ -11,17 +11,9 @@ import {
   type ChallengeCategory,
   type ChallengeListQuery,
 } from "../../api/challenges";
+import { EmptyState } from "../../components/common/EmptyState";
 import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingState } from "../../components/common/LoadingState";
-
-const FALLBACK_CHALLENGES: Challenge[] = [
-  { id: 1, name: "30일 걷기 챌린지", description: "매일 30분 이상 걷기", category: "WALK", difficulty: "EASY", duration_days: 30, participant_count: 1245, avg_completion_rate: 78, icon_emoji: "🚶" },
-  { id: 2, name: "수분 섭취 챌린지", description: "매일 물 2L 마시기", category: "WATER", difficulty: "NORMAL", duration_days: 30, participant_count: 876, avg_completion_rate: 65, icon_emoji: "💧" },
-  { id: 3, name: "저염식 습관", description: "나트륨 섭취 줄이기", category: "DIET", difficulty: "NORMAL", duration_days: 30, participant_count: 654, avg_completion_rate: 72, icon_emoji: "🥗" },
-  { id: 4, name: "규칙적 운동", description: "주 5회 운동 실천", category: "EXERCISE", difficulty: "HARD", duration_days: 21, participant_count: 432, avg_completion_rate: 55, icon_emoji: "🏃" },
-  { id: 5, name: "수면 개선 프로젝트", description: "규칙적인 수면 습관", category: "SLEEP", difficulty: "EASY", duration_days: 30, participant_count: 987, avg_completion_rate: 70, icon_emoji: "😴" },
-  { id: 6, name: "종합 건강 관리", description: "전반적 건강 습관", category: "COMPREHENSIVE", difficulty: "NORMAL", duration_days: 90, participant_count: 1543, avg_completion_rate: 62, icon_emoji: "🎯" },
-];
 
 type CategoryFilter = "ALL" | ChallengeCategory;
 type SortOption = "POPULAR" | "LATEST" | "DURATION";
@@ -55,7 +47,10 @@ export function ChallengeListPage({ onNavigate }: Props) {
 
   function fetchList(query: ChallengeListQuery) {
     const token = getStoredAccessToken();
-    if (!token) return;
+    if (!token) {
+      setChallenges([]);
+      return;
+    }
     setIsLoading(true);
     getChallengeList(query, token)
       .then((res) => {
@@ -72,12 +67,7 @@ export function ChallengeListPage({ onNavigate }: Props) {
     fetchList({ category: category === "ALL" ? "ALL" : category, sort });
   }, [category, sort]);
 
-  const isUsingFallback = challenges.length === 0;
-  const displayItems = isUsingFallback ? filterFallback(FALLBACK_CHALLENGES, category) : challenges;
-
-  function filterFallback(items: Challenge[], cat: CategoryFilter) {
-    return items.filter((c) => cat === "ALL" || c.category === cat);
-  }
+  const displayItems = challenges;
 
   async function handleJoin(challengeId: number) {
     const token = getStoredAccessToken();
@@ -115,7 +105,7 @@ export function ChallengeListPage({ onNavigate }: Props) {
         </div>
       </section>
 
-      {hasError && <ErrorState title="목록을 불러오지 못했습니다." description="예시 데이터로 표시됩니다." />}
+      {hasError && <ErrorState title="목록을 불러오지 못했습니다." description="실제 챌린지 목록을 불러오지 못했습니다. 잠시 후 다시 시도해 주세요." />}
 
       {/* 카테고리 탭 */}
       <div className="challenge-category-tabs">
@@ -155,18 +145,7 @@ export function ChallengeListPage({ onNavigate }: Props) {
                 <span className="challenge-diff-tag">{c.duration_days}일</span>
               </div>
               <p className="challenge-card-participants">참여 {c.participant_count.toLocaleString()}명</p>
-              {isUsingFallback ? (
-                <button
-                  type="button"
-                  className="challenge-joined-btn"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setJoinErrorMessage("현재 화면은 예시 챌린지입니다. 실제 챌린지 데이터가 등록된 뒤 참여할 수 있습니다.");
-                  }}
-                >
-                  참여 불가
-                </button>
-              ) : isJoined ? (
+              {isJoined ? (
                 <button type="button" className="challenge-joined-btn" onClick={(e) => e.stopPropagation()}>참여 중</button>
               ) : (
                 <button
@@ -181,6 +160,13 @@ export function ChallengeListPage({ onNavigate }: Props) {
           );
         })}
       </div>
+
+      {!hasError && displayItems.length === 0 && (
+        <EmptyState
+          title="표시할 챌린지가 없습니다."
+          description={category === "ALL" ? "등록된 챌린지가 아직 없습니다." : `${CATEGORY_LABELS[category]} 카테고리에 등록된 챌린지가 아직 없습니다.`}
+        />
+      )}
 
       {hasMore && (
         <button

@@ -235,7 +235,11 @@ type ApiLeaderboard = {
   week_start: string;
   week_end: string;
   top_three: ApiLeaderboardItem[];
-  my_rank: ApiLeaderboardItem | null;
+  my_rank: {
+    rank: number | null;
+    score: number;
+    completed_mission_count: number;
+  };
   items: ApiLeaderboardItem[];
 };
 
@@ -495,17 +499,23 @@ export async function getBadges(token?: string): Promise<{ data: BadgeListData }
 
 export async function getLeaderboard(token?: string): Promise<{ data: LeaderboardData }> {
   const response = await apiRequest<{ data: ApiLeaderboard }>("/challenge-leaderboards/weekly", { token });
-  const myUserId = response.data.my_rank?.user_id;
-  const entries = response.data.items.map((item) => mapLeaderboardItem(item, myUserId));
-  const topThree = response.data.top_three.map((item) => mapLeaderboardItem(item, myUserId));
+  const myRank = response.data.my_rank;
+  const entries = response.data.items.map((item) => ({
+    ...mapLeaderboardItem(item),
+    is_me: myRank.rank != null && item.rank === myRank.rank,
+  }));
+  const topThree = response.data.top_three.map((item) => ({
+    ...mapLeaderboardItem(item),
+    is_me: myRank.rank != null && item.rank === myRank.rank,
+  }));
 
   return {
     data: {
       period_start: response.data.week_start,
       period_end: response.data.week_end,
-      my_rank: response.data.my_rank?.rank ?? 0,
-      my_score: response.data.my_rank?.score ?? 0,
-      my_completed_missions: response.data.my_rank?.completed_mission_count ?? 0,
+      my_rank: myRank.rank ?? 0,
+      my_score: myRank.score,
+      my_completed_missions: myRank.completed_mission_count,
       entries,
       top_three: topThree,
     },

@@ -36,6 +36,7 @@ from app.models.users import User
 from app.services.email import EmailService
 from app.services.llm_advice import OPENAI_PROVIDER
 from app.services.llm_report import OpenAIReportClient, ReportLLMError, ReportLLMResult
+from app.services.notifications import NotificationService
 
 RULE_BASED_PROVIDER = "RULE_BASED"
 RULE_BASED_MODEL = "weekly-report-rules-v1"
@@ -48,6 +49,7 @@ class WeeklyReportService:
         week_start, week_end = self._week_range()
         existing = await WeeklyReport.get_or_none(user_id=user.id, week_start_date=week_start)
         if existing and not data.force_regenerate:
+            await self._refresh_report_if_source_changed(existing, user.id)
             return self._to_response(existing, generated=False)
         if existing and data.force_regenerate:
             await existing.delete()
@@ -55,6 +57,8 @@ class WeeklyReportService:
         source_summary = await self._build_source_summary(user.id, week_start, week_end)
         llm_result = await self._generate_llm_report(source_summary)
         report_text = llm_result.report_text if llm_result else self._build_report_text(source_summary)
+        previous_report = await self._get_previous_report(user.id, week_start)
+        previous_source_summary = await self._build_previous_source_summary(user.id, week_start)
         report = await WeeklyReport.create(
             user=user,
             week_start_date=week_start,
@@ -63,7 +67,7 @@ class WeeklyReportService:
             source_summary=source_summary,
             summary_cards=self._build_summary_cards(source_summary),
             metric_summaries=self._build_metric_summaries(source_summary),
-            trend_summary=self._build_trend_summary(None),
+            trend_summary=self._build_trend_summary(previous_report, previous_source_summary),
             challenge_summary=self._build_challenge_summary(source_summary),
             report_text=report_text,
             provider=llm_result.provider if llm_result else RULE_BASED_PROVIDER,
@@ -72,12 +76,14 @@ class WeeklyReportService:
             output_tokens=llm_result.output_tokens if llm_result else 0,
             cache_read_tokens=llm_result.cache_read_tokens if llm_result else 0,
         )
+        await NotificationService().notify_weekly_report_created(user_id=user.id, report_id=report.id)
         return self._to_response(report, generated=True)
 
     async def get_current_week(self, user: User) -> CurrentWeeklyReportResponse:
         week_start, week_end = self._week_range()
         report = await WeeklyReport.get_or_none(user_id=user.id, week_start_date=week_start)
         if report:
+            await self._refresh_report_if_source_changed(report, user.id)
             return CurrentWeeklyReportResponse(
                 status="AVAILABLE",
                 week_start_date=week_start,
@@ -105,10 +111,13 @@ class WeeklyReportService:
         report = await WeeklyReport.get_or_none(id=report_id, user_id=user.id)
         if report is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="주간 리포트를 찾을 수 없습니다.")
+        await self._refresh_report_if_source_changed(report, user.id)
         return self._to_response(report, generated=False)
 
     async def get_reports(self, user: User, limit: int = 20) -> list[WeeklyReportListItemResponse]:
         reports = await WeeklyReport.filter(user_id=user.id).order_by("-week_start_date").limit(limit)
+        for report in reports:
+            await self._refresh_report_if_source_changed(report, user.id)
         return [self._to_list_item(report) for report in reports]
 
     async def export_report(
@@ -121,6 +130,7 @@ class WeeklyReportService:
         report = await WeeklyReport.get_or_none(id=report_id, user_id=user.id)
         if report is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="주간 리포트를 찾을 수 없습니다.")
+        await self._refresh_report_if_source_changed(report, user.id)
 
         normalized_format = export_format.upper()
         content_encoding = "TEXT"
@@ -225,10 +235,16 @@ class WeeklyReportService:
             "meal_log_count": meal_log_count,
             "prediction_count": len(predictions),
             "at_risk_prediction_count": sum(
-                1 for prediction in predictions if any(item.is_at_risk for item in prediction.items)
+                1 for prediction in predictions if WeeklyReportService._has_risk_signal(prediction)
             ),
             "challenge_checkin_count": challenge_checkin_count,
         }
+
+    @staticmethod
+    def _has_risk_signal(prediction: PredictionResult) -> bool:
+        if prediction.overall_risk_level in {"MEDIUM", "HIGH"}:
+            return True
+        return any(item.is_at_risk or item.risk_level in {"MEDIUM", "HIGH"} for item in prediction.items)
 
     @staticmethod
     def _has_report_source_data(source_summary: dict[str, int]) -> bool:
@@ -402,18 +418,103 @@ class WeeklyReportService:
         }
 
     @staticmethod
-    def _build_trend_summary(previous_report: WeeklyReport | None) -> dict[str, str | int | None]:
-        if previous_report is None:
+    def _build_trend_summary(
+        previous_report: WeeklyReport | None,
+        previous_source_summary: dict[str, int] | None = None,
+    ) -> dict[str, str | int | None]:
+        previous_report_id = previous_report.id if previous_report else None
+        previous_summary = previous_report.source_summary if previous_report else previous_source_summary
+        if not previous_summary or not WeeklyReportService._has_report_source_data(previous_summary):
             return {
                 "status": "UNAVAILABLE",
-                "message": "전주 리포트가 없어 추이 비교는 제공하지 않습니다.",
+                "message": "전주 건강 기록이 없어 추이 비교는 제공하지 않습니다.",
                 "previous_week_report_id": None,
             }
+        previous_records = WeeklyReportService._total_trend_records(previous_summary)
         return {
             "status": "UNCHANGED",
-            "message": "전주 대비 상세 추이 비교는 추후 고도화 예정입니다.",
-            "previous_week_report_id": previous_report.id,
+            "message": f"전주 건강 기록 {previous_records}건을 기준으로 이번 주 추이를 비교할 수 있습니다.",
+            "previous_week_report_id": previous_report_id,
         }
+
+    @staticmethod
+    def _total_trend_records(source_summary: dict[str, int]) -> int:
+        return (
+            WeeklyReportService._total_health_records(source_summary)
+            + source_summary.get("activity_log_count", 0)
+            + source_summary.get("exercise_log_count", 0)
+            + source_summary.get("meal_log_count", 0)
+            + source_summary.get("prediction_count", 0)
+            + source_summary.get("challenge_checkin_count", 0)
+        )
+
+    @staticmethod
+    async def _build_previous_source_summary(user_id: int, week_start: date) -> dict[str, int]:
+        previous_week_start = week_start - timedelta(days=7)
+        previous_week_end = previous_week_start + timedelta(days=6)
+        return await WeeklyReportService._build_source_summary(user_id, previous_week_start, previous_week_end)
+
+    @staticmethod
+    async def _get_previous_report(user_id: int, week_start: date) -> WeeklyReport | None:
+        previous_week_start = week_start - timedelta(days=7)
+        exact_previous = await WeeklyReport.get_or_none(user_id=user_id, week_start_date=previous_week_start)
+        if exact_previous:
+            return exact_previous
+        return (
+            await WeeklyReport.filter(user_id=user_id, week_start_date__lt=week_start)
+            .order_by("-week_start_date")
+            .first()
+        )
+
+    async def _refresh_trend_summary_if_needed(self, report: WeeklyReport, user_id: int) -> None:
+        trend_summary = report.trend_summary or {}
+        if trend_summary.get("previous_week_report_id"):
+            return
+        previous_report = await self._get_previous_report(user_id, report.week_start_date)
+        previous_source_summary = await self._build_previous_source_summary(user_id, report.week_start_date)
+        if previous_report is None:
+            if not self._has_report_source_data(previous_source_summary):
+                return
+        report.trend_summary = self._build_trend_summary(previous_report, previous_source_summary)
+        await report.save(update_fields=["trend_summary"])
+
+    async def _refresh_report_if_source_changed(self, report: WeeklyReport, user_id: int) -> None:
+        source_summary = await self._build_source_summary(user_id, report.week_start_date, report.week_end_date)
+        previous_report = await self._get_previous_report(user_id, report.week_start_date)
+        previous_source_summary = await self._build_previous_source_summary(user_id, report.week_start_date)
+        trend_summary = self._build_trend_summary(previous_report, previous_source_summary)
+        source_changed = source_summary != (report.source_summary or {})
+        trend_changed = trend_summary != (report.trend_summary or {})
+        if not source_changed and not trend_changed:
+            return
+
+        report.source_summary = source_summary
+        report.summary_cards = self._build_summary_cards(source_summary)
+        report.metric_summaries = self._build_metric_summaries(source_summary)
+        report.trend_summary = trend_summary
+        report.challenge_summary = self._build_challenge_summary(source_summary)
+        if source_changed:
+            report.report_text = self._build_report_text(source_summary)
+            report.provider = RULE_BASED_PROVIDER
+            report.model_name = RULE_BASED_MODEL
+            report.input_tokens = 0
+            report.output_tokens = 0
+            report.cache_read_tokens = 0
+        await report.save(
+            update_fields=[
+                "source_summary",
+                "summary_cards",
+                "metric_summaries",
+                "trend_summary",
+                "challenge_summary",
+                "report_text",
+                "provider",
+                "model_name",
+                "input_tokens",
+                "output_tokens",
+                "cache_read_tokens",
+            ]
+        )
 
     @staticmethod
     def _build_challenge_summary(source_summary: dict[str, int]) -> dict[str, str | int | float]:

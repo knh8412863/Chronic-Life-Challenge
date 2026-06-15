@@ -63,3 +63,35 @@ def test_exercise_summary_sums_duration_and_calories():
     assert summary.total_duration_minutes == 95
     assert summary.total_calories_burned == 200
     assert summary.logged_count == 3
+
+
+async def test_exercise_calories_are_estimated_from_met_when_empty(monkeypatch):
+    async def fake_weight(_user):
+        return 60
+
+    monkeypatch.setattr(HealthInputService, "_exercise_weight_kg", fake_weight)
+
+    result = await HealthInputService._resolve_exercise_calories(
+        user=SimpleNamespace(gender="FEMALE"),
+        exercise_type="WALKING",
+        duration_minutes=30,
+        calories_burned=None,
+    )
+
+    assert result == 105
+
+
+async def test_exercise_calories_keep_manual_value(monkeypatch):
+    async def fake_weight(_user):
+        return 60
+
+    monkeypatch.setattr(HealthInputService, "_exercise_weight_kg", fake_weight)
+
+    result = await HealthInputService._resolve_exercise_calories(
+        user=SimpleNamespace(gender="FEMALE"),
+        exercise_type="WALKING",
+        duration_minutes=30,
+        calories_burned=88,
+    )
+
+    assert result == 88

@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import type { AppRoute } from "../../App";
-import { getStoredAccessToken } from "../../api/auth";
+import { clearOnboardingAccessToken, getStoredAccessToken } from "../../api/auth";
 import { createHealthSurveyInput } from "../../api/predictions";
 import { getCurrentUser } from "../../api/users";
 import { Stepper } from "../../components/common/Stepper";
@@ -176,8 +176,8 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   // 기본 정보
   const [birthDate, setBirthDate] = useState("");
   const [gender, setGender] = useState<"MALE" | "FEMALE" | "">("");
-  const [height, setHeight] = useState("170");
-  const [weight, setWeight] = useState("65");
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
   const [waist, setWaist] = useState("");
   const [bmi, setBmi] = useState<number | null>(null);
 
@@ -215,7 +215,10 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   const [surveyError, setSurveyError] = useState("");
 
   useEffect(() => {
-    const rawDraft = sessionStorage.getItem(ONBOARDING_PROFILE_KEY) ?? sessionStorage.getItem(SIGNUP_DRAFT_KEY);
+    const rawDraft =
+      sessionStorage.getItem(ONBOARDING_PROFILE_KEY) ??
+      localStorage.getItem(ONBOARDING_PROFILE_KEY) ??
+      sessionStorage.getItem(SIGNUP_DRAFT_KEY);
 
     if (rawDraft) {
       try {
@@ -290,12 +293,12 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
               <div>
                 <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>신장 (cm)<RequiredMark /></label>
-                <input type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder="170"
+                <input type="number" value={height} onChange={e => setHeight(e.target.value)} placeholder="예시: 170"
                   style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
               </div>
               <div>
                 <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>체중 (kg)<RequiredMark /></label>
-                <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="65"
+                <input type="number" value={weight} onChange={e => setWeight(e.target.value)} placeholder="예시: 65"
                   style={{ width: "100%", height: 34, border: "1.5px solid #ddd", borderRadius: 5, padding: "0 10px", fontSize: 11, boxSizing: "border-box", outline: "none" }} />
               </div>
             </div>
@@ -325,7 +328,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   if (surveyStep === 1) {
     const MED_OPTIONS = [
       { name: "고혈압 약", color: "#df8aac", bg: "#fce4ec" },
-      { name: "당뇨 약", color: "#f57f17", bg: "#fff9c4" },
+      { name: "당뇨 약", color: "#fdb42f", bg: "#fff9c4" },
       { name: "복용중인 약 없음", color: "#555", bg: "#fafafa" },
     ];
     const toggleItem = (arr: string[], item: string, setFn: (v: string[]) => void) => {
@@ -579,6 +582,8 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
         token,
       );
       sessionStorage.removeItem(ONBOARDING_PROFILE_KEY);
+      localStorage.removeItem(ONBOARDING_PROFILE_KEY);
+      clearOnboardingAccessToken();
       onNavigate("/onboarding-complete");
     } catch {
       setSurveyError("건강 설문 저장에 실패했습니다. 입력값을 확인해주세요.");

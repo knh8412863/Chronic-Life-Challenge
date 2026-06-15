@@ -38,7 +38,8 @@ function buildResultSummary(item: PredictionResultListItem) {
     return "예측 결과 없음";
   }
   const disease = diseaseLabels[item.highest_risk_disease] ?? item.highest_risk_disease;
-  const risk = riskLevelLabels[item.overall_risk_level] ?? item.overall_risk_level;
+  const highestRiskLevel = item.disease_risks[item.highest_risk_disease]?.risk_level ?? item.overall_risk_level;
+  const risk = riskLevelLabels[highestRiskLevel] ?? highestRiskLevel;
   return `${disease} ${risk}`;
 }
 
@@ -115,7 +116,7 @@ export function PredictionHistoryPage({ onNavigate }: PredictionHistoryPageProps
                 <tr key={item.result_id}>
                   <td>{formatDate(item.created_at)}</td>
                   <td>{buildResultSummary(item)}</td>
-                  <td>{formatProbability(item.highest_risk_probability)}</td>
+                  <td>{formatProbability(item.highest_risk_score ?? item.highest_risk_probability)}</td>
                   <td>{item.feedback_submitted ? "제출 완료" : "미제출"}</td>
                   <td>
                     <button

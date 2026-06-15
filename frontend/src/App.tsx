@@ -190,7 +190,7 @@ export default function App() {
   };
 
   const page = useMemo(() => {
-    const isMypageProtectedRoute = route.startsWith("/mypage") && route !== "/mypage/verify";
+    const isMypageProtectedRoute = route === "/mypage" || route === "/mypage/profile";
     if (isMypageProtectedRoute && verifiedMypageRoute !== route) {
       return (
         <MyPagePasswordVerifyPage
