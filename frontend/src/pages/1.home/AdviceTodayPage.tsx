@@ -11,6 +11,8 @@ type AdviceTodayPageProps = {
   onNavigate: (route: AppRoute) => void;
 };
 
+const MAX_DAILY_ADVICE_GENERATIONS = 2;
+
 type DailyAdviceDraft = Partial<DailyAdvice>;
 
 type AdviceApiResponse = {
@@ -49,6 +51,7 @@ function formatCreatedAt(value?: string | null) {
 
 export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
   const [advice, setAdvice] = useState<DailyAdvice | null>(null);
+  const [remainingCount, setRemainingCount] = useState(MAX_DAILY_ADVICE_GENERATIONS);
   const [isLoading, setIsLoading] = useState(true);
   const [isGenerating, setIsGenerating] = useState(false);
   const [message, setMessage] = useState("");
@@ -66,9 +69,20 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
         const nextAdvice = normalizeDailyAdvice(response);
         setAdvice(nextAdvice);
         setMessage("");
-        setIsLimitExceeded((nextAdvice?.remaining_regeneration_count ?? 0) <= 0);
+        const nextRemainingCount = nextAdvice?.remaining_regeneration_count ?? MAX_DAILY_ADVICE_GENERATIONS;
+        setRemainingCount(nextRemainingCount);
+        setIsLimitExceeded(nextRemainingCount <= 0);
       })
-      .catch(() => setMessage("오늘의 조언을 불러오지 못했습니다. 새로 받아보세요."))
+      .catch((error) => {
+        if (error instanceof ApiError && error.status === 404) {
+          setAdvice(null);
+          setRemainingCount(MAX_DAILY_ADVICE_GENERATIONS);
+          setIsLimitExceeded(false);
+          setMessage("");
+          return;
+        }
+        setMessage("오늘의 조언을 불러오지 못했습니다. 새로 받아보세요.");
+      })
       .finally(() => setIsLoading(false));
   }, [onNavigate]);
 
@@ -85,9 +99,12 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
       const response = await generateTodayAdvice(token);
       const nextAdvice = normalizeDailyAdvice(response);
       setAdvice(nextAdvice);
-      setIsLimitExceeded((nextAdvice?.remaining_regeneration_count ?? 0) <= 0);
+      const nextRemainingCount = nextAdvice?.remaining_regeneration_count ?? 0;
+      setRemainingCount(nextRemainingCount);
+      setIsLimitExceeded(nextRemainingCount <= 0);
     } catch (error) {
       if (error instanceof ApiError && error.status === 429) {
+        setRemainingCount(0);
         setIsLimitExceeded(true);
         return;
       }
@@ -99,7 +116,6 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
 
   if (isLoading) return <LoadingState message="오늘의 조언을 불러오는 중입니다." />;
 
-  const remainingCount = advice?.remaining_regeneration_count ?? 0;
   const generateDisabled = isGenerating || isLimitExceeded || remainingCount <= 0;
 
   return (
