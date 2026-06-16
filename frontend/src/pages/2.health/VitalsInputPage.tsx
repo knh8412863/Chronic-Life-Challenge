@@ -36,6 +36,9 @@ function nowTimeStr() {
 function isToday(iso: string) {
   return iso.slice(0, 10) === todayStr();
 }
+function isSameRecordDate(isoOrDate: string | undefined, date: string) {
+  return isoOrDate?.slice(0, 10) === date;
+}
 function nonNegativeValue(value: string): string {
   if (value === "") return "";
   const n = Number(value);
@@ -433,7 +436,18 @@ function BpForm({ onSaveAll, isSavingAll, todayBpCount }, ref) {
       await updateVital(editingVital.id, body, token ?? undefined);
       return true;
     }
-    await Promise.all(requests.map((body) => createVital(body, token ?? undefined)));
+
+    const existingVitals = requests.length > 0
+      ? (await getVitals({ from: date, to: date, limit: 100 }, token ?? undefined)).data.items
+      : [];
+    await Promise.all(requests.map((body) => {
+      const existing = existingVitals.find(
+        (record) => record.measure_type === body.measure_type && isSameRecordDate(record.measured_at, date),
+      );
+      return existing
+        ? updateVital(existing.id, body, token ?? undefined)
+        : createVital(body, token ?? undefined);
+    }));
     return requests.length > 0;
   }
 
@@ -780,13 +794,17 @@ function KidneyForm({ onNavigate, onSaveAll, isSavingAll }, ref) {
       ? (Math.round((186 * Math.pow(Number(creatinine), -1.154)) * 10) / 10).toFixed(1)
       : null;
 
+  const hasRenalMeasurement = () => Boolean(
+    creatinine || bun || egfr || calculatedEgfr || proteinuria !== null,
+  );
+
   const hasInput = () => Boolean(
-    editingKidney || creatinine || bun || egfr || proteinuria !== null,
+    editingKidney || hasRenalMeasurement(),
   );
 
   async function saveDraft() {
     const token = getStoredAccessToken();
-    if (!hasInput()) return false;
+    if (!hasRenalMeasurement()) return false;
     const body: CreateKidneyBody = {
       measured_date: date,
       record_date: date,
@@ -801,6 +819,13 @@ function KidneyForm({ onNavigate, onSaveAll, isSavingAll }, ref) {
 
     if (editingKidney) {
       await updateKidneyRecord(editingKidney.id, body, token ?? undefined);
+      return true;
+    }
+    const existingKidney = (await getKidneyRecords({ limit: 100 }, token ?? undefined)).data.find(
+      (record) => isSameRecordDate(record.record_date ?? record.measured_date, date),
+    );
+    if (existingKidney) {
+      await updateKidneyRecord(existingKidney.id, body, token ?? undefined);
       return true;
     }
     await createKidneyRecord(body, token ?? undefined);
