@@ -1993,6 +1993,17 @@ button {
   gap: 10px;
 }
 
+.modal-button-row {
+  justify-content: center;
+  margin-top: 14px;
+}
+
+.modal-error-text {
+  color: #c44040;
+  font-weight: 700;
+  text-align: center;
+}
+
 .section-header-row .button-row button,
 .prediction-title-row .button-row button {
   width: 160px;

@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useState } from "react";
 
+import { clearStoredAccessToken } from "./api/auth";
+import { AUTH_REQUIRED_EVENT, AUTH_REQUIRED_MESSAGE } from "./api/client";
 import { AppLayout } from "./layouts/AppLayout";
 import { AdviceHistoryPage } from "./pages/1.home/AdviceHistoryPage";
 import { AdviceFeedbackPage } from "./pages/1.home/AdviceFeedbackPage";
@@ -167,6 +169,7 @@ function normalizePath(pathname: string): AppRoute {
 export default function App() {
   const [route, setRoute] = useState<AppRoute>(() => normalizePath(window.location.pathname));
   const [verifiedMypageRoute, setVerifiedMypageRoute] = useState<AppRoute | null>(null);
+  const [authRequiredMessage, setAuthRequiredMessage] = useState("");
 
   useEffect(() => {
     const onPopState = () => setRoute(normalizePath(window.location.pathname));
@@ -179,6 +182,16 @@ export default function App() {
       setVerifiedMypageRoute(null);
     }
   }, [route]);
+
+  useEffect(() => {
+    const handleAuthRequired = (event: Event) => {
+      const detail = (event as CustomEvent<{ message?: string }>).detail;
+      setAuthRequiredMessage(detail?.message ?? AUTH_REQUIRED_MESSAGE);
+    };
+
+    window.addEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+    return () => window.removeEventListener(AUTH_REQUIRED_EVENT, handleAuthRequired);
+  }, []);
 
   const navigate = (nextRoute: AppRoute) => {
     const nextUrl =
@@ -310,17 +323,47 @@ export default function App() {
     }
   }, [route, verifiedMypageRoute]);
 
+  const closeAuthRequiredModal = () => {
+    clearStoredAccessToken();
+    setAuthRequiredMessage("");
+    navigate("/login");
+  };
+
+  const renderWithAuthModal = (content: ReactNode) => (
+    <>
+      {content}
+      {authRequiredMessage && (
+        <div className="app-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="app-modal-card">
+            <h2>인증이 필요합니다</h2>
+            <p>
+              {authRequiredMessage.split("\n").map((line) => (
+                <span key={line}>
+                  {line}
+                  <br />
+                </span>
+              ))}
+            </p>
+            <button type="button" className="green-button" onClick={closeAuthRequiredModal}>
+              로그인하기
+            </button>
+          </div>
+        </div>
+      )}
+    </>
+  );
+
   if (publicRoutes.has(route)) {
-    return <PublicLayout onNavigate={navigate}>{page}</PublicLayout>;
+    return renderWithAuthModal(<PublicLayout onNavigate={navigate}>{page}</PublicLayout>);
   }
 
   if (standaloneRoutes.has(route)) {
-    return page;
+    return renderWithAuthModal(page);
   }
 
-  return (
+  return renderWithAuthModal(
     <AppLayout currentRoute={route} onNavigate={navigate}>
       {page}
-    </AppLayout>
+    </AppLayout>,
   );
 }
