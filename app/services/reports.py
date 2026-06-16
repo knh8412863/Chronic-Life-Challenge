@@ -634,7 +634,7 @@ class WeeklyReportService:
     def _to_printable_report_html(report: WeeklyReport) -> str:
         def esc(value: object) -> str:
             return html.escape("" if value is None else str(value))
-
+ 
         def status_label(status_value: str | None) -> str:
             return {
                 "NORMAL": "정상",
@@ -644,11 +644,23 @@ class WeeklyReportService:
                 "ACHIEVED": "달성",
                 "IN_PROGRESS": "진행 중",
             }.get(status_value or "", status_value or "확인 필요")
-
-        source = report.source_summary
+ 
+        def status_badge_class(status_value: str | None) -> str:
+            return {
+                "NORMAL": "badge--normal",
+                "CAUTION": "badge--caution",
+                "HIGH": "badge--high",
+                "UNAVAILABLE": "badge--unavail",
+                "ACHIEVED": "badge--normal",
+                "IN_PROGRESS": "badge--caution",
+            }.get(status_value or "", "badge--unavail")
+ 
+        source = report.source_summary or {}
         summary_cards = report.summary_cards or []
         metric_summaries = report.metric_summaries or []
         challenge = report.challenge_summary or {}
+        trend = report.trend_summary or {}
+ 
         total_health_records = WeeklyReportService._total_health_records(source)
         score = min(
             100,
@@ -659,183 +671,407 @@ class WeeklyReportService:
             + min(source.get("challenge_checkin_count", 0), 7) * 2,
         )
         completion_rate = int(float(challenge.get("completion_rate") or 0))
-        trend_points = [18, 32, 24, 38, 30, 44, 35]
-        trend_polyline = " ".join(f"{index * 58 + 20},{70 - value}" for index, value in enumerate(trend_points))
-        metric_rows = []
+ 
+        # 요약 카드 HTML
+        card_icons = ["🩺", "⚠️", "🥗", "🏃", "🏅"]
+        card_html_parts = []
+        for i, card in enumerate(summary_cards[:5]):
+            s = card.get("status", "UNAVAILABLE")
+            card_html_parts.append(f"""
+        <div class="card">
+          <span class="card__icon">{card_icons[i % len(card_icons)]}</span>
+          <p class="card__label">{esc(card.get("label"))}</p>
+          <p class="card__value">{esc(card.get("value"))}</p>
+          <span class="badge {status_badge_class(s)}">{esc(status_label(s))}</span>
+        </div>""")
+ 
+        # 지표 바 HTML
+        bar_html_parts = []
         for metric in metric_summaries:
-            value = f"{metric.get('value', '0')}{metric.get('unit') or ''}"
-            status_value = status_label(metric.get("status"))
-            metric_rows.append(
-                f"""
-                <tr>
-                  <td>{esc(metric.get("label"))}</td>
-                  <td>{esc(value)}</td>
-                  <td>{esc(status_value)}</td>
-                  <td>{esc(metric.get("description"))}</td>
-                </tr>
-                """
-            )
-
-        card_html = []
-        colors = ["#ff4d3d", "#ff9900", "#14a85b", "#8b5cf6", "#333333"]
-        for index, card in enumerate(summary_cards[:5]):
-            card_html.append(
-                f"""
-                <article class="metric-card">
-                  <p>{esc(card.get("label"))}</p>
-                  <strong style="color:{colors[index % len(colors)]}">{esc(card.get("value"))}</strong>
-                  <small>{esc(status_label(card.get("status")))}</small>
-                </article>
-                """
-            )
-
-        metric_bars = []
-        for metric in metric_summaries[:5]:
-            raw_value = int("".join(ch for ch in str(metric.get("value", "0")) if ch.isdigit()) or "0")
-            width = min(100, max(12, raw_value * 12))
-            metric_bars.append(
-                f"""
-                <div class="bar-row">
-                  <span>{esc(metric.get("label"))}</span>
-                  <b>{esc(metric.get("value"))}{esc(metric.get("unit") or "")}</b>
-                  <div><i style="width:{width}%"></i></div>
-                </div>
-                """
-            )
-
-        goal_lines = [
+            raw = int("".join(ch for ch in str(metric.get("value", "0")) if ch.isdigit()) or "0")
+            pct = min(100, max(4, raw * 12))
+            bar_html_parts.append(f"""
+        <div class="bar-row">
+          <span class="bar-row__label">{esc(metric.get("label"))}</span>
+          <span class="bar-row__val">{esc(metric.get("value"))}{esc(metric.get("unit") or "")}</span>
+          <div class="bar-row__track"><div class="bar-row__fill" style="width:{pct}%"></div></div>
+        </div>""")
+ 
+        # 목표 달성 HTML
+        goal_rows = [
             ("혈압·혈당", source.get("vital_record_count", 0), "주 3회 이상"),
-            ("식단 기록", source.get("meal_log_count", 0), "주 5회"),
-            ("운동 기록", source.get("exercise_log_count", 0), "주 3회"),
-            ("챌린지", source.get("challenge_checkin_count", 0), "주 3회 이상"),
+            ("식단 기록",  source.get("meal_log_count", 0),    "주 5회"),
+            ("운동 기록",  source.get("exercise_log_count", 0), "주 3회"),
+            ("챌린지",    source.get("challenge_checkin_count", 0), "주 3회 이상"),
         ]
-        goal_html = "\n".join(
-            f"<li>{'✓' if count else '△'} {esc(label)}: {esc(count)}회 / {esc(target)}</li>"
-            for label, count, target in goal_lines
-        )
-
+        goal_html_parts = []
+        for lbl, count, target in goal_rows:
+            icon = "✓" if count else "○"
+            cls = "goal--done" if count else "goal--todo"
+            goal_html_parts.append(
+                f'<li class="goal-item {cls}"><span class="goal-item__icon">{icon}</span>'
+                f'<span class="goal-item__lbl">{esc(lbl)}</span>'
+                f'<span class="goal-item__count">{count}회</span>'
+                f'<span class="goal-item__target">목표 {esc(target)}</span></li>'
+            )
+ 
+        # 상세 테이블 HTML
+        table_rows = []
+        for metric in metric_summaries:
+            s = metric.get("status", "UNAVAILABLE")
+            table_rows.append(f"""
+        <tr>
+          <td>{esc(metric.get("label"))}</td>
+          <td>{esc(metric.get("value"))}{esc(metric.get("unit") or "")}</td>
+          <td><span class="badge {status_badge_class(s)}">{esc(status_label(s))}</span></td>
+          <td class="td--desc">{esc(metric.get("description"))}</td>
+        </tr>""")
+ 
+        challenge_msg = esc(challenge.get("message", "이번 주 생활습관 실천 내용을 확인했습니다."))
+        trend_msg     = esc(trend.get("message", "다음 리포트에서 추이를 비교할 수 있습니다."))
+ 
         return f"""<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>All4Health 주간 리포트</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet" />
   <style>
-    * {{ box-sizing: border-box; }}
+    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+ 
+    :root {{
+      --green:      #2D7A4F;
+      --green-lt:   #EAF4EE;
+      --green-md:   #A8D5B5;
+      --red:        #D94F4F;
+      --red-lt:     #FDF0F0;
+      --orange:     #E07A2B;
+      --orange-lt:  #FEF4EB;
+      --gray-50:    #F8F9FA;
+      --gray-100:   #F1F3F5;
+      --gray-200:   #E9ECEF;
+      --gray-400:   #ADB5BD;
+      --gray-600:   #6C757D;
+      --gray-800:   #343A40;
+      --gray-900:   #212529;
+      --radius-sm:  6px;
+      --radius-md:  10px;
+      --radius-lg:  14px;
+      --shadow-sm:  0 1px 4px rgba(0,0,0,.06);
+      --shadow-md:  0 4px 16px rgba(0,0,0,.08);
+    }}
+ 
     body {{
-      margin: 0;
-      background: #f3f4f6;
-      color: #222;
-      font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Noto Sans KR", "Malgun Gothic", sans-serif;
-      line-height: 1.55;
+      background: var(--gray-50);
+      color: var(--gray-900);
+      font-family: "Noto Sans KR", -apple-system, "Apple SD Gothic Neo", sans-serif;
+      font-size: 14px;
+      line-height: 1.6;
+      -webkit-font-smoothing: antialiased;
     }}
+ 
+    /* ── 레이아웃 ── */
     .page {{
-      width: 760px;
-      min-height: 1080px;
-      margin: 24px auto;
-      padding: 52px;
-      border: 1px solid #e5e7eb;
-      border-radius: 10px;
-      background: #fff;
+      max-width: 780px;
+      margin: 32px auto 64px;
+      padding: 0 16px;
     }}
-    .hero {{ padding: 34px 38px; border-radius: 14px; background: #f1f2f5; margin-bottom: 38px; }}
-    h1 {{ margin: 0 0 8px; font-size: 30px; letter-spacing: -0.02em; }}
-    h2 {{ margin: 34px 0 16px; font-size: 20px; }}
-    p {{ margin: 0; }}
-    .period {{ color: #555; font-size: 16px; }}
-    .score {{ margin-top: 28px; font-size: 20px; font-weight: 800; }}
-    .score strong {{ font-size: 26px; }}
-    .formula {{ margin-top: 8px; color: #444; font-size: 14px; }}
-    .grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 18px; margin-bottom: 28px; }}
-    .metric-card {{ min-height: 126px; padding: 24px; border-radius: 12px; background: #f1f2f4; }}
-    .metric-card p {{ margin-bottom: 12px; color: #333; font-size: 15px; }}
-    .metric-card strong {{ display: block; font-size: 28px; line-height: 1.1; }}
-    .metric-card small {{ display: block; margin-top: 8px; color: #555; font-size: 13px; }}
-    .chart {{ height: 160px; padding: 20px; border-radius: 10px; background: #f1f2f4; }}
-    .summary-box {{ padding: 24px; border-radius: 10px; background: #f4f5f8; white-space: pre-wrap; }}
-    .bars {{ padding: 20px; border-radius: 10px; background: #f4f5f8; }}
-    .bar-row {{ display: grid; grid-template-columns: 120px 60px 1fr; align-items: center; gap: 14px; margin-bottom: 14px; }}
-    .bar-row span {{ color: #555; }}
-    .bar-row b {{ text-align: right; }}
-    .bar-row div {{ height: 8px; border-radius: 999px; background: #e5e7eb; overflow: hidden; }}
-    .bar-row i {{ display: block; height: 100%; border-radius: 999px; background: #333; }}
-    table {{ width: 100%; border-collapse: collapse; font-size: 14px; }}
-    th {{ background: #f0f1f3; text-align: left; }}
-    th, td {{ padding: 12px; border-bottom: 1px solid #e5e7eb; }}
-    ul {{ margin: 0; padding-left: 20px; }}
-    li {{ margin: 7px 0; }}
-    .notice {{ margin-top: 34px; padding: 18px 20px; border-radius: 10px; background: #f1f2f4; color: #444; }}
-    .footer {{ display: flex; justify-content: space-between; margin-top: 34px; padding-top: 20px; border-top: 1px solid #e5e7eb; color: #c0c5cc; font-size: 12px; }}
+ 
+    /* ── 헤더 ── */
+    .header {{
+      background: var(--green);
+      border-radius: var(--radius-lg);
+      padding: 36px 40px;
+      color: #fff;
+      margin-bottom: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 24px;
+    }}
+    .header__brand {{ font-size: 22px; font-weight: 700; letter-spacing: -0.03em; margin-bottom: 4px; }}
+    .header__sub   {{ font-size: 13px; color: var(--green-md); }}
+    .header__period{{ font-size: 13px; color: var(--green-md); margin-top: 2px; }}
+    .score-badge {{
+      text-align: center;
+      background: rgba(255,255,255,.12);
+      border-radius: var(--radius-md);
+      padding: 16px 28px;
+      min-width: 108px;
+      flex-shrink: 0;
+    }}
+    .score-badge__num  {{ font-size: 36px; font-weight: 700; line-height: 1; }}
+    .score-badge__unit {{ font-size: 12px; color: var(--green-md); margin-top: 4px; }}
+ 
+    /* ── 섹션 ── */
+    .section {{ margin-bottom: 28px; }}
+    .section__title {{
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-600);
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }}
+    .section__title::after {{
+      content: "";
+      flex: 1;
+      height: 1px;
+      background: var(--gray-200);
+    }}
+ 
+    /* ── 요약 카드 ── */
+    .cards {{
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(136px, 1fr));
+      gap: 12px;
+    }}
+    .card {{
+      background: #fff;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      padding: 18px 16px 14px;
+      box-shadow: var(--shadow-sm);
+    }}
+    .card__icon  {{ font-size: 20px; display: block; margin-bottom: 10px; }}
+    .card__label {{ font-size: 11px; color: var(--gray-600); font-weight: 500; margin-bottom: 4px; }}
+    .card__value {{ font-size: 22px; font-weight: 700; color: var(--gray-900); margin-bottom: 8px; line-height: 1.2; }}
+ 
+    /* ── 배지 ── */
+    .badge {{
+      display: inline-block;
+      font-size: 11px;
+      font-weight: 600;
+      border-radius: 999px;
+      padding: 2px 10px;
+    }}
+    .badge--normal  {{ background: var(--green-lt);  color: var(--green); }}
+    .badge--caution {{ background: var(--orange-lt); color: var(--orange); }}
+    .badge--high    {{ background: var(--red-lt);    color: var(--red); }}
+    .badge--unavail {{ background: var(--gray-100);  color: var(--gray-400); }}
+ 
+    /* ── AI 요약 박스 ── */
+    .summary-box {{
+      background: #fff;
+      border: 1px solid var(--gray-200);
+      border-left: 4px solid var(--green);
+      border-radius: var(--radius-md);
+      padding: 20px 22px;
+      font-size: 14px;
+      line-height: 1.75;
+      color: var(--gray-800);
+      box-shadow: var(--shadow-sm);
+      white-space: pre-wrap;
+    }}
+ 
+    /* ── 바 차트 ── */
+    .bars {{ display: flex; flex-direction: column; gap: 14px; }}
+    .bar-row {{ display: grid; grid-template-columns: 88px 44px 1fr; align-items: center; gap: 12px; }}
+    .bar-row__label {{ font-size: 13px; color: var(--gray-600); }}
+    .bar-row__val   {{ font-size: 13px; font-weight: 600; text-align: right; color: var(--gray-800); }}
+    .bar-row__track {{ height: 6px; background: var(--gray-100); border-radius: 999px; overflow: hidden; }}
+    .bar-row__fill  {{ height: 100%; background: var(--green); border-radius: 999px; transition: width .4s; }}
+ 
+    /* ── 목표 달성 ── */
+    .progress-ring-wrap {{
+      display: flex;
+      align-items: center;
+      gap: 28px;
+      margin-bottom: 20px;
+    }}
+    .progress-ring-label {{ font-size: 32px; font-weight: 700; color: var(--green); }}
+    .progress-ring-sub   {{ font-size: 13px; color: var(--gray-600); margin-top: 2px; }}
+    .goal-list {{ list-style: none; display: flex; flex-direction: column; gap: 8px; }}
+    .goal-item {{
+      display: grid;
+      grid-template-columns: 20px 1fr auto auto;
+      align-items: center;
+      gap: 10px;
+      font-size: 13px;
+      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      background: #fff;
+      border: 1px solid var(--gray-200);
+    }}
+    .goal--done {{ border-color: var(--green-md); }}
+    .goal-item__icon   {{ font-size: 14px; font-weight: 700; color: var(--green); }}
+    .goal--todo .goal-item__icon {{ color: var(--gray-400); }}
+    .goal-item__lbl    {{ font-weight: 500; }}
+    .goal-item__count  {{ font-weight: 700; color: var(--gray-800); }}
+    .goal-item__target {{ font-size: 11px; color: var(--gray-400); }}
+ 
+    /* ── 상세 테이블 ── */
+    .detail-table {{ width: 100%; border-collapse: collapse; font-size: 13px; }}
+    .detail-table th {{
+      background: var(--gray-100);
+      padding: 10px 14px;
+      text-align: left;
+      font-weight: 600;
+      color: var(--gray-600);
+      font-size: 12px;
+    }}
+    .detail-table td {{ padding: 11px 14px; border-bottom: 1px solid var(--gray-100); color: var(--gray-800); }}
+    .detail-table tr:last-child td {{ border-bottom: none; }}
+    .td--desc {{ color: var(--gray-400); font-size: 12px; }}
+    .table-wrap {{ background: #fff; border: 1px solid var(--gray-200); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-sm); }}
+ 
+    /* ── 조언 박스 ── */
+    .advice-grid {{ display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }}
+    .advice-box {{
+      padding: 20px;
+      border-radius: var(--radius-md);
+      border: 1px solid transparent;
+    }}
+    .advice-box--caution {{ background: var(--red-lt); border-color: #f7c5c5; }}
+    .advice-box--good    {{ background: var(--green-lt); border-color: var(--green-md); }}
+    .advice-box__title {{ font-size: 12px; font-weight: 700; margin-bottom: 8px; }}
+    .advice-box--caution .advice-box__title {{ color: var(--red); }}
+    .advice-box--good    .advice-box__title {{ color: var(--green); }}
+    .advice-box__body {{ font-size: 13px; line-height: 1.65; color: var(--gray-700); }}
+ 
+    /* ── 다음 단계 ── */
+    .next-steps {{ list-style: none; display: flex; flex-direction: column; gap: 10px; }}
+    .next-steps li {{
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 14px 18px;
+      background: #fff;
+      border: 1px solid var(--gray-200);
+      border-radius: var(--radius-md);
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gray-800);
+      box-shadow: var(--shadow-sm);
+    }}
+    .step-num {{
+      width: 26px; height: 26px;
+      background: var(--green);
+      color: #fff;
+      border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 12px; font-weight: 700;
+      flex-shrink: 0;
+    }}
+ 
+    /* ── 면책 고지 ── */
+    .disclaimer {{
+      text-align: center;
+      font-size: 11px;
+      color: var(--gray-400);
+      margin-top: 32px;
+      padding-top: 20px;
+      border-top: 1px solid var(--gray-200);
+    }}
+ 
+    /* ── 인쇄 ── */
     @media print {{
       body {{ background: #fff; }}
-      .page {{ width: auto; min-height: auto; margin: 0; border: 0; border-radius: 0; page-break-after: always; }}
+      .page {{ margin: 0; max-width: none; padding: 0; }}
+      .header {{ border-radius: 0; }}
     }}
   </style>
 </head>
 <body>
   <main class="page">
-    <section class="hero">
-      <h1>All4Health</h1>
-      <p class="period">주간 건강 리포트</p>
-      <p class="period">{esc(report.week_start_date)} ~ {esc(report.week_end_date)}</p>
-      <p class="score">종합 건강 점수: <strong>{score}점</strong></p>
-      <p class="formula">점수 계산: 건강 기록 + 혈압·혈당 + 운동 + 식단 + 챌린지 실천을 종합 반영</p>
+ 
+    <!-- ── 헤더 ── -->
+    <header class="header">
+      <div>
+        <p class="header__brand">All4Health</p>
+        <p class="header__sub">주간 건강 리포트</p>
+        <p class="header__period">{esc(report.week_start_date)} – {esc(report.week_end_date)}</p>
+      </div>
+      <div class="score-badge">
+        <p class="score-badge__num">{score}</p>
+        <p class="score-badge__unit">종합 점수</p>
+      </div>
+    </header>
+ 
+    <!-- ── 요약 카드 ── -->
+    <section class="section">
+      <h2 class="section__title">이번 주 요약</h2>
+      <div class="cards">{"".join(card_html_parts)}</div>
     </section>
-
-    <section class="grid">
-      {"".join(card_html)}
+ 
+    <!-- ── AI 요약 ── -->
+    <section class="section">
+      <h2 class="section__title">AI 분석 요약</h2>
+      <div class="summary-box">{esc(report.report_text)}</div>
     </section>
-
-    <h2>건강 추이</h2>
-    <div class="chart">
-      <svg viewBox="0 0 410 110" width="100%" height="100%" aria-label="건강 추이">
-        <polyline points="{trend_polyline}" fill="none" stroke="#ff4d3d" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
-      </svg>
-    </div>
-
-    <h2>AI 분석 요약</h2>
-    <div class="summary-box">{esc(report.report_text)}</div>
-
-    <h2>관리 영역별 성과</h2>
-    <div class="bars">{"".join(metric_bars)}</div>
-
-    <h2>목표 달성률: {completion_rate}%</h2>
-    <ul>{goal_html}</ul>
-
-    <h2>상세 분석</h2>
-    <table>
-      <thead><tr><th>영역</th><th>기록</th><th>상태</th><th>설명</th></tr></thead>
-      <tbody>{"".join(metric_rows)}</tbody>
-    </table>
-
-    <h2>건강 조언</h2>
-    <p><strong>주의할 점</strong></p>
-    <ul>
-      <li>혈압·혈당 수치를 주기적으로 확인하세요.</li>
-      <li>식단과 운동 기록을 꾸준히 남기면 리포트 정확도가 높아집니다.</li>
-    </ul>
-    <p style="margin-top:18px"><strong>잘한 점</strong></p>
-    <ul>
-      <li>{esc(report.challenge_summary.get("message", "이번 주 생활습관 실천 내용을 확인했습니다."))}</li>
-      <li>{esc(report.trend_summary.get("message", "다음 리포트에서 추이를 비교할 수 있습니다."))}</li>
-    </ul>
-
-    <h2>다음 단계</h2>
-    <ol>
-      <li>주 4회 이상 유산소 운동 기록</li>
-      <li>나트륨 섭취 줄이기</li>
-      <li>정기적인 혈압·혈당 모니터링</li>
-    </ol>
-    <div class="notice">{esc(REPORT_DISCLAIMER)}</div>
-    <footer class="footer"><span>All4Health © 2026</span><span>주간 리포트</span></footer>
+ 
+    <!-- ── 관리 영역별 성과 ── -->
+    <section class="section">
+      <h2 class="section__title">관리 영역별 성과</h2>
+      <div class="bars">{"".join(bar_html_parts)}</div>
+    </section>
+ 
+    <!-- ── 목표 달성률 ── -->
+    <section class="section">
+      <h2 class="section__title">목표 달성률</h2>
+      <div class="progress-ring-wrap">
+        <div>
+          <p class="progress-ring-label">{completion_rate}%</p>
+          <p class="progress-ring-sub">이번 주 챌린지 달성</p>
+        </div>
+      </div>
+      <ul class="goal-list">{"".join(goal_html_parts)}</ul>
+    </section>
+ 
+    <!-- ── 상세 분석 ── -->
+    <section class="section">
+      <h2 class="section__title">상세 분석</h2>
+      <div class="table-wrap">
+        <table class="detail-table">
+          <thead><tr><th>영역</th><th>기록</th><th>상태</th><th>설명</th></tr></thead>
+          <tbody>{"".join(table_rows)}</tbody>
+        </table>
+      </div>
+    </section>
+ 
+    <!-- ── 건강 조언 ── -->
+    <section class="section">
+      <h2 class="section__title">건강 조언</h2>
+      <div class="advice-grid">
+        <div class="advice-box advice-box--caution">
+          <p class="advice-box__title">⚠ 주의할 점</p>
+          <p class="advice-box__body">혈압·혈당 수치를 주기적으로 확인하세요. 식단과 운동 기록을 꾸준히 남기면 리포트 정확도가 높아집니다.</p>
+        </div>
+        <div class="advice-box advice-box--good">
+          <p class="advice-box__title">✓ 잘한 점</p>
+          <p class="advice-box__body">{challenge_msg} {trend_msg}</p>
+        </div>
+      </div>
+    </section>
+ 
+    <!-- ── 다음 단계 ── -->
+    <section class="section">
+      <h2 class="section__title">다음 단계</h2>
+      <ol class="next-steps">
+        <li><span class="step-num">1</span>주 4회 이상 유산소 운동 기록</li>
+        <li><span class="step-num">2</span>나트륨 섭취 줄이기</li>
+        <li><span class="step-num">3</span>정기적인 혈압·혈당 모니터링</li>
+      </ol>
+    </section>
+ 
+    <p class="disclaimer">{esc(REPORT_DISCLAIMER)}</p>
+ 
   </main>
 </body>
 </html>"""
-
+    
     @staticmethod
     def _to_pdf_content(report: WeeklyReport) -> bytes:  # noqa: C901
         try:
             from reportlab.lib import colors
             from reportlab.lib.pagesizes import A4
+            from reportlab.lib.units import mm
             from reportlab.pdfbase import pdfmetrics
             from reportlab.pdfbase.cidfonts import UnicodeCIDFont
             from reportlab.pdfgen import canvas
@@ -844,72 +1080,106 @@ class WeeklyReportService:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="PDF 생성 모듈이 설치되지 않았습니다. 서버 의존성을 다시 설치해주세요.",
             ) from exc
-
+ 
+        # ── 폰트 등록 ──────────────────────────────────────────────────────────
+        # HYSMyeongJo-Medium: 명조 계열 / 본문 가독성 우수
+        # HYGothic-Medium:    고딕 계열 / 레이블·수치에 사용
+        for font_name in ("HYSMyeongJo-Medium", "HYGothic-Medium"):
+            pdfmetrics.registerFont(UnicodeCIDFont(font_name))
+ 
+        FN_BODY  = "HYSMyeongJo-Medium"   # 본문용 (명조)
+        FN_UI    = "HYGothic-Medium"       # UI 레이블·수치용 (고딕)
+ 
+        # ── 색상 팔레트 ────────────────────────────────────────────────────────
+        C_GREEN   = colors.HexColor("#2D7A4F")
+        C_GREEN_D = colors.HexColor("#1F5C3A")
+        C_GREEN_L = colors.HexColor("#EAF4EE")
+        C_GREEN_M = colors.HexColor("#A8D5B5")
+        C_RED     = colors.HexColor("#D94F4F")
+        C_RED_L   = colors.HexColor("#FDF0F0")
+        C_ORANGE  = colors.HexColor("#E07A2B")
+        C_GRAY_50 = colors.HexColor("#F8F9FA")
+        C_GRAY_100= colors.HexColor("#F1F3F5")
+        C_GRAY_200= colors.HexColor("#E9ECEF")
+        C_GRAY_400= colors.HexColor("#ADB5BD")
+        C_GRAY_600= colors.HexColor("#6C757D")
+        C_GRAY_800= colors.HexColor("#343A40")
+        C_GRAY_900= colors.HexColor("#212529")
+        C_WHITE   = colors.white
+ 
+        # ── 페이지 기본값 ───────────────────────────────────────────────────────
         buffer = io.BytesIO()
-        page_width, page_height = A4
-        margin = 48
-        content_w = page_width - margin * 2
-        pdfmetrics.registerFont(UnicodeCIDFont("HYGothic-Medium"))
-        fn = "HYGothic-Medium"
+        pw, ph = A4                      # 595 × 842 pt
+        MG   = 44                        # 좌우 마진
+        CW   = pw - MG * 2              # 콘텐츠 너비
+ 
         cv = canvas.Canvas(buffer, pagesize=A4)
-
-        C_GRN = colors.HexColor("#3D7A4F")
-        C_GRN_D = colors.HexColor("#2D5A3D")
-        C_GRN_M = colors.HexColor("#A8D5B5")
-        C_RED = colors.HexColor("#E53935")
-        C_ORG = colors.HexColor("#F57C00")
-        C_PUR = colors.HexColor("#7B1FA2")
-        C_TXT = colors.HexColor("#1A1A1A")
-        C_MID = colors.HexColor("#555555")
-        C_LIT = colors.HexColor("#888888")
-        C_BDR = colors.HexColor("#E5E7EB")
-        C_BG = colors.HexColor("#F8F9FA")
-        C_WHT = colors.white
-        CARD_COLS = [C_RED, C_ORG, colors.HexColor("#14A85B"), C_PUR]
-
-        def sf(size: int, fill=None) -> None:
-            cv.setFont(fn, size)
-            cv.setFillColor(fill if fill is not None else C_TXT)
-
-        def wrap(text: str, x: float, y: float, max_w: float, size: int, lead: int = 14, fill=None) -> float:
-            sf(size, fill)
+ 
+        # ── 헬퍼 ───────────────────────────────────────────────────────────────
+        def sf(size: int, font=FN_UI, fill=None) -> None:
+            cv.setFont(font, size)
+            cv.setFillColor(fill if fill is not None else C_GRAY_900)
+ 
+        def wrap_text(text: str, x: float, y: float, max_w: float,
+                      size: int, font=FN_BODY, lead: int = 15, fill=None) -> float:
+            sf(size, font, fill)
             for para in (str(text) or "").splitlines() or [""]:
                 line = ""
                 for word in para.split():
                     cand = word if not line else f"{line} {word}"
-                    if pdfmetrics.stringWidth(cand, fn, size) <= max_w:
+                    if pdfmetrics.stringWidth(cand, font, size) <= max_w:
                         line = cand
                     else:
                         cv.drawString(x, y, line)
                         y -= lead
                         line = word
-                cv.drawString(x, y, line)
-                y -= lead
+                if line:
+                    cv.drawString(x, y, line)
+                    y -= lead
             return y
-
-        def section_heading(title: str, y: float) -> float:
-            sf(11, C_TXT)
-            cv.drawString(margin, y, title)
-            w = pdfmetrics.stringWidth(title, fn, 11)
-            cv.setStrokeColor(C_GRN)
-            cv.setLineWidth(2)
-            cv.line(margin, y - 5, margin + w, y - 5)
-            return y - 22
-
-        def footer(page: int) -> None:
-            cv.setStrokeColor(C_BDR)
+ 
+        def section_title(title: str, y: float, icon: str = "") -> float:
+            sf(9, FN_UI, C_GRAY_600)
+            label = f"{icon}  {title}" if icon else title
+            cv.drawString(MG, y, label)
+            cv.setStrokeColor(C_GRAY_200)
             cv.setLineWidth(0.5)
-            cv.line(margin, 38, page_width - margin, 38)
-            sf(7.5, C_LIT)
-            cv.drawString(margin, 24, "All4Health © 2026")
-            cv.drawCentredString(page_width / 2, 24, REPORT_DISCLAIMER)
-            cv.drawRightString(page_width - margin, 24, f"{page} / 2")
-
-        source = getattr(report, "source_summary", None) or {}
+            cv.line(MG, y - 6, pw - MG, y - 6)
+            return y - 22
+ 
+        def chip(x: float, y: float, text: str, bg_col, txt_col, w: float = 52, h: float = 14) -> None:
+            cv.setFillColor(bg_col)
+            cv.roundRect(x, y - h / 2, w, h, 4, stroke=0, fill=1)
+            sf(7, FN_UI, txt_col)
+            cv.drawCentredString(x + w / 2, y - h / 2 + 3.5, text)
+ 
+        def footer_page(page: int, total: int = 2) -> None:
+            cv.setStrokeColor(C_GRAY_200)
+            cv.setLineWidth(0.4)
+            cv.line(MG, 34, pw - MG, 34)
+            sf(7, FN_UI, C_GRAY_400)
+            cv.drawString(MG, 22, "All4Health © 2026")
+            cv.drawCentredString(pw / 2, 22, REPORT_DISCLAIMER)
+            cv.drawRightString(pw - MG, 22, f"{page} / {total}")
+ 
+        def status_chip(x: float, y: float, status_val: str | None) -> None:
+            label_map  = {"NORMAL": "정상", "CAUTION": "주의", "HIGH": "위험", "UNAVAILABLE": "데이터 부족",
+                          "ACHIEVED": "달성", "IN_PROGRESS": "진행 중"}
+            bg_map     = {"NORMAL": C_GREEN_L, "CAUTION": colors.HexColor("#FEF4EB"),
+                          "HIGH": C_RED_L,     "UNAVAILABLE": C_GRAY_100,
+                          "ACHIEVED": C_GREEN_L, "IN_PROGRESS": colors.HexColor("#FEF4EB")}
+            txt_map    = {"NORMAL": C_GREEN,   "CAUTION": C_ORANGE,
+                          "HIGH": C_RED,       "UNAVAILABLE": C_GRAY_400,
+                          "ACHIEVED": C_GREEN,  "IN_PROGRESS": C_ORANGE}
+            sv = status_val or "UNAVAILABLE"
+            chip(x, y, label_map.get(sv, sv), bg_map.get(sv, C_GRAY_100), txt_map.get(sv, C_GRAY_400))
+ 
+        # ── 데이터 추출 ────────────────────────────────────────────────────────
+        source    = getattr(report, "source_summary",   None) or {}
         challenge = getattr(report, "challenge_summary", None) or {}
-        trend = getattr(report, "trend_summary", None) or {}
-        total_hr = WeeklyReportService._total_health_records(source)
-        score = min(
+        trend     = getattr(report, "trend_summary",    None) or {}
+        total_hr  = WeeklyReportService._total_health_records(source)
+        score     = min(
             100,
             55
             + min(total_hr, 5) * 5
@@ -918,191 +1188,223 @@ class WeeklyReportService:
             + min(source.get("challenge_checkin_count", 0), 7) * 2,
         )
         completion_rate = int(float(challenge.get("completion_rate") or 0))
-
-        # ── PAGE 1 ──────────────────────────────────────────────────────────────
-        hdr_h = 120
-        cv.setFillColor(C_GRN)
-        cv.rect(0, page_height - hdr_h, page_width, hdr_h, stroke=0, fill=1)
-
-        sf(20, C_WHT)
-        cv.drawString(margin, page_height - 36, "All4Health")
-        sf(9, C_GRN_M)
-        cv.drawString(margin, page_height - 54, "주간 건강 리포트")
-        sf(8.5, colors.HexColor("#C8E6CE"))
-        cv.drawString(margin, page_height - 70, f"{report.week_start_date}  ~  {report.week_end_date}")
-
-        bx = page_width - margin - 88
-        by = page_height - hdr_h + 16
-        cv.setFillColor(C_GRN_D)
-        cv.roundRect(bx, by, 88, 90, 8, stroke=0, fill=1)
-        sf(8, C_GRN_M)
-        cv.drawCentredString(bx + 44, by + 70, "종합 점수")
-        sf(30, C_WHT)
-        cv.drawCentredString(bx + 44, by + 34, str(score))
-        sf(9, C_GRN_M)
-        cv.drawCentredString(bx + 44, by + 16, "점")
-
-        y = page_height - hdr_h - 28
-        cards_src = (report.summary_cards or [])[:4]
-        if cards_src:
-            card_lv = [(d.get("label", ""), str(d.get("value", ""))) for d in cards_src]
-        else:
-            card_lv = [
-                ("건강 기록", f"{total_hr}건"),
-                ("AI 위험 신호", "—"),
-                ("식단 기록", f"{source.get('meal_log_count', 0)}건"),
-                ("운동 기록", f"{source.get('exercise_log_count', 0)}건"),
-            ]
-        card_w = (content_w - 12) / 2
-        card_h = 64
-        for idx, (lbl, val) in enumerate(card_lv[:4]):
-            cax = margin + (idx % 2) * (card_w + 12)
-            cay = y - (idx // 2) * (card_h + 10)
-            accent = CARD_COLS[idx % len(CARD_COLS)]
-            cv.setFillColor(C_BG)
-            cv.roundRect(cax, cay - card_h, card_w, card_h, 6, stroke=0, fill=1)
-            cv.setFillColor(accent)
-            cv.roundRect(cax, cay - card_h, 4, card_h, 2, stroke=0, fill=1)
-            sf(8, C_LIT)
-            cv.drawString(cax + 14, cay - 18, lbl)
-            sf(20, accent)
-            cv.drawString(cax + 14, cay - 44, val)
-
-        y -= (card_h + 10) * 2 + 24
-
-        y = section_heading("AI 분석 요약", y)
-        box_h = 88
-        cv.setFillColor(C_BG)
-        cv.roundRect(margin, y - box_h, content_w, box_h, 6, stroke=0, fill=1)
-        cv.setStrokeColor(C_BDR)
-        cv.setLineWidth(0.5)
-        cv.roundRect(margin, y - box_h, content_w, box_h, 6, stroke=1, fill=0)
-        wrap(report.report_text or "분석 내용 없음", margin + 14, y - 16, content_w - 28, 8.5, 13)
-        y -= box_h + 22
-
-        y = section_heading("관리 영역별 성과", y)
-        bar_x = margin + 130
-        bar_w = content_w - 130 - 4
+ 
+        # ══════════════════════════════════════════════════════════════════════
+        #  PAGE 1
+        # ══════════════════════════════════════════════════════════════════════
+        HDR_H = 110
+ 
+        # 헤더 배경
+        cv.setFillColor(C_GREEN)
+        cv.rect(0, ph - HDR_H, pw, HDR_H, stroke=0, fill=1)
+ 
+        # 브랜드명
+        sf(18, FN_UI, C_WHITE)
+        cv.drawString(MG, ph - 36, "All4Health")
+        sf(9, FN_UI, C_GREEN_M)
+        cv.drawString(MG, ph - 52, "주간 건강 리포트")
+        sf(8, FN_UI, colors.HexColor("#C8E6CE"))
+        cv.drawString(MG, ph - 66, f"{report.week_start_date}  –  {report.week_end_date}")
+ 
+        # 점수 박스
+        sx, sy = pw - MG - 80, ph - HDR_H + 12
+        cv.setFillColor(C_GREEN_D)
+        cv.roundRect(sx, sy, 80, 86, 8, stroke=0, fill=1)
+        sf(7.5, FN_UI, C_GREEN_M)
+        cv.drawCentredString(sx + 40, sy + 70, "종합 점수")
+        sf(28, FN_UI, C_WHITE)
+        cv.drawCentredString(sx + 40, sy + 34, str(score))
+        sf(8, FN_UI, C_GREEN_M)
+        cv.drawCentredString(sx + 40, sy + 16, "점")
+ 
+        y = ph - HDR_H - 26
+ 
+        # ── 요약 카드 (2×2 그리드) ─────────────────────────────────────────────
+        cards_data = (report.summary_cards or [])[:4]
+        card_labels = [d.get("label", "") for d in cards_data]
+        card_values = [str(d.get("value", "")) for d in cards_data]
+        card_statuses = [d.get("status") for d in cards_data]
+        if not cards_data:
+            card_labels  = ["건강 기록", "AI 위험 신호", "식단 기록", "운동 기록"]
+            card_values  = [f"{total_hr}건", "—",
+                            f"{source.get('meal_log_count',0)}건",
+                            f"{source.get('exercise_log_count',0)}건"]
+            card_statuses = ["NORMAL", "NORMAL", "NORMAL", "NORMAL"]
+ 
+        ACCENT = [C_GREEN, C_RED, colors.HexColor("#14A85B"), colors.HexColor("#7B1FA2")]
+        cw = (CW - 10) / 2
+        ch = 58
+        for i in range(min(4, len(card_labels))):
+            cx_ = MG + (i % 2) * (cw + 10)
+            cy_ = y - (i // 2) * (ch + 10)
+            cv.setFillColor(C_GRAY_50)
+            cv.roundRect(cx_, cy_ - ch, cw, ch, 6, stroke=0, fill=1)
+            # 왼쪽 액센트 바
+            cv.setFillColor(ACCENT[i % len(ACCENT)])
+            cv.roundRect(cx_, cy_ - ch, 3, ch, 2, stroke=0, fill=1)
+            sf(7.5, FN_UI, C_GRAY_600)
+            cv.drawString(cx_ + 12, cy_ - 16, card_labels[i])
+            sf(18, FN_UI, ACCENT[i % len(ACCENT)])
+            cv.drawString(cx_ + 12, cy_ - 38, card_values[i])
+            status_chip(cx_ + cw - 58, cy_ - 28, card_statuses[i])
+ 
+        y -= ch * 2 + 10 * 2 + 22
+ 
+        # ── AI 분석 요약 ────────────────────────────────────────────────────────
+        y = section_title("AI 분석 요약", y, "✦")
+        BOX_H = 80
+        cv.setFillColor(C_GRAY_50)
+        cv.roundRect(MG, y - BOX_H, CW, BOX_H, 6, stroke=0, fill=1)
+        cv.setFillColor(C_GREEN)
+        cv.roundRect(MG, y - BOX_H, 3, BOX_H, 2, stroke=0, fill=1)
+        wrap_text(report.report_text or "분석 내용 없음",
+                  MG + 14, y - 14, CW - 24, 8.5, FN_BODY, 13)
+        y -= BOX_H + 22
+ 
+        # ── 관리 영역별 성과 ────────────────────────────────────────────────────
+        y = section_title("관리 영역별 성과", y, "◈")
+        bar_x = MG + 92
+        bar_w = CW - 92 - 4
         for metric in (report.metric_summaries or [])[:5]:
-            lbl = str(metric.get("label", ""))
+            lbl  = str(metric.get("label", ""))
             val_s = str(metric.get("value", "0"))
-            unit = metric.get("unit") or ""
-            raw = int("".join(ch for ch in val_s if ch.isdigit()) or "0")
-            sf(8.5, C_MID)
-            cv.drawString(margin, y, lbl)
-            sf(8.5, C_TXT)
+            unit  = metric.get("unit") or ""
+            raw   = int("".join(ch for ch in val_s if ch.isdigit()) or "0")
+            # 레이블
+            sf(8.5, FN_UI, C_GRAY_600)
+            cv.drawString(MG, y, lbl)
+            # 수치
+            sf(8.5, FN_UI, C_GRAY_800)
             cv.drawRightString(bar_x - 6, y, f"{val_s}{unit}")
-            cv.setFillColor(C_BDR)
-            cv.roundRect(bar_x, y - 2, bar_w, 7, 3, stroke=0, fill=1)
-            fill_w = min(bar_w, max(14, raw * 15))
-            cv.setFillColor(C_GRN)
-            cv.roundRect(bar_x, y - 2, fill_w, 7, 3, stroke=0, fill=1)
+            # 트랙
+            cv.setFillColor(C_GRAY_200)
+            cv.roundRect(bar_x, y - 2, bar_w, 6, 3, stroke=0, fill=1)
+            fill_w = min(bar_w, max(10, raw * 14))
+            cv.setFillColor(C_GREEN)
+            cv.roundRect(bar_x, y - 2, fill_w, 6, 3, stroke=0, fill=1)
             y -= 20
-
-        footer(1)
+ 
+        footer_page(1)
         cv.showPage()
-
-        # ── PAGE 2 ──────────────────────────────────────────────────────────────
-        y = page_height - 60
-
-        y = section_heading("목표 달성률", y)
-        sf(26, C_GRN)
-        cv.drawString(margin, y, f"{completion_rate}%")
-        sf(9, C_LIT)
-        cv.drawString(margin + 52, y, "달성")
+ 
+        # ══════════════════════════════════════════════════════════════════════
+        #  PAGE 2
+        # ══════════════════════════════════════════════════════════════════════
+        y = ph - 56
+ 
+        # ── 목표 달성률 ─────────────────────────────────────────────────────────
+        y = section_title("목표 달성률", y, "◎")
+        sf(28, FN_UI, C_GREEN)
+        cv.drawString(MG, y, f"{completion_rate}%")
+        sf(9, FN_UI, C_GRAY_600)
+        cv.drawString(MG + 56, y, "달성")
         y -= 26
-
+ 
         for lbl, count, target in [
-            ("혈압·혈당", source.get("vital_record_count", 0), "주 3회 이상"),
-            ("식단 기록", source.get("meal_log_count", 0), "주 5회"),
-            ("운동 기록", source.get("exercise_log_count", 0), "주 3회"),
-            ("챌린지", source.get("challenge_checkin_count", 0), "주 3회 이상"),
+            ("혈압·혈당", source.get("vital_record_count", 0),    "주 3회 이상"),
+            ("식단 기록",  source.get("meal_log_count", 0),         "주 5회"),
+            ("운동 기록",  source.get("exercise_log_count", 0),     "주 3회"),
+            ("챌린지",    source.get("challenge_checkin_count", 0), "주 3회 이상"),
         ]:
-            sf(9, C_GRN if count else C_ORG)
-            cv.drawString(margin, y, "✓" if count else "△")
-            sf(8.5, C_TXT)
-            cv.drawString(margin + 16, y, f"{lbl}: {count}회")
-            tw = pdfmetrics.stringWidth(f"{lbl}: {count}회", fn, 8.5)
-            sf(8, C_LIT)
-            cv.drawString(margin + 16 + tw + 8, y, f"/ {target}")
-            y -= 16
-        y -= 20
-
-        y = section_heading("상세 분석", y)
-        col_xs = [margin, margin + 110, margin + 178, margin + 248]
-        cv.setFillColor(C_GRN)
-        cv.roundRect(margin, y - 20, content_w, 22, 4, stroke=0, fill=1)
-        sf(8.5, C_WHT)
-        for xi, h in zip(col_xs, ["영역", "기록", "상태", "설명"]):
-            cv.drawString(xi + 6, y - 14, h)
-        y -= 26
-
-        for idx, metric in enumerate((report.metric_summaries or [])[:7]):
-            cv.setFillColor(C_BG if idx % 2 == 0 else C_WHT)
-            cv.rect(margin, y - 24, content_w, 24, stroke=0, fill=1)
-            sf(8, C_TXT)
-            cv.drawString(col_xs[0] + 6, y - 15, str(metric.get("label", "")))
-            cv.drawString(col_xs[1] + 6, y - 15, f"{metric.get('value', '')}{metric.get('unit') or ''}")
-            status_v = str(metric.get("status", ""))
-            sf(7.5, C_GRN if status_v == "NORMAL" else C_RED)
-            cv.drawString(col_xs[2] + 6, y - 15, status_v)
-            sf(7.5, C_MID)
-            cv.drawString(col_xs[3] + 6, y - 15, str(metric.get("description", ""))[:42])
-            cv.setStrokeColor(C_BDR)
-            cv.setLineWidth(0.3)
-            cv.line(margin, y - 24, page_width - margin, y - 24)
-            y -= 24
-        y -= 20
-
-        y = section_heading("건강 조언", y)
-
-        def advice_box(title: str, body: str, bg_hex: str, accent_col) -> None:
-            nonlocal y
-            cv.setFillColor(colors.HexColor(bg_hex))
-            cv.roundRect(margin, y - 54, content_w, 56, 6, stroke=0, fill=1)
-            cv.setFillColor(accent_col)
-            cv.roundRect(margin, y - 54, 3, 56, 2, stroke=0, fill=1)
-            sf(8.5, accent_col)
-            cv.drawString(margin + 12, y - 13, title)
-            wrap(body, margin + 12, y - 28, content_w - 20, 8, 13)
-            y -= 68
-
-        advice_box(
-            "주의할 점",
-            "혈압·혈당 수치를 주기적으로 확인하세요. 식단과 운동 기록을 꾸준히 남기면 리포트 정확도가 높아집니다.",
-            "#FFF3F3",
-            C_RED,
-        )
-        good_msg = (
-            f"{challenge.get('message', '이번 주 생활습관 실천 내용을 확인했습니다.')}"
-            f" {trend.get('message', '다음 리포트에서 추이를 비교할 수 있습니다.')}"
-        )
-        advice_box("잘한 점", good_msg, "#F0F9F3", C_GRN)
-        y -= 6
-
-        y = section_heading("다음 단계", y)
-        for step_i, step_text in enumerate([
-            "주 4회 이상 유산소 운동 기록",
-            "나트륨 섭취 줄이기",
-            "정기적인 혈압·혈당 모니터링",
-        ]):
-            cv.setFillColor(C_GRN)
-            cv.circle(margin + 8, y - 2, 7, stroke=0, fill=1)
-            sf(7.5, C_WHT)
-            cv.drawCentredString(margin + 8, y - 5, str(step_i + 1))
-            sf(8.5, C_TXT)
-            cv.drawString(margin + 22, y - 3, step_text)
-            y -= 20
+            done = bool(count)
+            cv.setFillColor(C_GRAY_50)
+            cv.roundRect(MG, y - 18, CW, 22, 4, stroke=0, fill=1)
+            if done:
+                cv.setFillColor(C_GREEN)
+                cv.roundRect(MG, y - 18, 3, 22, 2, stroke=0, fill=1)
+            sf(8.5, FN_UI, C_GREEN if done else C_GRAY_400)
+            cv.drawString(MG + 10, y - 10, "✓" if done else "○")
+            sf(8.5, FN_BODY, C_GRAY_800)
+            cv.drawString(MG + 26, y - 10, f"{lbl}: {count}회")
+            tw = pdfmetrics.stringWidth(f"{lbl}: {count}회", FN_BODY, 8.5)
+            sf(7.5, FN_UI, C_GRAY_400)
+            cv.drawString(MG + 26 + tw + 8, y - 10, f"목표 {target}")
+            y -= 26
         y -= 14
-
-        cv.setFillColor(C_BG)
-        cv.roundRect(margin, y - 26, content_w, 28, 6, stroke=0, fill=1)
-        sf(7.5, C_LIT)
-        cv.drawCentredString(page_width / 2, y - 14, REPORT_DISCLAIMER)
-
-        footer(2)
+ 
+        # ── 상세 분석 ───────────────────────────────────────────────────────────
+        y = section_title("상세 분석", y, "≡")
+        col_x = [MG, MG + 100, MG + 168, MG + 230, MG + 340]
+        ROW_H = 22
+ 
+        # 헤더 행
+        cv.setFillColor(C_GREEN)
+        cv.roundRect(MG, y - ROW_H, CW, ROW_H + 2, 4, stroke=0, fill=1)
+        sf(8, FN_UI, C_WHITE)
+        for xi, h in zip(col_x, ["영역", "기록", "상태", "설명"]):
+            cv.drawString(xi + 6, y - 14, h)
+        y -= ROW_H + 4
+ 
+        for idx, metric in enumerate((report.metric_summaries or [])[:7]):
+            bg = C_GRAY_50 if idx % 2 == 0 else C_WHITE
+            cv.setFillColor(bg)
+            cv.rect(MG, y - ROW_H, CW, ROW_H, stroke=0, fill=1)
+            sf(8, FN_BODY, C_GRAY_800)
+            cv.drawString(col_x[0] + 6, y - 14, str(metric.get("label", "")))
+            cv.drawString(col_x[1] + 6, y - 14, f"{metric.get('value','')}{metric.get('unit') or ''}")
+            status_chip(col_x[2] + 6, y - 7, metric.get("status"))
+            sf(7.5, FN_BODY, C_GRAY_400)
+            cv.drawString(col_x[3] + 6, y - 14, str(metric.get("description", ""))[:40])
+            cv.setStrokeColor(C_GRAY_200)
+            cv.setLineWidth(0.3)
+            cv.line(MG, y - ROW_H, pw - MG, y - ROW_H)
+            y -= ROW_H
+        y -= 18
+ 
+        # ── 건강 조언 ───────────────────────────────────────────────────────────
+        y = section_title("건강 조언", y, "♡")
+        half_w = (CW - 10) / 2
+ 
+        def advice_rect(ax: float, ay: float, aw: float, title: str,
+                        body: str, bg_col, accent_col, title_col) -> float:
+            abox_h = 70
+            cv.setFillColor(bg_col)
+            cv.roundRect(ax, ay - abox_h, aw, abox_h, 6, stroke=0, fill=1)
+            cv.setFillColor(accent_col)
+            cv.roundRect(ax, ay - abox_h, 3, abox_h, 2, stroke=0, fill=1)
+            sf(8.5, FN_UI, title_col)
+            cv.drawString(ax + 12, ay - 16, title)
+            wrap_text(body, ax + 12, ay - 30, aw - 20, 7.5, FN_BODY, 12, C_GRAY_600)
+            return ay - abox_h
+ 
+        good_msg = (
+            f"{challenge.get('message','이번 주 생활습관 실천 내용을 확인했습니다.')} "
+            f"{trend.get('message','다음 리포트에서 추이를 비교할 수 있습니다.')}"
+        )
+        advice_rect(MG, y, half_w,
+                    "⚠ 주의할 점",
+                    "혈압·혈당 수치를 주기적으로 확인하세요. 식단과 운동 기록을 꾸준히 남기면 리포트 정확도가 높아집니다.",
+                    C_RED_L, C_RED, C_RED)
+        advice_rect(MG + half_w + 10, y, half_w,
+                    "✓ 잘한 점", good_msg,
+                    C_GREEN_L, C_GREEN, C_GREEN)
+        y -= 80
+ 
+        # ── 다음 단계 ───────────────────────────────────────────────────────────
+        y = section_title("다음 단계", y, "→")
+        for step_i, step_text in enumerate(["주 4회 이상 유산소 운동 기록", "나트륨 섭취 줄이기", "정기적인 혈압·혈당 모니터링"]):
+            cv.setFillColor(C_GRAY_50)
+            cv.roundRect(MG, y - 22, CW, 24, 5, stroke=0, fill=1)
+            cv.setFillColor(C_GREEN)
+            cv.circle(MG + 14, y - 10, 9, stroke=0, fill=1)
+            sf(7.5, FN_UI, C_WHITE)
+            cv.drawCentredString(MG + 14, y - 13, str(step_i + 1))
+            sf(8.5, FN_BODY, C_GRAY_800)
+            cv.drawString(MG + 30, y - 13, step_text)
+            y -= 28
+        y -= 12
+ 
+        # 면책 고지
+        cv.setFillColor(C_GRAY_100)
+        cv.roundRect(MG, y - 22, CW, 24, 5, stroke=0, fill=1)
+        sf(7.5, FN_UI, C_GRAY_400)
+        cv.drawCentredString(pw / 2, y - 13, REPORT_DISCLAIMER)
+ 
+        footer_page(2)
         cv.save()
         return buffer.getvalue()
+ 
+ 
 
     @staticmethod
     def _summary_text(report_text: str, max_length: int = 80) -> str:
