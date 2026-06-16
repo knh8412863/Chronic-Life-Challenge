@@ -499,7 +499,14 @@ class ClovaOcrService:
                 value = (
                     value
                     if value is not None
-                    else ClovaOcrService._find_nutrient_value(normalized, labels, expected_unit, minimum, maximum)
+                    else ClovaOcrService._find_nutrient_value(
+                        normalized,
+                        labels,
+                        expected_unit,
+                        minimum,
+                        maximum,
+                        prefer_first_unit_value=ClovaOcrService._has_multiple_basis_columns(normalized),
+                    )
                 )
             if value is None and field_name == "calories":
                 value = ClovaOcrService._extract_basis_calories(normalized, serving_basis, basis_amount_g)
@@ -593,19 +600,75 @@ class ClovaOcrService:
         unit: str,
         minimum: float,
         maximum: float,
+        *,
+        prefer_first_unit_value: bool = False,
     ) -> float | None:
         label_pattern = "|".join(labels)
-        unit_pattern = re.escape(unit)
-        unit_value_pattern = (
-            rf"(?:{label_pattern})(?:(?!\n).){{0,80}}?"
-            rf"(\d+(?:\.\d+)?)\s*{unit_pattern}(?![a-zA-Z가-힣%])"
+        row_context = ClovaOcrService._find_label_context(text, labels)
+        if row_context is None:
+            return None
+        value = ClovaOcrService._find_unit_anchored_number(
+            row_context,
+            unit,
+            minimum,
+            maximum,
+            prefer_first=prefer_first_unit_value,
         )
-        value = ClovaOcrService._find_valid_nutrient_match(text, unit_value_pattern, minimum, maximum)
         if value is not None:
             return value
 
-        loose_value_pattern = rf"(?:{label_pattern})(?:(?!\n).){{0,80}}?(\d+(?:\.\d+)?)(?!\s*%)"
+        loose_value_pattern = rf"(?:{label_pattern})(?:(?!\n).){{0,80}}?(\d+(?:\.\d+)?)(?!\s*(?:%|％))"
         return ClovaOcrService._find_valid_nutrient_match(text, loose_value_pattern, minimum, maximum)
+
+    @staticmethod
+    def _find_label_context(text: str, labels: list[str], max_chars: int = 100) -> str | None:
+        label_pattern = "|".join(labels)
+        match = re.search(rf"(?:{label_pattern})(?P<context>(?:(?!\n).){{0,{max_chars}}})", text, flags=re.IGNORECASE)
+        if not match:
+            return None
+        return match.group("context")
+
+    @staticmethod
+    def _find_unit_anchored_number(
+        text: str,
+        unit: str,
+        minimum: float,
+        maximum: float,
+        *,
+        prefer_first: bool = False,
+    ) -> float | None:
+        unit_pattern = ClovaOcrService._unit_pattern(unit)
+        matches: list[tuple[float, int]] = []
+        for match in re.finditer(rf"(\d+(?:\.\d+)?)\s*{unit_pattern}(?![a-zA-Z가-힣%％])", text, re.IGNORECASE):
+            value = float(match.group(1))
+            if minimum <= value <= maximum:
+                matches.append((value, match.start()))
+        if not matches:
+            return None
+        if prefer_first:
+            return matches[0][0]
+        if unit == "g" and len(matches) > 1:
+            non_daily_reference = [item for item in matches if "일" not in text[max(0, item[1] - 8) : item[1] + 12]]
+            if non_daily_reference:
+                return max(non_daily_reference, key=lambda item: item[0])[0]
+        return matches[0][0]
+
+    @staticmethod
+    def _has_multiple_basis_columns(text: str) -> bool:
+        return bool(
+            re.search(r"[1-9]\d{1,2}(?:\.\d+)?\s*g\s*[)\]]?\s*(?:당|기준)", text, flags=re.IGNORECASE)
+            and re.search(r"100\s*g\s*(?:당|기준|per)|per\s*100\s*g", text, flags=re.IGNORECASE)
+        )
+
+    @staticmethod
+    def _unit_pattern(unit: str) -> str:
+        if unit == "g":
+            return r"(?:g|ｇ|9|q|그램)"
+        if unit == "mg":
+            return r"(?:mg|㎎|mｇ|ｍg|밀리그램)"
+        if unit == "kcal":
+            return r"(?:kcal|㎉|kcaI|kca1)"
+        return re.escape(unit)
 
     @staticmethod
     def _find_valid_nutrient_match(text: str, pattern: str, minimum: float, maximum: float) -> float | None:
@@ -687,7 +750,10 @@ class ClovaOcrService:
 
     @staticmethod
     def _normalize_text(text: str) -> str:
-        return re.sub(r"[ \t]+", " ", text.replace("：", ":")).strip()
+        text = text.replace("：", ":")
+        text = re.sub(r"(?<=\d),(?=\d{3}(?:\D|$))", "", text)
+        text = re.sub(r"(?<=\d)\s*[％﹪]\s*", "%", text)
+        return re.sub(r"[ \t]+", " ", text).strip()
 
     @staticmethod
     def _classify_ocr_token(text: str) -> str:

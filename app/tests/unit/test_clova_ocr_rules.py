@@ -299,6 +299,23 @@ def test_clova_ocr_parser_uses_unit_anchor_when_percent_appears_before_value():
     assert result["nutrition"]["sugar_g"] == 8
 
 
+def test_clova_ocr_parser_normalizes_thousand_commas_and_common_unit_misreads():
+    text = """
+    총 내용량 1개
+    열량 1,420 kcal
+    탄수화물 17 g 56 g
+    나트륨 18 % 1,280 mg
+    당류 8 ％ 8 ｇ
+    """
+
+    result = ClovaOcrService._parse_food_nutrition_text(text)
+
+    assert result["nutrition"]["calories"] == 1420
+    assert result["nutrition"]["carbs_g"] == 56
+    assert result["nutrition"]["sodium_mg"] == 1280
+    assert result["nutrition"]["sugar_g"] == 8
+
+
 def test_gauge_results_match_value_box_to_label_by_y_axis():
     fields = [
         ClovaOcrService._extract_fields(
