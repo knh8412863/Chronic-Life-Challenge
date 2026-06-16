@@ -165,11 +165,13 @@ class ChallengeService:
             for participation in active_participations
             if any(checkin.checkin_date == today for checkin in participation.checkins)
         }
+        today_context = await self._today_health_context(user.id, today)
         summaries = [
             self._to_summary(
                 challenge,
                 is_joined=challenge.id in joined_ids,
-                today_checked=challenge.id in today_checked_ids,
+                today_checked=challenge.id in today_checked_ids
+                or self._health_context_satisfies_challenge(challenge, today_context),
                 participant_count=participation_counts.get(challenge.id, 0),
             )
             for challenge in challenges
@@ -192,7 +194,14 @@ class ChallengeService:
             .all()
         )
         participant_count = len(participations)
-        today_checked = bool(participation and any(checkin.checkin_date == today for checkin in participation.checkins))
+        today_context = await self._today_health_context(user.id, today)
+        today_checked = bool(
+            participation
+            and (
+                any(checkin.checkin_date == today for checkin in participation.checkins)
+                or self._health_context_satisfies_challenge(challenge, today_context)
+            )
+        )
         return ChallengeDetailResponse(
             **self._to_summary(
                 challenge,
@@ -237,7 +246,8 @@ class ChallengeService:
             .order_by("-created_at")
             .prefetch_related("challenge", "checkins")
         )
-        return [self._to_my_challenge(participation, today) for participation in participations]
+        today_context = await self._today_health_context(user.id, today)
+        return [self._to_my_challenge(participation, today, today_context) for participation in participations]
 
     async def get_participation(self, user: User, participation_id: int) -> MyChallengeResponse:
         participation = await ChallengeParticipation.get_or_none(id=participation_id, user_id=user.id).prefetch_related(
@@ -246,7 +256,9 @@ class ChallengeService:
         )
         if participation is None:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="참여 중인 챌린지를 찾을 수 없습니다.")
-        return self._to_my_challenge(participation, date.today())
+        today = date.today()
+        today_context = await self._today_health_context(user.id, today)
+        return self._to_my_challenge(participation, today, today_context)
 
     async def get_recommendations(self, user: User, limit: int = 5) -> list[ChallengeSummaryResponse]:
         await self._ensure_default_challenges()
@@ -276,7 +288,10 @@ class ChallengeService:
         )
         earned_badge_count = await UserBadge.filter(user_id=user.id).count()
 
-        return self._build_dashboard_summary(participations, today, week_start, week_end, earned_badge_count)
+        today_context = await self._today_health_context(user.id, today)
+        return self._build_dashboard_summary(
+            participations, today, week_start, week_end, earned_badge_count, today_context
+        )
 
     async def get_badges(self, user: User, badge_filter: str = "ALL") -> ChallengeBadgeListResponse:
         checkins = await ChallengeCheckin.filter(user_id=user.id).order_by("-checkin_date", "-created_at")
@@ -468,11 +483,15 @@ class ChallengeService:
 
         activity_exercise_minutes = sum(item.exercise_minutes or 0 for item in activities)
         exercise_log_minutes = sum(item.duration_minutes or 0 for item in exercises)
+        walking_minutes = sum(
+            item.duration_minutes or 0 for item in exercises if str(item.exercise_type).upper() == "WALKING"
+        )
 
         return {
             "steps": max([item.steps or 0 for item in activities], default=0),
             "water_ml": max([item.water_ml or 0 for item in activities], default=0),
             "exercise_minutes": max(activity_exercise_minutes, exercise_log_minutes),
+            "walking_minutes": walking_minutes,
             "sleep_hours": max([float(item.sleep_hours or 0) for item in activities], default=0.0),
             "meal_count": meal_count,
             "health_record_count": meal_count
@@ -489,7 +508,7 @@ class ChallengeService:
         goal_value = int(challenge.goal_value or 1)
 
         if metric == "STEPS":
-            return int(context.get("steps") or 0) >= goal_value
+            return int(context.get("steps") or 0) >= goal_value or int(context.get("walking_minutes") or 0) >= 30
         if metric == "WATER":
             water_goal_ml = goal_value * 250 if goal_value <= 20 else goal_value
             return int(context.get("water_ml") or 0) >= water_goal_ml
@@ -608,8 +627,14 @@ class ChallengeService:
         )
 
     @staticmethod
-    def _to_my_challenge(participation: ChallengeParticipation, today: date) -> MyChallengeResponse:
+    def _to_my_challenge(
+        participation: ChallengeParticipation,
+        today: date,
+        today_context: dict[str, object] | None = None,
+    ) -> MyChallengeResponse:
         today_checked = any(checkin.checkin_date == today for checkin in participation.checkins)
+        if not today_checked and today_context is not None:
+            today_checked = ChallengeService._health_context_satisfies_challenge(participation.challenge, today_context)
         return MyChallengeResponse(
             participation_id=participation.id,
             challenge_id=participation.challenge.id,
@@ -633,6 +658,7 @@ class ChallengeService:
         week_start: date,
         week_end: date,
         earned_badge_count: int = 0,
+        today_context: dict[str, object] | None = None,
     ) -> ChallengeDashboardSummaryResponse:
         active_participations = [
             item for item in participations if item.status == ChallengeParticipationStatus.JOINED.value
@@ -658,7 +684,7 @@ class ChallengeService:
             current_streak_days=ChallengeService._current_streak_days(checkin_dates, today),
             completed_mission_count=completed_mission_count,
             earned_badge_count=earned_badge_count,
-            today_missions=ChallengeService._build_today_missions(active_participations, today),
+            today_missions=ChallengeService._build_today_missions(active_participations, today, today_context),
             weekly_activity=weekly_activity,
         )
 
@@ -666,10 +692,16 @@ class ChallengeService:
     def _build_today_missions(
         participations: list[ChallengeParticipation],
         today: date,
+        today_context: dict[str, object] | None = None,
     ) -> list[ChallengeTodayMissionResponse]:
         missions = []
         for participation in participations:
             today_checked = any(checkin.checkin_date == today for checkin in participation.checkins)
+            if not today_checked and today_context is not None:
+                today_checked = ChallengeService._health_context_satisfies_challenge(
+                    participation.challenge,
+                    today_context,
+                )
             missions.append(
                 ChallengeTodayMissionResponse(
                     participation_id=participation.id,
