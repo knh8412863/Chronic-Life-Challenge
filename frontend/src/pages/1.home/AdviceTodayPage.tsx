@@ -11,6 +11,42 @@ type AdviceTodayPageProps = {
   onNavigate: (route: AppRoute) => void;
 };
 
+type DailyAdviceDraft = Partial<DailyAdvice>;
+
+type AdviceApiResponse = {
+  data?: DailyAdviceDraft | null;
+};
+
+function hasData(value: unknown): value is AdviceApiResponse {
+  return typeof value === "object" && value !== null && "data" in value;
+}
+
+function normalizeDailyAdvice(response: AdviceApiResponse | DailyAdviceDraft | null | undefined): DailyAdvice | null {
+  const raw = hasData(response) ? response.data : response;
+  if (!raw || typeof raw !== "object") return null;
+
+  const remainingCount = Number(raw.remaining_regeneration_count);
+
+  return {
+    advice_id: raw.advice_id ?? 0,
+    advice_date: raw.advice_date ?? new Date().toISOString().slice(0, 10),
+    title: raw.title || "오늘의 AI 건강 조언",
+    advice_text: raw.advice_text || "오늘의 조언을 새로 받아보세요.",
+    provider: raw.provider ?? "SYSTEM",
+    model_name: raw.model_name ?? "",
+    trigger_type: raw.trigger_type ?? "AUTO",
+    generated: raw.generated ?? false,
+    created_at: raw.created_at || new Date().toISOString(),
+    source_type: raw.source_type ?? "RULE_BASED",
+    remaining_regeneration_count: Number.isFinite(remainingCount) ? remainingCount : 0,
+  };
+}
+
+function formatCreatedAt(value?: string | null) {
+  if (!value) return "생성 시간 확인 중";
+  return `${value.slice(0, 16).replace("T", " ")} 생성`;
+}
+
 export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
   const [advice, setAdvice] = useState<DailyAdvice | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -27,9 +63,10 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
 
     getTodayAdvice(token)
       .then((response) => {
-        setAdvice(response.data);
+        const nextAdvice = normalizeDailyAdvice(response);
+        setAdvice(nextAdvice);
         setMessage("");
-        setIsLimitExceeded(response.data.remaining_regeneration_count <= 0);
+        setIsLimitExceeded((nextAdvice?.remaining_regeneration_count ?? 0) <= 0);
       })
       .catch(() => setMessage("오늘의 조언을 불러오지 못했습니다. 새로 받아보세요."))
       .finally(() => setIsLoading(false));
@@ -46,8 +83,9 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
     setMessage("");
     try {
       const response = await generateTodayAdvice(token);
-      setAdvice(response.data);
-      setIsLimitExceeded(response.data.remaining_regeneration_count <= 0);
+      const nextAdvice = normalizeDailyAdvice(response);
+      setAdvice(nextAdvice);
+      setIsLimitExceeded((nextAdvice?.remaining_regeneration_count ?? 0) <= 0);
     } catch (error) {
       if (error instanceof ApiError && error.status === 429) {
         setIsLimitExceeded(true);
@@ -94,7 +132,7 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
           <span>AI</span>
           <div>
             <h2>{advice?.title ?? "오늘의 AI 건강 조언"}</h2>
-            <p>{advice ? `${advice.created_at.slice(0, 16).replace("T", " ")} 생성` : "생성된 조언 없음"}</p>
+            <p>{advice ? formatCreatedAt(advice.created_at) : "생성된 조언 없음"}</p>
           </div>
         </div>
         <div className="advice-text-box">

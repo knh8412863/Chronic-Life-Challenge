@@ -64,6 +64,9 @@ export function MyChallengesPage({ onNavigate }: Props) {
   const [data, setData] = useState<MyChallengeData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [hasError, setHasError] = useState(false);
+  const [abandonTarget, setAbandonTarget] = useState<MyChallenge | null>(null);
+  const [abandonMessage, setAbandonMessage] = useState("");
+  const [isAbandoning, setIsAbandoning] = useState(false);
 
   function fetchData() {
     const token = getStoredAccessToken();
@@ -77,14 +80,24 @@ export function MyChallengesPage({ onNavigate }: Props) {
 
   useEffect(() => { fetchData(); }, []);
 
-  async function handleAbandon(mc: MyChallenge) {
-    if (!window.confirm(`"${mc.challenge.name}" 챌린지를 포기하시겠습니까?`)) return;
+  function handleAbandon(mc: MyChallenge) {
+    setAbandonMessage("");
+    setAbandonTarget(mc);
+  }
+
+  async function confirmAbandon() {
+    if (!abandonTarget) return;
     const token = getStoredAccessToken();
+    setIsAbandoning(true);
+    setAbandonMessage("");
     try {
-      if (token) await abandonChallenge(mc.id, token);
+      if (token) await abandonChallenge(abandonTarget.id, token);
+      setAbandonTarget(null);
       fetchData();
     } catch {
-      alert("처리에 실패했습니다.");
+      setAbandonMessage("챌린지 포기에 실패했습니다.\n잠시 후 다시 시도해주세요.");
+    } finally {
+      setIsAbandoning(false);
     }
   }
 
@@ -235,6 +248,46 @@ export function MyChallengesPage({ onNavigate }: Props) {
           </div>
         </section>
       </div>
+      {abandonTarget && (
+        <div className="app-modal-backdrop" role="dialog" aria-modal="true">
+          <div className="app-modal-card">
+            <h2>챌린지 포기</h2>
+            <p>
+              {abandonTarget.challenge.name}
+              <br />
+              챌린지를 포기하시겠습니까?
+            </p>
+            {abandonMessage && (
+              <p className="modal-error-text">
+                {abandonMessage.split("\n").map((line) => (
+                  <span key={line}>
+                    {line}
+                    <br />
+                  </span>
+                ))}
+              </p>
+            )}
+            <div className="button-row modal-button-row">
+              <button
+                type="button"
+                className="small-button"
+                onClick={() => setAbandonTarget(null)}
+                disabled={isAbandoning}
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                className="my-challenge-abandon-btn"
+                onClick={confirmAbandon}
+                disabled={isAbandoning}
+              >
+                {isAbandoning ? "처리 중..." : "포기하기"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
