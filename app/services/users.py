@@ -251,10 +251,12 @@ class UserManageService:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="비밀번호가 올바르지 않습니다.")
 
         payload = self._build_withdrawal_payload(data)
+        anonymized_payload = self._build_withdrawn_user_payload(user.id)
         async with in_transaction():
             await UserWithdrawal.create(user_id=user.id, **payload)
-            user.is_active = False
-            await user.save(update_fields=["is_active", "updated_at"])
+            for field, value in anonymized_payload.items():
+                setattr(user, field, value)
+            await user.save(update_fields=[*anonymized_payload.keys(), "updated_at"])
 
     async def change_password(self, user: User, data: PasswordChangeRequest) -> None:
         if not verify_password(data.current_password, user.hashed_password):
@@ -343,6 +345,16 @@ class UserManageService:
             "withdrawal_reason": data.withdrawal_reason,
             "withdrawal_comment": data.withdrawal_comment.strip() if data.withdrawal_comment else None,
             "confirm_agreed": data.confirm_agreed,
+        }
+
+    @staticmethod
+    def _build_withdrawn_user_payload(user_id: int) -> dict:
+        return {
+            "email": f"withdrawn_{user_id}@all4health.deleted",
+            "phone_number": f"WD{user_id:09d}"[-11:],
+            "google_sub": None,
+            "profile_image_url": None,
+            "is_active": False,
         }
 
     @staticmethod

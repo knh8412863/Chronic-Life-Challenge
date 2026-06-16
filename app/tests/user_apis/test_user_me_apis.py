@@ -118,3 +118,40 @@ class TestUserMeApis(TestCase):
             response = await client.patch("/api/v1/users/me/password", json=change_data, headers=headers)
 
         assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+    async def test_withdraw_user_allows_signup_with_same_email_and_phone_number(self):
+        email = "withdraw_rejoin@example.com"
+        phone_number = "01088889999"
+        signup_data = {
+            "email": email,
+            "password": "Password123!",
+            "name": "탈퇴전",
+            "gender": "FEMALE",
+            "birth_date": "1992-02-02",
+            "phone_number": phone_number,
+        }
+        withdrawal_data = {
+            "password": "Password123!",
+            "withdrawal_reason": "NOT_USEFUL",
+            "withdrawal_comment": "재가입 테스트",
+            "confirm_agreed": True,
+        }
+        rejoin_data = {
+            **signup_data,
+            "password": "NewPassword123!",
+            "name": "재가입",
+        }
+
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+            await client.post("/api/v1/auth/signup", json=signup_data)
+            login_response = await client.post("/api/v1/auth/login", json={"email": email, "password": "Password123!"})
+            access_token = login_response.json()["access_token"]
+            headers = {"Authorization": f"Bearer {access_token}"}
+
+            withdrawal_response = await client.request(
+                "DELETE", "/api/v1/users/me", json=withdrawal_data, headers=headers
+            )
+            rejoin_response = await client.post("/api/v1/auth/signup", json=rejoin_data)
+
+        assert withdrawal_response.status_code == status.HTTP_204_NO_CONTENT
+        assert rejoin_response.status_code == status.HTTP_201_CREATED

@@ -523,8 +523,11 @@ export async function getLeaderboard(token?: string): Promise<{ data: Leaderboar
 }
 
 export async function getMyChallenges(token?: string): Promise<{ data: MyChallengeData }> {
-  const response = await apiRequest<{ data: ApiMyChallenge[] }>("/challenge-participations/me", { token });
-  const items = response.data.map(mapMyChallenge);
+  const [myResponse, summaryResponse] = await Promise.all([
+    apiRequest<{ data: ApiMyChallenge[] }>("/challenge-participations/me", { token }),
+    apiRequest<{ data: ApiDashboardSummary }>("/challenges/summary", { token }),
+  ]);
+  const items = myResponse.data.map(mapMyChallenge);
   const inProgress = items.filter((item) => item.status === "IN_PROGRESS");
   const completed = items.filter((item) => item.status === "COMPLETED");
   const completionRate = items.length > 0
@@ -533,13 +536,13 @@ export async function getMyChallenges(token?: string): Promise<{ data: MyChallen
 
   return {
     data: {
-      in_progress_count: inProgress.length,
-      completed_count: completed.length,
+      in_progress_count: summaryResponse.data.active_count,
+      completed_count: summaryResponse.data.completed_count,
       completion_rate: completionRate,
-      streak_days: 0,
+      streak_days: summaryResponse.data.current_streak_days,
       in_progress: inProgress,
       completed,
-      earned_badge_count: 0,
+      earned_badge_count: summaryResponse.data.earned_badge_count,
     },
   };
 }

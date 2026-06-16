@@ -42,3 +42,15 @@ def test_withdrawal_requires_user_confirmation():
 
     assert exc_info.value.status_code == 422
     assert exc_info.value.detail == "탈퇴 유의사항에 동의해주세요."
+
+
+def test_withdrawn_user_payload_anonymizes_identifiers():
+    payload = UserManageService._build_withdrawn_user_payload(123)
+
+    assert payload == {
+        "email": "withdrawn_123@all4health.deleted",
+        "phone_number": "WD000000123",
+        "google_sub": None,
+        "profile_image_url": None,
+        "is_active": False,
+    }

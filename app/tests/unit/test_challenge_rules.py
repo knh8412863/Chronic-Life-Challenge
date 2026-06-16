@@ -142,6 +142,72 @@ def test_my_challenge_response_detects_today_checkin():
     assert result.completion_rate == 40.0
 
 
+def test_my_challenge_response_detects_today_health_context():
+    today = date(2026, 6, 2)
+    participation = SimpleNamespace(
+        id=5,
+        challenge=SimpleNamespace(id=2, title="물 챌린지", duration_days=5, target_metric="WATER", goal_value=8),
+        status="JOINED",
+        start_date=date(2026, 6, 1),
+        end_date=date(2026, 6, 5),
+        progress_count=2,
+        checkins=[],
+    )
+
+    result = ChallengeService._to_my_challenge(participation, today, {"water_ml": 2000})
+
+    assert result.today_checked is True
+
+
+def test_challenge_health_context_satisfies_goal_metrics():
+    assert ChallengeService._health_context_satisfies_challenge(
+        SimpleNamespace(target_metric="STEPS", goal_value=6000),
+        {"steps": 6200},
+    )
+    assert ChallengeService._health_context_satisfies_challenge(
+        SimpleNamespace(target_metric="WATER", goal_value=8),
+        {"water_ml": 2000},
+    )
+    assert ChallengeService._health_context_satisfies_challenge(
+        SimpleNamespace(target_metric="EXERCISE", goal_value=30),
+        {"exercise_minutes": 30},
+    )
+    assert ChallengeService._health_context_satisfies_challenge(
+        SimpleNamespace(target_metric="DIET", goal_value=1),
+        {"meal_count": 1},
+    )
+    assert ChallengeService._health_context_satisfies_challenge(
+        SimpleNamespace(target_metric="DAILY_CHECKIN", goal_value=1),
+        {"health_record_count": 1},
+    )
+
+
+def test_step_challenge_accepts_walking_minutes_as_completion():
+    assert ChallengeService._health_context_satisfies_challenge(
+        SimpleNamespace(target_metric="STEPS", goal_value=6000),
+        {"steps": 0, "walking_minutes": 30},
+    )
+    assert ChallengeService._health_context_satisfies_challenge(
+        SimpleNamespace(target_metric="STEPS", goal_value=6000),
+        {"steps": 0, "walking_minutes": 45},
+    )
+
+
+def test_challenge_health_context_rejects_unmet_goal_metrics():
+    assert not ChallengeService._health_context_satisfies_challenge(
+        SimpleNamespace(target_metric="STEPS", goal_value=6000),
+        {"steps": 5000, "walking_minutes": 29},
+    )
+    assert not ChallengeService._health_context_satisfies_challenge(
+        SimpleNamespace(target_metric="WATER", goal_value=8),
+        {"water_ml": 1500},
+    )
+    assert not ChallengeService._health_context_satisfies_challenge(
+        SimpleNamespace(target_metric="UNKNOWN", goal_value=1),
+        {"health_record_count": 1},
+    )
+
+
 def test_challenge_checkin_response_can_mark_completed():
     checkin = SimpleNamespace(id=7, checkin_date=date(2026, 6, 2), created_at=datetime(2026, 6, 2, 14, 30))
     participation = SimpleNamespace(
@@ -273,6 +339,36 @@ def test_challenge_dashboard_summary_counts_active_completed_and_today_missions(
     assert len(result.today_missions) == 2
     assert result.today_missions[0].today_checked is True
     assert result.today_missions[0].mission_text == "걸음 수 5000 달성하기"
+
+
+def test_challenge_dashboard_summary_marks_multiple_today_missions_from_health_context():
+    today = date(2026, 6, 3)
+    week_start = date(2026, 6, 1)
+    week_end = date(2026, 6, 7)
+    participations = [
+        SimpleNamespace(
+            id=1,
+            status="JOINED",
+            challenge=SimpleNamespace(id=10, title="걷기 챌린지", target_metric="STEPS", goal_value=5000),
+            checkins=[],
+        ),
+        SimpleNamespace(
+            id=2,
+            status="JOINED",
+            challenge=SimpleNamespace(id=11, title="물 마시기", target_metric="WATER", goal_value=8),
+            checkins=[],
+        ),
+    ]
+
+    result = ChallengeService._build_dashboard_summary(
+        participations,
+        today,
+        week_start,
+        week_end,
+        today_context={"steps": 6000, "water_ml": 2000},
+    )
+
+    assert [mission.today_checked for mission in result.today_missions] == [True, True]
 
 
 def test_challenge_dashboard_summary_returns_empty_state():
