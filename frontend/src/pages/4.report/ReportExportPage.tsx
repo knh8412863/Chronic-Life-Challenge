@@ -95,7 +95,7 @@ function downloadFile(fileName: string, contentType: string, content: string, en
 }
 
 export default function ReportExportPage({ onNavigate }: Props) {
-  const [selectedFormat, setSelectedFormat] = useState<WeeklyReportExportFormat>("JSON");
+  const [selectedFormat, setSelectedFormat] = useState<WeeklyReportExportFormat>("PDF");
   const [sendEmail, setSendEmail] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [message, setMessage] = useState("");

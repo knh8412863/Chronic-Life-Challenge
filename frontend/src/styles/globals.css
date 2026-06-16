@@ -966,6 +966,11 @@ button {
   padding: 54px 0 30px;
 }
 
+.public-footer-inner--simple {
+  display: block;
+  padding: 40px 0 28px;
+}
+
 .footer-brand img {
   width: 126px;
   height: auto;
@@ -1004,11 +1009,16 @@ button {
   grid-column: 1 / -1;
   display: flex;
   justify-content: space-between;
+  gap: 24px;
   margin-top: 36px;
   padding-top: 24px;
   border-top: 1px solid #333333;
   color: #9b9b9b;
   font-size: 13px;
+}
+
+.public-footer-inner--simple .footer-bottom {
+  margin-top: 0;
 }
 
 .auth-card {
