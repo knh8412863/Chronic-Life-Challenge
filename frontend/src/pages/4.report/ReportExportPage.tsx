@@ -99,6 +99,7 @@ export default function ReportExportPage({ onNavigate }: Props) {
   const [sendEmail, setSendEmail] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
   const [message, setMessage] = useState("");
+  const [isSuccess, setIsSuccess] = useState(false);
 
   async function handleExport() {
     const reportId = Number(sessionStorage.getItem(selectedReportStorageKey()));
@@ -117,12 +118,14 @@ export default function ReportExportPage({ onNavigate }: Props) {
         response.data.content,
         response.data.content_encoding,
       );
+      setIsSuccess(true);
       setMessage(
         response.data.emailed
           ? "리포트 파일을 생성하고 이메일 발송을 요청했습니다."
           : "리포트 파일을 생성했습니다.",
       );
     } catch {
+      setIsSuccess(false);
       setMessage("리포트 내보내기에 실패했습니다. 로그인 상태와 리포트 존재 여부를 확인해 주세요.");
     } finally {
       setIsExporting(false);
@@ -130,7 +133,7 @@ export default function ReportExportPage({ onNavigate }: Props) {
   }
 
   return (
-    <div style={{ padding: "28px 24px", maxWidth: 680 }}>
+    <div style={{ padding: "28px 40px", maxWidth: 860 }}>
       {/* 뒤로가기 */}
       <button
         onClick={() => onNavigate("/reports")}
@@ -158,7 +161,27 @@ export default function ReportExportPage({ onNavigate }: Props) {
         선택한 주간 리포트를 원하는 형식으로 저장하세요
       </p>
 
-      {message && <ErrorState title={message} />}
+      {message && (
+        isSuccess ? (
+          <div
+            style={{
+              background: "#E8F3EC",
+              border: "0.5px solid #3D7A4F",
+              borderRadius: 10,
+              padding: "14px 18px",
+              display: "flex",
+              alignItems: "center",
+              gap: 12,
+              marginBottom: 16,
+            }}
+          >
+            <span style={{ fontSize: 20, color: "#3D7A4F", lineHeight: 1 }}>✓</span>
+            <span style={{ fontSize: 13, color: "#3D7A4F", fontWeight: 500 }}>{message}</span>
+          </div>
+        ) : (
+          <ErrorState title={message} />
+        )
+      )}
 
       {/* 파일 형식 + 이메일 카드 */}
       <div

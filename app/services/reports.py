@@ -847,202 +847,261 @@ class WeeklyReportService:
 
         buffer = io.BytesIO()
         page_width, page_height = A4
-        margin = 42
+        margin = 48
+        content_w = page_width - margin * 2
         pdfmetrics.registerFont(UnicodeCIDFont("HYGothic-Medium"))
-        font_name = "HYGothic-Medium"
-        c = canvas.Canvas(buffer, pagesize=A4)
+        fn = "HYGothic-Medium"
+        cv = canvas.Canvas(buffer, pagesize=A4)
 
-        def set_font(size: int, color=None) -> None:
-            c.setFillColor(color or colors.HexColor("#222222"))
-            c.setFont(font_name, size)
+        C_GRN = colors.HexColor("#3D7A4F")
+        C_GRN_D = colors.HexColor("#2D5A3D")
+        C_GRN_M = colors.HexColor("#A8D5B5")
+        C_RED = colors.HexColor("#E53935")
+        C_ORG = colors.HexColor("#F57C00")
+        C_PUR = colors.HexColor("#7B1FA2")
+        C_TXT = colors.HexColor("#1A1A1A")
+        C_MID = colors.HexColor("#555555")
+        C_LIT = colors.HexColor("#888888")
+        C_BDR = colors.HexColor("#E5E7EB")
+        C_BG = colors.HexColor("#F8F9FA")
+        C_WHT = colors.white
+        CARD_COLS = [C_RED, C_ORG, colors.HexColor("#14A85B"), C_PUR]
 
-        def draw_wrapped(text: str, x: float, y: float, max_width: float, size: int, leading: int = 16) -> float:
-            set_font(size)
-            for paragraph in str(text).splitlines() or [""]:
+        def sf(size: int, fill=None) -> None:
+            cv.setFont(fn, size)
+            cv.setFillColor(fill if fill is not None else C_TXT)
+
+        def wrap(text: str, x: float, y: float, max_w: float, size: int, lead: int = 14, fill=None) -> float:
+            sf(size, fill)
+            for para in (str(text) or "").splitlines() or [""]:
                 line = ""
-                for word in paragraph.split(" "):
-                    candidate = word if not line else f"{line} {word}"
-                    if pdfmetrics.stringWidth(candidate, font_name, size) <= max_width:
-                        line = candidate
+                for word in para.split():
+                    cand = word if not line else f"{line} {word}"
+                    if pdfmetrics.stringWidth(cand, fn, size) <= max_w:
+                        line = cand
                     else:
-                        c.drawString(x, y, line)
-                        y -= leading
+                        cv.drawString(x, y, line)
+                        y -= lead
                         line = word
-                c.drawString(x, y, line)
-                y -= leading
+                cv.drawString(x, y, line)
+                y -= lead
             return y
 
+        def section_heading(title: str, y: float) -> float:
+            sf(11, C_TXT)
+            cv.drawString(margin, y, title)
+            w = pdfmetrics.stringWidth(title, fn, 11)
+            cv.setStrokeColor(C_GRN)
+            cv.setLineWidth(2)
+            cv.line(margin, y - 5, margin + w, y - 5)
+            return y - 22
+
         def footer(page: int) -> None:
-            set_font(8, colors.HexColor("#c7ccd3"))
-            c.line(margin, 34, page_width - margin, 34)
-            c.drawString(margin, 20, "All4Health © 2026")
-            c.drawRightString(page_width - margin, 20, f"페이지 {page}/2")
+            cv.setStrokeColor(C_BDR)
+            cv.setLineWidth(0.5)
+            cv.line(margin, 38, page_width - margin, 38)
+            sf(7.5, C_LIT)
+            cv.drawString(margin, 24, "All4Health © 2026")
+            cv.drawCentredString(page_width / 2, 24, REPORT_DISCLAIMER)
+            cv.drawRightString(page_width - margin, 24, f"{page} / 2")
 
         source = getattr(report, "source_summary", None) or {}
         challenge = getattr(report, "challenge_summary", None) or {}
         trend = getattr(report, "trend_summary", None) or {}
-        total_health_records = WeeklyReportService._total_health_records(source)
+        total_hr = WeeklyReportService._total_health_records(source)
         score = min(
             100,
             55
-            + min(total_health_records, 5) * 5
+            + min(total_hr, 5) * 5
             + min(source.get("exercise_log_count", 0), 5) * 3
             + min(source.get("meal_log_count", 0), 5) * 2
             + min(source.get("challenge_checkin_count", 0), 7) * 2,
         )
         completion_rate = int(float(challenge.get("completion_rate") or 0))
 
-        # Page 1
-        c.setFillColor(colors.HexColor("#f1f2f5"))
-        c.roundRect(margin, page_height - 150, page_width - margin * 2, 116, 10, stroke=0, fill=1)
-        set_font(20)
-        c.drawString(margin + 24, page_height - 72, "All4Health")
-        set_font(11, colors.HexColor("#444444"))
-        c.drawString(margin + 24, page_height - 94, "주간 건강 리포트")
-        c.drawString(margin + 24, page_height - 114, f"{report.week_start_date} ~ {report.week_end_date}")
-        set_font(13)
-        c.drawString(margin + 24, page_height - 136, f"종합 건강 점수: {score}점")
+        # ── PAGE 1 ──────────────────────────────────────────────────────────────
+        hdr_h = 120
+        cv.setFillColor(C_GRN)
+        cv.rect(0, page_height - hdr_h, page_width, hdr_h, stroke=0, fill=1)
 
-        y = page_height - 190
-        card_width = (page_width - margin * 2 - 14) / 2
-        card_height = 72
-        colors_for_cards = ["#ff4d3d", "#ff9900", "#14a85b", "#8b5cf6"]
-        for index, card in enumerate((report.summary_cards or [])[:4]):
-            x = margin + (index % 2) * (card_width + 14)
-            cy = y - (index // 2) * (card_height + 12)
-            c.setFillColor(colors.HexColor("#f1f2f4"))
-            c.roundRect(x, cy - card_height, card_width, card_height, 8, stroke=0, fill=1)
-            set_font(9, colors.HexColor("#333333"))
-            c.drawString(x + 14, cy - 20, str(card.get("label", "")))
-            set_font(17, colors.HexColor(colors_for_cards[index % len(colors_for_cards)]))
-            c.drawString(x + 14, cy - 46, str(card.get("value", "")))
+        sf(20, C_WHT)
+        cv.drawString(margin, page_height - 36, "All4Health")
+        sf(9, C_GRN_M)
+        cv.drawString(margin, page_height - 54, "주간 건강 리포트")
+        sf(8.5, colors.HexColor("#C8E6CE"))
+        cv.drawString(margin, page_height - 70, f"{report.week_start_date}  ~  {report.week_end_date}")
 
-        y -= 178
-        set_font(13)
-        c.drawString(margin, y, "건강 추이")
-        y -= 18
-        c.setFillColor(colors.HexColor("#f1f2f4"))
-        c.roundRect(margin, y - 88, page_width - margin * 2, 88, 8, stroke=0, fill=1)
-        c.setStrokeColor(colors.HexColor("#ff4d3d"))
-        c.setLineWidth(2)
-        points = [(margin + 28 + i * 70, y - 62 + point) for i, point in enumerate([8, 24, 16, 30, 22, 34, 26])]
-        path = c.beginPath()
-        path.moveTo(points[0][0], points[0][1])
-        for px, py in points[1:]:
-            path.lineTo(px, py)
-        c.drawPath(path)
+        bx = page_width - margin - 88
+        by = page_height - hdr_h + 16
+        cv.setFillColor(C_GRN_D)
+        cv.roundRect(bx, by, 88, 90, 8, stroke=0, fill=1)
+        sf(8, C_GRN_M)
+        cv.drawCentredString(bx + 44, by + 70, "종합 점수")
+        sf(30, C_WHT)
+        cv.drawCentredString(bx + 44, by + 34, str(score))
+        sf(9, C_GRN_M)
+        cv.drawCentredString(bx + 44, by + 16, "점")
 
-        y -= 124
-        set_font(13)
-        c.drawString(margin, y, "AI 분석 요약")
-        y -= 18
-        c.setFillColor(colors.HexColor("#f4f5f8"))
-        c.roundRect(margin, y - 104, page_width - margin * 2, 104, 8, stroke=0, fill=1)
-        y = draw_wrapped(report.report_text, margin + 16, y - 24, page_width - margin * 2 - 32, 9, 14)
+        y = page_height - hdr_h - 28
+        cards_src = (report.summary_cards or [])[:4]
+        if cards_src:
+            card_lv = [(d.get("label", ""), str(d.get("value", ""))) for d in cards_src]
+        else:
+            card_lv = [
+                ("건강 기록", f"{total_hr}건"),
+                ("AI 위험 신호", "—"),
+                ("식단 기록", f"{source.get('meal_log_count', 0)}건"),
+                ("운동 기록", f"{source.get('exercise_log_count', 0)}건"),
+            ]
+        card_w = (content_w - 12) / 2
+        card_h = 64
+        for idx, (lbl, val) in enumerate(card_lv[:4]):
+            cax = margin + (idx % 2) * (card_w + 12)
+            cay = y - (idx // 2) * (card_h + 10)
+            accent = CARD_COLS[idx % len(CARD_COLS)]
+            cv.setFillColor(C_BG)
+            cv.roundRect(cax, cay - card_h, card_w, card_h, 6, stroke=0, fill=1)
+            cv.setFillColor(accent)
+            cv.roundRect(cax, cay - card_h, 4, card_h, 2, stroke=0, fill=1)
+            sf(8, C_LIT)
+            cv.drawString(cax + 14, cay - 18, lbl)
+            sf(20, accent)
+            cv.drawString(cax + 14, cay - 44, val)
 
-        y -= 12
-        set_font(13)
-        c.drawString(margin, y, "관리 영역별 성과")
-        y -= 20
-        c.setFillColor(colors.HexColor("#f4f5f8"))
-        c.roundRect(margin, y - 120, page_width - margin * 2, 120, 8, stroke=0, fill=1)
-        for index, metric in enumerate((report.metric_summaries or [])[:5]):
-            row_y = y - 24 - index * 19
-            set_font(9, colors.HexColor("#555555"))
-            c.drawString(margin + 16, row_y, str(metric.get("label", "")))
-            c.drawRightString(margin + 128, row_y, f"{metric.get('value', '')}{metric.get('unit') or ''}")
-            c.setFillColor(colors.HexColor("#e5e7eb"))
-            c.roundRect(margin + 150, row_y - 1, page_width - margin * 2 - 170, 6, 3, stroke=0, fill=1)
-            raw_value = int("".join(ch for ch in str(metric.get("value", "0")) if ch.isdigit()) or "0")
-            bar_width = min(page_width - margin * 2 - 170, max(30, raw_value * 18))
-            c.setFillColor(colors.HexColor("#333333"))
-            c.roundRect(margin + 150, row_y - 1, bar_width, 6, 3, stroke=0, fill=1)
+        y -= (card_h + 10) * 2 + 24
+
+        y = section_heading("AI 분석 요약", y)
+        box_h = 88
+        cv.setFillColor(C_BG)
+        cv.roundRect(margin, y - box_h, content_w, box_h, 6, stroke=0, fill=1)
+        cv.setStrokeColor(C_BDR)
+        cv.setLineWidth(0.5)
+        cv.roundRect(margin, y - box_h, content_w, box_h, 6, stroke=1, fill=0)
+        wrap(report.report_text or "분석 내용 없음", margin + 14, y - 16, content_w - 28, 8.5, 13)
+        y -= box_h + 22
+
+        y = section_heading("관리 영역별 성과", y)
+        bar_x = margin + 130
+        bar_w = content_w - 130 - 4
+        for metric in (report.metric_summaries or [])[:5]:
+            lbl = str(metric.get("label", ""))
+            val_s = str(metric.get("value", "0"))
+            unit = metric.get("unit") or ""
+            raw = int("".join(ch for ch in val_s if ch.isdigit()) or "0")
+            sf(8.5, C_MID)
+            cv.drawString(margin, y, lbl)
+            sf(8.5, C_TXT)
+            cv.drawRightString(bar_x - 6, y, f"{val_s}{unit}")
+            cv.setFillColor(C_BDR)
+            cv.roundRect(bar_x, y - 2, bar_w, 7, 3, stroke=0, fill=1)
+            fill_w = min(bar_w, max(14, raw * 15))
+            cv.setFillColor(C_GRN)
+            cv.roundRect(bar_x, y - 2, fill_w, 7, 3, stroke=0, fill=1)
+            y -= 20
 
         footer(1)
-        c.showPage()
+        cv.showPage()
 
-        # Page 2
-        y = page_height - 62
-        set_font(14)
-        c.drawString(margin, y, f"목표 달성률: {completion_rate}%")
-        y -= 28
-        goal_lines = [
+        # ── PAGE 2 ──────────────────────────────────────────────────────────────
+        y = page_height - 60
+
+        y = section_heading("목표 달성률", y)
+        sf(26, C_GRN)
+        cv.drawString(margin, y, f"{completion_rate}%")
+        sf(9, C_LIT)
+        cv.drawString(margin + 52, y, "달성")
+        y -= 26
+
+        for lbl, count, target in [
             ("혈압·혈당", source.get("vital_record_count", 0), "주 3회 이상"),
             ("식단 기록", source.get("meal_log_count", 0), "주 5회"),
             ("운동 기록", source.get("exercise_log_count", 0), "주 3회"),
             ("챌린지", source.get("challenge_checkin_count", 0), "주 3회 이상"),
-        ]
-        for label, count, target in goal_lines:
-            set_font(9, colors.HexColor("#333333"))
-            c.drawString(margin, y, f"{'✓' if count else '△'} {label}: {count}회 / {target}")
-            y -= 17
+        ]:
+            sf(9, C_GRN if count else C_ORG)
+            cv.drawString(margin, y, "✓" if count else "△")
+            sf(8.5, C_TXT)
+            cv.drawString(margin + 16, y, f"{lbl}: {count}회")
+            tw = pdfmetrics.stringWidth(f"{lbl}: {count}회", fn, 8.5)
+            sf(8, C_LIT)
+            cv.drawString(margin + 16 + tw + 8, y, f"/ {target}")
+            y -= 16
+        y -= 20
 
-        y -= 16
-        set_font(13)
-        c.drawString(margin, y, "상세 분석")
-        y -= 22
-        c.setFillColor(colors.HexColor("#f0f1f3"))
-        c.rect(margin, y - 20, page_width - margin * 2, 20, stroke=0, fill=1)
-        set_font(9)
-        headers = ["영역", "기록", "상태", "설명"]
-        xs = [margin + 10, margin + 130, margin + 205, margin + 285]
-        for x, header in zip(xs, headers, strict=True):
-            c.drawString(x, y - 14, header)
-        y -= 24
-        for metric in (report.metric_summaries or [])[:7]:
-            set_font(8, colors.HexColor("#333333"))
-            c.drawString(xs[0], y, str(metric.get("label", "")))
-            c.drawString(xs[1], y, f"{metric.get('value', '')}{metric.get('unit') or ''}")
-            c.drawString(xs[2], y, str(metric.get("status", "")))
-            y = draw_wrapped(str(metric.get("description", "")), xs[3], y, page_width - margin - xs[3], 8, 11) + 2
-            c.setStrokeColor(colors.HexColor("#e5e7eb"))
-            c.line(margin, y + 8, page_width - margin, y + 8)
-            y -= 12
+        y = section_heading("상세 분석", y)
+        col_xs = [margin, margin + 110, margin + 178, margin + 248]
+        cv.setFillColor(C_GRN)
+        cv.roundRect(margin, y - 20, content_w, 22, 4, stroke=0, fill=1)
+        sf(8.5, C_WHT)
+        for xi, h in zip(col_xs, ["영역", "기록", "상태", "설명"]):
+            cv.drawString(xi + 6, y - 14, h)
+        y -= 26
 
-        y -= 12
-        set_font(13)
-        c.drawString(margin, y, "건강 조언")
-        y -= 24
-        set_font(10, colors.HexColor("#e53935"))
-        c.drawString(margin, y, "주의할 점")
-        y -= 18
-        y = draw_wrapped(
+        for idx, metric in enumerate((report.metric_summaries or [])[:7]):
+            cv.setFillColor(C_BG if idx % 2 == 0 else C_WHT)
+            cv.rect(margin, y - 24, content_w, 24, stroke=0, fill=1)
+            sf(8, C_TXT)
+            cv.drawString(col_xs[0] + 6, y - 15, str(metric.get("label", "")))
+            cv.drawString(col_xs[1] + 6, y - 15, f"{metric.get('value', '')}{metric.get('unit') or ''}")
+            status_v = str(metric.get("status", ""))
+            sf(7.5, C_GRN if status_v == "NORMAL" else C_RED)
+            cv.drawString(col_xs[2] + 6, y - 15, status_v)
+            sf(7.5, C_MID)
+            cv.drawString(col_xs[3] + 6, y - 15, str(metric.get("description", ""))[:42])
+            cv.setStrokeColor(C_BDR)
+            cv.setLineWidth(0.3)
+            cv.line(margin, y - 24, page_width - margin, y - 24)
+            y -= 24
+        y -= 20
+
+        y = section_heading("건강 조언", y)
+
+        def advice_box(title: str, body: str, bg_hex: str, accent_col) -> None:
+            nonlocal y
+            cv.setFillColor(colors.HexColor(bg_hex))
+            cv.roundRect(margin, y - 54, content_w, 56, 6, stroke=0, fill=1)
+            cv.setFillColor(accent_col)
+            cv.roundRect(margin, y - 54, 3, 56, 2, stroke=0, fill=1)
+            sf(8.5, accent_col)
+            cv.drawString(margin + 12, y - 13, title)
+            wrap(body, margin + 12, y - 28, content_w - 20, 8, 13)
+            y -= 68
+
+        advice_box(
+            "주의할 점",
             "혈압·혈당 수치를 주기적으로 확인하세요. 식단과 운동 기록을 꾸준히 남기면 리포트 정확도가 높아집니다.",
-            margin,
-            y,
-            page_width - margin * 2,
-            9,
-            14,
+            "#FFF3F3",
+            C_RED,
         )
-        y -= 10
-        set_font(10, colors.HexColor("#14a85b"))
-        c.drawString(margin, y, "잘한 점")
-        y -= 18
-        y = draw_wrapped(
-            f"{challenge.get('message', '이번 주 생활습관 실천 내용을 확인했습니다.')} {trend.get('message', '다음 리포트에서 추이를 비교할 수 있습니다.')}",
-            margin,
-            y,
-            page_width - margin * 2,
-            9,
-            14,
+        good_msg = (
+            f"{challenge.get('message', '이번 주 생활습관 실천 내용을 확인했습니다.')}"
+            f" {trend.get('message', '다음 리포트에서 추이를 비교할 수 있습니다.')}"
         )
-        y -= 18
-        set_font(13)
-        c.drawString(margin, y, "다음 단계")
-        y -= 22
-        y = draw_wrapped(
-            "1. 주 4회 이상 유산소 운동 기록\n2. 나트륨 섭취 줄이기\n3. 정기적인 혈압·혈당 모니터링",
-            margin,
-            y,
-            page_width - margin * 2,
-            9,
-            14,
-        )
-        c.setFillColor(colors.HexColor("#f1f2f4"))
-        c.roundRect(margin, 64, page_width - margin * 2, 36, 8, stroke=0, fill=1)
-        draw_wrapped(REPORT_DISCLAIMER, margin + 14, 82, page_width - margin * 2 - 28, 8, 11)
+        advice_box("잘한 점", good_msg, "#F0F9F3", C_GRN)
+        y -= 6
+
+        y = section_heading("다음 단계", y)
+        for step_i, step_text in enumerate([
+            "주 4회 이상 유산소 운동 기록",
+            "나트륨 섭취 줄이기",
+            "정기적인 혈압·혈당 모니터링",
+        ]):
+            cv.setFillColor(C_GRN)
+            cv.circle(margin + 8, y - 2, 7, stroke=0, fill=1)
+            sf(7.5, C_WHT)
+            cv.drawCentredString(margin + 8, y - 5, str(step_i + 1))
+            sf(8.5, C_TXT)
+            cv.drawString(margin + 22, y - 3, step_text)
+            y -= 20
+        y -= 14
+
+        cv.setFillColor(C_BG)
+        cv.roundRect(margin, y - 26, content_w, 28, 6, stroke=0, fill=1)
+        sf(7.5, C_LIT)
+        cv.drawCentredString(page_width / 2, y - 14, REPORT_DISCLAIMER)
+
         footer(2)
-        c.save()
+        cv.save()
         return buffer.getvalue()
 
     @staticmethod
