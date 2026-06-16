@@ -22,10 +22,10 @@ function selectedReportStorageKey() {
 }
 
 function getStatusStyle(status: ReportItemStatus) {
-  if (status === "HIGH") return { background: "#FFF1F2", border: "1px solid #FDA4AF", color: "#E11D48" };
-  if (status === "CAUTION") return { background: "#FFF8E1", border: "1px solid #FFC107", color: "#F59E0B" };
-  if (status === "NORMAL") return { background: "#F0F7F2", border: "1px solid #86EFAC", color: "#3D7A4F" };
-  return { background: "#F3F4F6", border: "1px solid #D1D5DB", color: "#6B7280" };
+  if (status === "HIGH") return { background: "#FFF1F2", border: "0.5px solid #FDA4AF", color: "#E11D48" };
+  if (status === "CAUTION") return { background: "#FFF8E1", border: "0.5px solid #FFC107", color: "#F59E0B" };
+  if (status === "NORMAL") return { background: "#F0F7F2", border: "0.5px solid #86EFAC", color: "#3D7A4F" };
+  return { background: "#F3F4F6", border: "0.5px solid #D1D5DB", color: "#6B7280" };
 }
 
 function getStatusText(status: ReportItemStatus) {
@@ -57,6 +57,9 @@ function cardValue(card: WeeklyReportSummaryCard) {
 function metricValue(metric: WeeklyReportMetricSummary) {
   return `${metric.value}${metric.unit ?? ""}`;
 }
+
+// 걸음 수 카드 전용 블루 스타일 (label 기준으로 JSX에서만 분기)
+const STEPS_CARD_STYLE = { background: "#E6F1FB", border: "0.5px solid #85B7EB", color: "#185FA5" };
 
 export default function ReportDetailPage({ onNavigate }: Props) {
   const [report, setReport] = useState<WeeklyReport | null>(null);
@@ -104,7 +107,7 @@ export default function ReportDetailPage({ onNavigate }: Props) {
         <button
           type="button"
           onClick={() => onNavigate("/reports")}
-          style={{ marginTop: 16, padding: "9px 16px", background: "#3D7A4F", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, cursor: "pointer" }}
+          style={{ marginTop: 16, padding: "9px 16px", background: "#3D7A4F", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}
         >
           목록으로 돌아가기
         </button>
@@ -115,12 +118,12 @@ export default function ReportDetailPage({ onNavigate }: Props) {
   if (!report) {
     return (
       <div style={{ padding: 24, textAlign: "center" }}>
-        <p style={{ fontSize: 15, fontWeight: 700, color: "#555", marginBottom: 8 }}>조회할 리포트가 없습니다.</p>
+        <p style={{ fontSize: 15, fontWeight: 500, color: "#555", marginBottom: 8 }}>조회할 리포트가 없습니다.</p>
         <p style={{ fontSize: 13, color: "#888", marginBottom: 16 }}>리포트를 먼저 생성해 주세요.</p>
         <button
           type="button"
           onClick={() => onNavigate("/reports")}
-          style={{ padding: "9px 16px", background: "#3D7A4F", color: "#fff", border: "none", borderRadius: 6, fontSize: 13, cursor: "pointer" }}
+          style={{ padding: "9px 16px", background: "#3D7A4F", color: "#fff", border: "none", borderRadius: 8, fontSize: 13, cursor: "pointer" }}
         >
           목록으로 돌아가기
         </button>
@@ -137,47 +140,72 @@ export default function ReportDetailPage({ onNavigate }: Props) {
         : "UNAVAILABLE";
 
   return (
-    <div style={{ padding: "24px" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-        <button onClick={() => onNavigate("/reports")} style={{ background: "none", border: "none", fontSize: 18, cursor: "pointer", color: "#555" }}>←</button>
-        <h1 style={{ fontSize: 20, fontWeight: 700, color: "#1a1a1a", margin: 0 }}>주간 리포트 상세</h1>
-      </div>
+    <div style={{ padding: "28px 24px" }}>
+      {/* 뒤로가기 */}
+      <button
+        onClick={() => onNavigate("/reports")}
+        style={{ background: "none", border: "none", cursor: "pointer", display: "flex", alignItems: "center", gap: 6, color: "#888", fontSize: 13, marginBottom: 20, padding: 0 }}
+      >
+        ← 리포트 목록으로
+      </button>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
-        <span style={{ fontSize: 15, fontWeight: 700 }}>
+      {/* 페이지 제목 */}
+      <h1 style={{ fontSize: 20, fontWeight: 500, color: "#1a1a1a", margin: 0, marginBottom: 16 }}>주간 리포트 상세</h1>
+
+      {/* 주차 + 상태 뱃지 */}
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+        <span style={{ fontSize: 15, fontWeight: 500, color: "#1a1a1a" }}>
           {getWeekTitle(report.week_start_date)} ({formatPeriod(report.week_start_date, report.week_end_date)})
         </span>
-        <span style={{ padding: "3px 8px", borderRadius: 12, fontSize: 10, ...getStatusStyle(overallStatus) }}>
+        <span style={{ padding: "3px 10px", borderRadius: 12, fontSize: 11, fontWeight: 500, ...getStatusStyle(overallStatus) }}>
           {getStatusText(overallStatus)}
         </span>
-        <span style={{ padding: "3px 8px", background: "#F3F4F6", borderRadius: 12, fontSize: 10, color: "#555" }}>
+        <span style={{ padding: "3px 10px", background: "#F3F4F6", borderRadius: 12, fontSize: 11, fontWeight: 500, color: "#6B7280", border: "0.5px solid #D1D5DB" }}>
           {report.source_type === "LLM" ? "AI 생성" : "규칙 기반"}
         </span>
       </div>
 
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 18 }}>
-        <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>요약 카드</h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 12 }}>
+      {/* 1. 리포트 조언 */}
+      <div style={{ background: "#F2F8F4", border: "0.5px solid #c6e0cc", borderRadius: 12, padding: 20, marginBottom: 14 }}>
+        <p style={{ fontSize: 11, fontWeight: 500, color: "#aaa", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 12 }}>리포트 조언</p>
+        <div style={{ fontSize: 14, color: "#333", lineHeight: 1.9, whiteSpace: "pre-line" }}>
+          {report.report_text}
+        </div>
+      </div>
+
+      {/* 2. 요약 카드 */}
+      <div style={{ background: "#fff", border: "0.5px solid #e5e7eb", borderRadius: 12, padding: 20, marginBottom: 14 }}>
+        <p style={{ fontSize: 11, fontWeight: 500, color: "#aaa", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 14 }}>요약 카드</p>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
           {report.summary_cards.map((card) => (
-            <div key={card.label} style={{ padding: "12px 10px", borderRadius: 8, textAlign: "center", ...getStatusStyle(card.status) }}>
-              <p style={{ fontSize: 10, marginBottom: 6 }}>{card.label}</p>
-              <p style={{ fontSize: 20, fontWeight: 700 }}>{cardValue(card)}</p>
-              <p style={{ marginTop: 6, fontSize: 10, lineHeight: 1.4 }}>{card.description}</p>
+            <div
+              key={card.label}
+              style={{
+                padding: "12px 8px",
+                borderRadius: 10,
+                textAlign: "center",
+                ...(card.label === "걸음 수" ? STEPS_CARD_STYLE : getStatusStyle(card.status)),
+              }}
+            >
+              <p style={{ fontSize: 10, marginBottom: 6, opacity: 0.75 }}>{card.label}</p>
+              <p style={{ fontSize: 18, fontWeight: 500 }}>{cardValue(card)}</p>
+              <p style={{ marginTop: 4, fontSize: 10, lineHeight: 1.4, opacity: 0.75 }}>{card.description}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <div style={{ background: "#F5F7FA", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 18 }}>
-        <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>지표별 요약</h2>
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {/* 3. 지표별 요약 */}
+      <div style={{ background: "#f9fafb", border: "0.5px solid #e5e7eb", borderRadius: 12, padding: 20, marginBottom: 14 }}>
+        <p style={{ fontSize: 11, fontWeight: 500, color: "#aaa", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 14 }}>지표별 요약</p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {report.metric_summaries.map((metric) => (
             <div key={metric.metric}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
-                <span style={{ fontSize: 12, color: "#333" }}>{metric.label}</span>
-                <span style={{ fontSize: 12, fontWeight: 700, color: "#333" }}>{metricValue(metric)}</span>
+                <span style={{ fontSize: 13, color: "#333" }}>{metric.label}</span>
+                <span style={{ fontSize: 13, fontWeight: 500, color: "#333" }}>{metricValue(metric)}</span>
               </div>
-              <div style={{ height: 8, background: "#dde8e2", borderRadius: 4 }}>
+              <div style={{ height: 6, background: "#e5e7eb", borderRadius: 4 }}>
                 <div
                   style={{
                     width: metric.status === "UNAVAILABLE" ? "8%" : "100%",
@@ -187,35 +215,30 @@ export default function ReportDetailPage({ onNavigate }: Props) {
                   }}
                 />
               </div>
-              <p style={{ marginTop: 4, fontSize: 11, color: "#888" }}>{metric.description}</p>
+              <p style={{ marginTop: 4, fontSize: 11, color: "#aaa" }}>{metric.description}</p>
             </div>
           ))}
         </div>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 18 }}>
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>전주 대비 추이</h2>
+      {/* 4. 전주 대비 + 챌린지 달성 */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14, marginBottom: 14 }}>
+        <div style={{ background: "#fff", border: "0.5px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+          <p style={{ fontSize: 11, fontWeight: 500, color: "#aaa", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10 }}>전주 대비 추이</p>
           <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>{report.trend_summary.message}</p>
         </div>
-        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 16 }}>
-          <h2 style={{ fontSize: 13, fontWeight: 700, marginBottom: 10 }}>챌린지 달성</h2>
+        <div style={{ background: "#fff", border: "0.5px solid #e5e7eb", borderRadius: 12, padding: 16 }}>
+          <p style={{ fontSize: 11, fontWeight: 500, color: "#aaa", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 10 }}>챌린지 달성</p>
           <p style={{ fontSize: 13, color: "#555", lineHeight: 1.7 }}>{report.challenge_summary.message}</p>
-          <p style={{ fontSize: 22, fontWeight: 700, color: "#3D7A4F", marginTop: 8 }}>
+          <p style={{ fontSize: 28, fontWeight: 500, color: "#3D7A4F", marginTop: 10 }}>
             {report.challenge_summary.completion_rate}%
           </p>
         </div>
       </div>
 
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20, marginBottom: 18 }}>
-        <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>리포트 조언</h2>
-        <div style={{ background: "#F9F9F9", border: "1px solid #e8f0ec", borderRadius: 6, padding: 16, fontSize: 13, color: "#333", lineHeight: 1.7, whiteSpace: "pre-line" }}>
-          {report.report_text}
-        </div>
-      </div>
-
-      <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10, padding: 20 }}>
-        <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>데이터 출처 요약</h2>
+      {/* 5. 데이터 출처 요약 */}
+      <div style={{ background: "#fff", border: "0.5px solid #e5e7eb", borderRadius: 12, padding: 20 }}>
+        <p style={{ fontSize: 11, fontWeight: 500, color: "#aaa", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: 14 }}>데이터 출처 요약</p>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: 10 }}>
           {[
             ["건강 설문", report.source_summary.health_survey_count],
@@ -224,9 +247,9 @@ export default function ReportDetailPage({ onNavigate }: Props) {
             ["운동", report.source_summary.exercise_log_count],
             ["챌린지", report.source_summary.challenge_checkin_count],
           ].map(([label, value]) => (
-            <div key={label} style={{ textAlign: "center", padding: 12, background: "#FAFCFA", border: "1px solid #e8f0ec", borderRadius: 8 }}>
+            <div key={label} style={{ textAlign: "center", padding: 12, background: "#f9fafb", border: "0.5px solid #e5e7eb", borderRadius: 8 }}>
               <p style={{ fontSize: 11, color: "#888", marginBottom: 6 }}>{label}</p>
-              <p style={{ fontSize: 20, fontWeight: 700, color: "#1a1a1a" }}>{value}</p>
+              <p style={{ fontSize: 20, fontWeight: 500, color: "#1a1a1a" }}>{value}</p>
             </div>
           ))}
         </div>
