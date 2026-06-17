@@ -292,6 +292,42 @@ docker compose logs --tail=100 nginx
 
 ---
 
+## 성능 테스트
+
+핵심 API의 P95 Latency 3초 이내 여부를 확인하기 위한 성능 측정 스크립트를 제공합니다.
+
+```bash
+PERF_EMAIL='테스트계정@example.com' PERF_PASSWORD='테스트비밀번호' \
+python scripts/performance_check.py --iterations 20 --output docs/performance-result.md
+```
+
+Mac 로컬 Python에서 인증서 체인 오류가 발생하면 측정용으로 아래 옵션을 추가합니다.
+
+```bash
+PERF_EMAIL='테스트계정@example.com' PERF_PASSWORD='테스트비밀번호' \
+python scripts/performance_check.py --iterations 20 --insecure-skip-tls-verify
+```
+
+측정 대상:
+
+- 로그인
+- 홈 요약
+- 알림
+- 챌린지
+- 예측 이력
+- 주간 리포트
+- 건강 기록 조회 API
+
+결과 문서:
+
+```text
+docs/performance-result.md
+```
+
+OCR, LLM 조언 생성, PDF 생성, SMTP 메일 발송처럼 외부 서비스 또는 파일 처리에 의존하는 API는 일반 조회 API와 분리하여 해석합니다.
+
+---
+
 ## 배포 구조
 
 현재 배포는 EC2 단일 인스턴스 기준입니다.
