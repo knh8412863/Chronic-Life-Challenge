@@ -292,6 +292,86 @@ docker compose logs --tail=100 nginx
 
 ---
 
+## 성능 테스트
+
+핵심 API의 P95 Latency 3초 이내 여부를 확인하기 위한 성능 측정 스크립트를 제공합니다.
+
+```bash
+PERF_EMAIL='테스트계정@example.com' PERF_PASSWORD='테스트비밀번호' \
+python scripts/performance_check.py --iterations 20 --output docs/performance-result.md
+```
+
+Mac 로컬 Python에서 인증서 체인 오류가 발생하면 측정용으로 아래 옵션을 추가합니다.
+
+```bash
+PERF_EMAIL='테스트계정@example.com' PERF_PASSWORD='테스트비밀번호' \
+python scripts/performance_check.py --iterations 20 --insecure-skip-tls-verify
+```
+
+측정 대상:
+
+- 로그인
+- 홈 요약
+- 알림
+- 챌린지
+- 예측 이력
+- 주간 리포트
+- 건강 기록 조회 API
+
+결과 문서:
+
+```text
+docs/performance-result.md
+```
+
+OCR, LLM 조언 생성, PDF 생성, SMTP 메일 발송처럼 외부 서비스 또는 파일 처리에 의존하는 API는 일반 조회 API와 분리하여 해석합니다.
+
+---
+
+## AI 품질 검증
+
+AI 질환 예측 모델은 학습/검증 데이터 분리, 질환별 성능 지표, Screening/Diagnostic threshold 비교, 동일 입력 반복 테스트, 사용자 피드백 저장 및 export 구조를 기준으로 품질 검증 근거를 관리합니다.
+
+상세 문서:
+
+```text
+docs/ai-quality-result.md
+```
+
+주요 검증 항목:
+
+- Train/Test 데이터 분리 및 질환별 샘플 수 기록
+- AUC, Precision, Recall, F1 기반 성능 지표 정리
+- Screening/Diagnostic threshold 비교
+- 동일 입력 반복 추론 결과 일관성 테스트
+- 예측 피드백 수집 및 재학습 후보 데이터 export
+
+---
+
+## UX 흐름 및 UI 일관성
+
+주요 기능은 홈 대시보드, 빠른 기록, 사이드바를 중심으로 3~5단계 이내 접근할 수 있도록 구성했습니다. 로그인 후 화면은 공통 앱 레이아웃과 카드/버튼/모달 패턴을 반복 적용하여 화면 간 사용 경험을 맞췄습니다.
+
+상세 문서:
+
+```text
+docs/ux-flow-and-consistency.md
+```
+
+---
+
+## API 설계, 보안, 운영 안정성
+
+API는 `/api/v1` 버전 prefix와 HTTP Method 기준으로 기능을 분리했습니다. 운영 환경은 EC2, Docker Compose, Nginx, HTTPS 기반으로 구성했으며, JWT/OAuth 인증과 사용자별 접근 제어를 적용했습니다.
+
+상세 문서:
+
+```text
+docs/api-security-operation.md
+```
+
+---
+
 ## 배포 구조
 
 현재 배포는 EC2 단일 인스턴스 기준입니다.
