@@ -360,6 +360,18 @@ docs/ux-flow-and-consistency.md
 
 ---
 
+## API 설계, 보안, 운영 안정성
+
+API는 `/api/v1` 버전 prefix와 HTTP Method 기준으로 기능을 분리했습니다. 운영 환경은 EC2, Docker Compose, Nginx, HTTPS 기반으로 구성했으며, JWT/OAuth 인증과 사용자별 접근 제어를 적용했습니다.
+
+상세 문서:
+
+```text
+docs/api-security-operation.md
+```
+
+---
+
 ## 배포 구조
 
 현재 배포는 EC2 단일 인스턴스 기준입니다.
