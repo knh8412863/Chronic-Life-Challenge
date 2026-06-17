@@ -13,6 +13,7 @@ const SIGNUP_DRAFT_KEY = "auth.signupDraft";
 const ONBOARDING_PROFILE_KEY = "auth.onboardingProfile";
 
 type HealthSurveySignupDraft = {
+  name?: string;
   birth_date?: string;
   gender?: "MALE" | "FEMALE";
   managed_diseases?: string[];
@@ -174,6 +175,7 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
   const [surveyStep, setSurveyStep] = useState(0); // 0: 기본정보, 1: 건강상태, 2: 생활습관1, 3: 생활습관2
 
   // 기본 정보
+  const [name, setName] = useState("");
   const [birthDate, setBirthDate] = useState("");
   const [gender, setGender] = useState<"MALE" | "FEMALE" | "">("");
   const [height, setHeight] = useState("");
@@ -220,12 +222,19 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
       localStorage.getItem(ONBOARDING_PROFILE_KEY) ??
       sessionStorage.getItem(SIGNUP_DRAFT_KEY);
 
+    let draftName = "";
+    let draftBirthDate = "";
+    let draftGender: "MALE" | "FEMALE" | "" = "";
+
     if (rawDraft) {
       try {
         const draft = JSON.parse(rawDraft) as HealthSurveySignupDraft;
-        if (draft.birth_date) setBirthDate(draft.birth_date);
-        if (draft.gender) setGender(draft.gender);
-        if (draft.birth_date && draft.gender) return;
+        draftName = draft.name ?? "";
+        draftBirthDate = draft.birth_date ?? "";
+        draftGender = draft.gender ?? "";
+        if (draftName) setName(draftName);
+        if (draftBirthDate) setBirthDate(draftBirthDate);
+        if (draftGender) setGender(draftGender);
       } catch {
         // 저장된 회원가입 임시 정보가 깨진 경우에는 사용자 정보 API로 보완합니다.
       }
@@ -236,8 +245,9 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
 
     getCurrentUser(token)
       .then(user => {
-        setBirthDate(user.birthday);
-        setGender(user.gender);
+        if (!draftName) setName(user.name);
+        if (!draftBirthDate) setBirthDate(user.birthday);
+        if (!draftGender) setGender(user.gender);
       })
       .catch(() => {
         // 사용자 정보를 불러오지 못하면 화면의 "회원가입 정보 없음" 상태를 유지합니다.
@@ -271,7 +281,14 @@ export function HealthSurveyPage({ onNavigate }: HealthSurveyPageProps) {
             <RequiredNotice />
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
+              <div>
+                <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>이름<RequiredMark /></label>
+                <div style={{ height: 34, border: "1.5px dashed #ddd", borderRadius: 5, padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafafa" }}>
+                  <span style={{ fontSize: 11, color: name ? "#333" : "#aaa" }}>{name || "회원가입 정보 없음"}</span>
+                  <span style={{ fontSize: 9, color: "#aaa" }}>(회원가입 시 입력)</span>
+                </div>
+              </div>
               <div>
                 <label style={{ fontSize: 10, color: "#555", display: "block", marginBottom: 4 }}>생년월일<RequiredMark /></label>
                 <div style={{ height: 34, border: "1.5px dashed #ddd", borderRadius: 5, padding: "0 10px", display: "flex", alignItems: "center", justifyContent: "space-between", background: "#fafafa" }}>

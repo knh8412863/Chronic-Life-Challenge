@@ -130,7 +130,7 @@ export function PetPage({ onNavigate }: PetPageProps) {
     try {
       const response = await claimVirtualPetRewards(token);
       if (response.data.claimed_task_count === 0) {
-        setRewardModal({ title: "수령 가능한 보상이 없습니다.", message: "오늘 완료한 보상 과제를 확인해 주세요." });
+        setRewardModal({ title: "이미 보상을 받으셨습니다.", message: "완료한 오늘의 보상은 이미 모두 수령했습니다." });
       } else {
         setRewardModal({
           title: "보상 수령 완료",
@@ -139,7 +139,7 @@ export function PetPage({ onNavigate }: PetPageProps) {
       }
       loadPet();
     } catch {
-      setRewardModal({ title: "보상 수령 실패", message: "잠시 후 다시 시도해 주세요." });
+      setRewardModal({ title: "이미 보상을 받으셨습니다.", message: "완료한 오늘의 보상은 이미 모두 수령했거나 수령 가능한 보상이 없습니다." });
     } finally {
       setIsClaiming(false);
     }
@@ -172,7 +172,7 @@ export function PetPage({ onNavigate }: PetPageProps) {
     );
   }
 
-  const hasClaimableTask = tasks.some((task) => task.is_completed);
+  const hasClaimableTask = tasks.some((task) => task.is_completed && !task.is_claimed);
   const petMeta = PET_META[pet.pet_type];
   const petImage = getPetImage(pet.pet_type, pet.growth_stage);
   const stageHelp = growthStageHelp(pet.level);
@@ -291,23 +291,23 @@ export function PetPage({ onNavigate }: PetPageProps) {
                 disabled={!hasClaimableTask || isClaiming}
                 style={{ padding: "6px 12px", border: "none", borderRadius: 6, background: hasClaimableTask ? "#1a1a1a" : "#ddd", color: "#fff", fontSize: 11, cursor: hasClaimableTask ? "pointer" : "not-allowed" }}
               >
-                {isClaiming ? "수령 중..." : "보상 받기"}
+                {isClaiming ? "수령 중..." : hasClaimableTask ? "보상 받기" : "보상 수령 완료"}
               </button>
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
               {tasks.map((task) => (
                 <div key={task.task_type} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 10px",
-                  background: task.is_completed ? "#f0f4f0" : "#fafafa",
+                  background: task.is_claimed ? "#f5f5f5" : task.is_completed ? "#f0f4f0" : "#fafafa",
                   border: "1.5px solid #e0e0e0", borderRadius: 8 }}>
                   <div style={{ width: 20, height: 20, borderRadius: "50%",
-                    background: task.is_completed ? "#2e7d32" : "#f0f0f0",
+                    background: task.is_claimed ? "#888" : task.is_completed ? "#2e7d32" : "#f0f0f0",
                     border: "1.5px solid #ddd",
                     display: "flex", alignItems: "center", justifyContent: "center",
                     fontSize: 10, color: "#fff", flexShrink: 0 }}>
-                    {task.is_completed ? "✓" : ""}
+                    {task.is_claimed ? "✓" : task.is_completed ? "✓" : ""}
                   </div>
-                  <span style={{ fontSize: 12, color: task.is_completed ? "#555" : "#1a1a1a", textDecoration: task.is_completed ? "line-through" : "none", flex: 1 }}>
-                    {task.title}
+                  <span style={{ fontSize: 12, color: task.is_claimed ? "#888" : task.is_completed ? "#555" : "#1a1a1a", textDecoration: task.is_claimed ? "line-through" : "none", flex: 1 }}>
+                    {task.title}{task.is_claimed ? " · 수령 완료" : ""}
                   </span>
                   <span style={{ padding: "2px 8px", background: "#f0f0f0", border: "1px solid #ddd", borderRadius: 12, fontSize: 11 }}>
                     {task.reward_experience} XP

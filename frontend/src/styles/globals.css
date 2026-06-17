@@ -5248,3 +5248,146 @@ button {
     grid-template-columns: 1fr;
   }
 }
+
+.hp-chip-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.hp-chip {
+  min-height: 36px;
+  padding: 8px 13px;
+  border: 1px solid #d9e0e6;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hp-chip.is-active {
+  border-color: var(--brand-green);
+  background: #e8f3ec;
+  color: var(--brand-green);
+}
+
+.hp-family-edit-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.hp-family-edit-card {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid #eceff3;
+  border-radius: 10px;
+  background: #f8faf9;
+}
+
+.hp-family-edit-card strong {
+  font-size: 13px;
+}
+
+.hp-family-edit-card label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: #334155;
+  cursor: pointer;
+}
+
+.hp-edit-stack {
+  display: grid;
+  gap: 16px;
+}
+
+.hp-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.hp-choice {
+  min-height: 38px;
+  padding: 9px 10px;
+  border: 1.5px solid #d9e0e6;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #4b5563;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.hp-choice.is-active {
+  border-color: #1a1a1a;
+  background: #1a1a1a;
+  color: #ffffff;
+}
+
+.hp-lifestyle-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.hp-lifestyle-card {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid #e5ece8;
+  border-radius: 16px;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fbf9 100%);
+  box-shadow: 0 8px 22px rgba(20, 24, 27, 0.04);
+}
+
+.hp-lifestyle-card-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.hp-lifestyle-card-head strong {
+  display: block;
+  font-size: 14px;
+  color: #14181b;
+  margin-bottom: 4px;
+}
+
+.hp-lifestyle-card-head p {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #737d85;
+}
+
+.hp-lifestyle-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 11px;
+  background: #e8f3ec;
+  color: var(--brand-green);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.hp-lifestyle-subgroup {
+  display: grid;
+  gap: 8px;
+}
+
+@media (max-width: 860px) {
+  .hp-lifestyle-card-grid {
+    grid-template-columns: 1fr;
+  }
+}
