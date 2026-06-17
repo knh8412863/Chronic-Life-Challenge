@@ -54,7 +54,7 @@ function normalizeDailyAdvice(response: AdviceApiResponse | DailyAdviceDraft | n
     generated: raw.generated ?? false,
     created_at: raw.created_at || new Date().toISOString(),
     source_type: raw.source_type ?? "RULE_BASED",
-    remaining_regeneration_count: Number.isFinite(remainingCount) ? remainingCount : 0,
+    remaining_regeneration_count: Number.isFinite(remainingCount) ? remainingCount : MAX_DAILY_ADVICE_GENERATIONS,
   };
 }
 
@@ -167,7 +167,7 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
 
   if (isLoading) return <LoadingState message="오늘의 조언을 불러오는 중입니다." />;
 
-  const generateDisabled = isGenerating || isLimitExceeded || remainingCount <= 0;
+  const generateDisabled = isGenerating || isLimitExceeded || (advice !== null && remainingCount <= 0);
 
   return (
     <div className="page-stack">
@@ -187,7 +187,7 @@ export function AdviceTodayPage({ onNavigate }: AdviceTodayPageProps) {
           </button>
         </div>
       </section>
-      {(isLimitExceeded || remainingCount <= 0) && (
+      {(isLimitExceeded || (advice !== null && remainingCount <= 0)) && (
         <p className="advice-limit-message">
           조언은 하루에 2번만 받을 수 있습니다.
           <br />

@@ -23,7 +23,7 @@ from app.services.predictions import HealthInputService
 RULE_BASED_PROVIDER = "RULE_BASED"
 RULE_BASED_MODEL = "daily-advice-rules-v1"
 ADVICE_TITLE = "오늘의 건강 조언"
-MAX_ADVICE_LENGTH = 200
+MAX_ADVICE_LENGTH = 350
 ADVICE_DISCLAIMER = "본 조언은 진단이 아니며, 증상이나 우려가 있으면 전문의와 상담하세요."
 MAX_DAILY_MANUAL_REGENERATIONS = 2
 
@@ -341,7 +341,7 @@ class AdviceService:
     def _to_response(
         advice: LLMAdvice,
         generated: bool,
-        remaining_regeneration_count: int = 0,
+        remaining_regeneration_count: int = MAX_DAILY_MANUAL_REGENERATIONS,
     ) -> DailyAdviceResponse:
         return DailyAdviceResponse(
             advice_id=advice.id,

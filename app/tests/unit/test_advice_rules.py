@@ -74,6 +74,7 @@ def test_daily_advice_response_marks_existing_generation_state():
     assert response.trigger_type == AdviceTriggerType.MANUAL
     assert response.generated is False
     assert response.source_type == "RULE_BASED"
+    assert response.remaining_regeneration_count == 2
 
 
 def test_daily_advice_response_marks_openai_source_type():

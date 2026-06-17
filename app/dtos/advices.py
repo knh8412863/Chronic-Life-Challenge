@@ -30,7 +30,7 @@ class DailyAdviceResponse(BaseModel):
     generated: bool
     created_at: datetime
     source_type: Literal["RULE_BASED", "LLM"] = "RULE_BASED"
-    remaining_regeneration_count: int = 0
+    remaining_regeneration_count: int = 2
 
 
 class AdviceHistoryItemResponse(BaseModel):
