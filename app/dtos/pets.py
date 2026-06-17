@@ -62,6 +62,7 @@ class PetRewardTaskResponse(BaseModel):
     title: str
     reward_experience: int
     is_completed: bool
+    is_claimed: bool = False
 
 
 class PetRecentActivityResponse(BaseModel):

@@ -246,12 +246,24 @@ class VirtualPetService:
         self, user_id: int, pet_type: PetType, target_date: date
     ) -> list[PetRewardTaskResponse]:
         completion_map = await self._task_completion_map(user_id, target_date)
+        pet = await VirtualPet.get_or_none(user_id=user_id)
+        claimed_types: set[str | None] = set()
+        if pet:
+            claimed = await VirtualPetActivityLog.filter(
+                user_id=user_id,
+                pet_id=pet.id,
+                activity_type=PetActivityType.TASK_COMPLETED,
+                source_id=self._date_key(target_date),
+            )
+            claimed_types = {item.source_type for item in claimed}
+
         return [
             PetRewardTaskResponse(
                 task_type=task_type,
                 title=title,
                 reward_experience=self._reward_experience(task_type, reward, pet_type),
                 is_completed=completion_map[task_type],
+                is_claimed=task_type in claimed_types,
             )
             for task_type, title, reward in BASE_REWARD_TASKS
         ]

@@ -18,6 +18,7 @@ import { getPolicyDocument, type ConsentType } from "../../api/users";
 import { PasswordToggleButton } from "../../components/common/PasswordToggleButton";
 import { Stepper } from "../../components/common/Stepper";
 import { icons } from "../../utils/iconAssets";
+import { notifyUserSessionUpdated } from "../../utils/authEvents";
 
 // ──────────────────────────────────────────────
 // 약관 동의 페이지
@@ -753,8 +754,13 @@ export function OnboardingCompletePage({ onNavigate }: OnboardingCompletePagePro
             ))}
           </div>
 
-          <button onClick={() => onNavigate("/home")}
-            style={{ width: "100%", height: 40, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 17, fontWeight: 600, cursor: "pointer" }}>
+          <button
+            onClick={() => {
+              notifyUserSessionUpdated();
+              onNavigate("/home");
+            }}
+            style={{ width: "100%", height: 40, background: "#1a1a1a", color: "#fff", border: "none", borderRadius: 8, fontSize: 17, fontWeight: 600, cursor: "pointer" }}
+          >
             홈으로 이동
           </button>
         </div>
