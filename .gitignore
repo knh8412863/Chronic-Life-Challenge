@@ -23,7 +23,7 @@ ai_worker/models/V8/dataset/
 # Local planning documents
 /API명세서*.xlsx
 /요구사항정의서*.xlsx
-/erd*.dbml
+/ERD*.dbml
 frontend/test-results/
 
 # Playwright local test artifacts
