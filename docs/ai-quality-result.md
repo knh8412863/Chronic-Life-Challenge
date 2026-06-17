@@ -83,7 +83,14 @@
 
 - `app/tests/unit/test_prediction_determinism_rules.py`
 
-해당 테스트는 동일한 모델 입력을 5회 반복 추론하고, 전체 예측 결과가 최초 결과와 동일한지 검증합니다.
+해당 테스트는 AI 선택 의존성 그룹이 설치된 환경에서 동일한 모델 입력을 5회 반복 추론하고, 전체 예측 결과가 최초 결과와 동일한지 검증합니다. 기본 백엔드 CI 환경에 AI 추론 라이브러리가 설치되어 있지 않은 경우에는 skip됩니다.
+
+실행 예시:
+
+```bash
+uv sync --group app --group dev --group ai
+uv run pytest app/tests/unit/test_prediction_determinism_rules.py
+```
 
 ## 5. 사용자 피드백 반영 구조
 

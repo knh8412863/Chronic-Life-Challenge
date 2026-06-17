@@ -1,4 +1,9 @@
+import pytest
+
 from app.services.predictions import PredictionService
+
+pytest.importorskip("pandas", reason="AI optional dependency group is required for model determinism test.")
+pytest.importorskip("joblib", reason="AI optional dependency group is required for model determinism test.")
 
 MODEL_INPUT = {
     "age": 55,
