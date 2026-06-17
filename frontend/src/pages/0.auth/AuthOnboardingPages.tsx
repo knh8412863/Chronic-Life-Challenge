@@ -28,7 +28,7 @@ const SIGNUP_ERROR_KEY = "auth.signupError";
 const ONBOARDING_PROFILE_KEY = "auth.onboardingProfile";
 const EMAIL_VERIFY_ADDRESS_KEY = "auth.emailVerifyAddress";
 
-function saveOnboardingProfile(profile: Pick<SignUpPayload, "birth_date" | "gender"> & { managed_diseases?: string[] }) {
+function saveOnboardingProfile(profile: Pick<SignUpPayload, "name" | "birth_date" | "gender"> & { managed_diseases?: string[] }) {
   const serialized = JSON.stringify(profile);
   sessionStorage.setItem(ONBOARDING_PROFILE_KEY, serialized);
   localStorage.setItem(ONBOARDING_PROFILE_KEY, serialized);
@@ -156,6 +156,7 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
         }
         storeAccessToken(loginResponse.access_token, Boolean(parsedDraft.remember_me));
         saveOnboardingProfile({
+          name: payload.name,
           birth_date: payload.birth_date,
           gender: payload.gender,
           managed_diseases: _managedDiseases ?? [],
@@ -194,6 +195,7 @@ export function TermsAgreementPage({ onNavigate }: TermsAgreementPageProps) {
       storeOnboardingAccessToken(loginResponse.access_token);
       saveEmailVerifyAddress(payload.email);
       saveOnboardingProfile({
+        name: payload.name,
         birth_date: payload.birth_date,
         gender: payload.gender,
         managed_diseases: _managedDiseases ?? [],
