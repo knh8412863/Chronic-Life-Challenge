@@ -16,10 +16,6 @@ type AdviceHistoryPageProps = {
   onNavigate: (route: AppRoute) => void;
 };
 
-function sourceLabel(sourceType: AdviceHistoryItem["source_type"]) {
-  return sourceType === "LLM" ? "AI 생성" : "기본 규칙";
-}
-
 export function AdviceHistoryPage({ onNavigate }: AdviceHistoryPageProps) {
   const [sort, setSort] = useState<AdviceHistorySort>("LATEST");
   const [items, setItems] = useState<AdviceHistoryItem[]>([]);
@@ -126,7 +122,6 @@ export function AdviceHistoryPage({ onNavigate }: AdviceHistoryPageProps) {
             <article className="dashboard-card advice-history-item" key={item.advice_id}>
               <div>
                 <span>{item.advice_date}</span>
-                <span className="chip">{sourceLabel(item.source_type)}</span>
                 {isHelpful && <span className="advice-feedback-positive">👍도움됨</span>}
               </div>
               <p>{item.advice_text}</p>

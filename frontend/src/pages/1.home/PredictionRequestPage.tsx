@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import type { AppRoute } from "../../App";
 import { getActivityLogs } from "../../api/activity";
@@ -31,7 +31,6 @@ function formatCompleteWithDate(date?: string | null) {
 
 export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps) {
   const [selectedDiseases, setSelectedDiseases] = useState(() => new Set(diseases));
-  const [analysisMode, setAnalysisMode] = useState<"BASIC" | "DEEP">("BASIC");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDataLoading, setIsDataLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
@@ -47,12 +46,6 @@ export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps
 
   const isAllSelected = selectedDiseases.size === diseases.length;
   const selectedCount = selectedDiseases.size;
-  const selectedDataRows = useMemo(() => {
-    if (analysisMode === "BASIC") {
-      return dataRows.slice(0, 3);
-    }
-    return dataRows;
-  }, [analysisMode, dataRows]);
 
   useEffect(() => {
     const token = getStoredAccessToken();
@@ -228,7 +221,6 @@ export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps
       sessionStorage.setItem("predictionTaskUuid", task.data.task_uuid);
       sessionStorage.removeItem("predictionResultId");
       sessionStorage.setItem("predictionSelectedDiseases", JSON.stringify([...selectedDiseases]));
-      sessionStorage.setItem("predictionAnalysisMode", analysisMode);
       window.history.pushState({}, "", `/prediction/progress?task_uuid=${task.data.task_uuid}`);
       onNavigate("/prediction/progress");
     } catch {
@@ -271,18 +263,12 @@ export function PredictionRequestPage({ onNavigate }: PredictionRequestPageProps
           </div>
         </article>
         <aside className="dashboard-card">
-          <h2>분석 모드</h2>
-          <div className="segment-control">
-            <button className={analysisMode === "BASIC" ? "is-active" : ""} type="button" onClick={() => setAnalysisMode("BASIC")}>
-              기본
-            </button>
-            <button className={analysisMode === "DEEP" ? "is-active" : ""} type="button" onClick={() => setAnalysisMode("DEEP")}>
-              심화
-            </button>
-          </div>
           <h2>분석 데이터</h2>
+          <p className="goal-section-note" style={{ marginTop: -6, marginBottom: 12 }}>
+            최근 건강설문과 건강 수치 기록을 함께 확인해 예측합니다.
+          </p>
           <div className="data-check-list">
-            {selectedDataRows.map(([label, value]) => (
+            {dataRows.map(([label, value]) => (
               <div key={label}>
                 <span>{value === "미입력" ? "·" : "✓"} {label}</span>
                 <strong>{value}</strong>

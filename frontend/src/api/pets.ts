@@ -20,6 +20,7 @@ export type PetRewardTask = {
   title: string;
   reward_experience: number;
   is_completed: boolean;
+  is_claimed: boolean;
 };
 
 export type PetRecentActivity = {

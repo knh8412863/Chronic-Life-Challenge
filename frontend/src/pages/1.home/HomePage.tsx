@@ -9,6 +9,7 @@ import { getMyVirtualPet, type PetGrowthStage, type PetType } from "../../api/pe
 import { getCurrentUser } from "../../api/users";
 import { ErrorState } from "../../components/common/ErrorState";
 import { LoadingState } from "../../components/common/LoadingState";
+import { userSessionUpdatedEvent } from "../../utils/authEvents";
 import { localDotDateLabel, localKoreanDateLabel } from "../../utils/date";
 import { getPetImage } from "../../utils/petAssets";
 
@@ -134,52 +135,58 @@ export function HomePage({ onNavigate }: HomePageProps) {
   const [hasApiError, setHasApiError] = useState(false);
 
   useEffect(() => {
-    const token = getStoredAccessToken();
-    if (!token) {
-      return;
-    }
+    const loadHome = () => {
+      const token = getStoredAccessToken();
+      if (!token) {
+        return;
+      }
 
-    setIsLoading(true);
-    getCurrentUser(token)
-      .then((user) => setUserName(user.name))
-      .catch(() => setUserName("사용자"));
-    getHomeSummary(token)
-      .then((response) => {
-        setSummary(response.data);
-        setHasApiError(false);
-      })
-      .catch(() => setHasApiError(true))
-      .finally(() => setIsLoading(false));
-    getTodayActivity(token)
-      .then((response) => setTodayActivity(response.data))
-      .catch(() => setTodayActivity(null));
-    getBadges(token)
-      .then((response) =>
-        setBadgeSummary({
-          earned: response.data.earned_count,
-          total: response.data.total_count,
-          icon: bestBadgeIcon(response.data.badges),
-        }),
-      )
-      .catch(() => setBadgeSummary({ earned: 0, total: 0, icon: "🏅" }));
-    getMyChallenges(token)
-      .then((response) => {
-        const active = response.data.in_progress[0];
-        setChallengeIcon(active?.challenge.icon_emoji ?? "🏆");
-      })
-      .catch(() => setChallengeIcon("🏆"));
-    getMyVirtualPet(token)
-      .then((response) => {
-        const pet = response.data.pet;
-        setPetSummary({
-          hasPet: response.data.has_pet,
-          name: pet?.pet_name ?? "미선택",
-          level: pet?.level ?? 0,
-          health: pet?.health_percent ?? 0,
-          image: pet ? getPetImage(pet.pet_type as PetType, pet.growth_stage as PetGrowthStage) : null,
-        });
-      })
-      .catch(() => setPetSummary({ hasPet: false, name: "미선택", level: 0, health: 0, image: null }));
+      setIsLoading(true);
+      getCurrentUser(token)
+        .then((user) => setUserName(user.name))
+        .catch(() => setUserName("사용자"));
+      getHomeSummary(token)
+        .then((response) => {
+          setSummary(response.data);
+          setHasApiError(false);
+        })
+        .catch(() => setHasApiError(true))
+        .finally(() => setIsLoading(false));
+      getTodayActivity(token)
+        .then((response) => setTodayActivity(response.data))
+        .catch(() => setTodayActivity(null));
+      getBadges(token)
+        .then((response) =>
+          setBadgeSummary({
+            earned: response.data.earned_count,
+            total: response.data.total_count,
+            icon: bestBadgeIcon(response.data.badges),
+          }),
+        )
+        .catch(() => setBadgeSummary({ earned: 0, total: 0, icon: "🏅" }));
+      getMyChallenges(token)
+        .then((response) => {
+          const active = response.data.in_progress[0];
+          setChallengeIcon(active?.challenge.icon_emoji ?? "🏆");
+        })
+        .catch(() => setChallengeIcon("🏆"));
+      getMyVirtualPet(token)
+        .then((response) => {
+          const pet = response.data.pet;
+          setPetSummary({
+            hasPet: response.data.has_pet,
+            name: pet?.pet_name ?? "미선택",
+            level: pet?.level ?? 0,
+            health: pet?.health_percent ?? 0,
+            image: pet ? getPetImage(pet.pet_type as PetType, pet.growth_stage as PetGrowthStage) : null,
+          });
+        })
+        .catch(() => setPetSummary({ hasPet: false, name: "미선택", level: 0, health: 0, image: null }));
+    };
+
+    loadHome();
+    window.addEventListener(userSessionUpdatedEvent, loadHome);
+    return () => window.removeEventListener(userSessionUpdatedEvent, loadHome);
   }, []);
 
   const recentScoreBars = useMemo(() => {

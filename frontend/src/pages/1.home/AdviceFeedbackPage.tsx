@@ -95,7 +95,7 @@ export function AdviceFeedbackPage({ onNavigate }: AdviceFeedbackPageProps) {
             <span className="advice-feedback-ai">AI</span>
             <div>
               <h2>{advice.title}</h2>
-              <p>{advice.advice_date} 생성 · {advice.source_type === "LLM" ? "AI 생성" : "기본 규칙"}</p>
+              <p>{advice.advice_date} 생성</p>
             </div>
           </div>
           <div className="advice-text-box">{advice.advice_text}</div>

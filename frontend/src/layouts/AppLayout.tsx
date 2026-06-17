@@ -7,6 +7,7 @@ import { getNotifications, type NotificationItem } from "../api/notifications";
 import { getCurrentUser } from "../api/users";
 import { Sidebar } from "../components/common/Sidebar";
 import { getStoredProfileImage, profileImageUpdatedEvent } from "../utils/profileImage";
+import { userSessionUpdatedEvent } from "../utils/authEvents";
 
 type AppLayoutProps = PropsWithChildren<{
   currentRoute: AppRoute;
@@ -28,20 +29,26 @@ export function AppLayout({ children, currentRoute, onNavigate }: AppLayoutProps
   }, [collapsed]);
 
   useEffect(() => {
-    const token = getStoredAccessToken();
-    if (!token) return;
+    const loadUser = () => {
+      const token = getStoredAccessToken();
+      if (!token) return;
 
-    getCurrentUser(token)
-      .then((user) => {
-        setUserId(user.id);
-        setUserName(user.name);
-        setProfileImageUrl(getStoredProfileImage(user.id) ?? user.profile_image_url);
-      })
-      .catch(() => {
-        setUserId(null);
-        setUserName("사용자");
-        setProfileImageUrl(null);
-      });
+      getCurrentUser(token)
+        .then((user) => {
+          setUserId(user.id);
+          setUserName(user.name);
+          setProfileImageUrl(getStoredProfileImage(user.id) ?? user.profile_image_url);
+        })
+        .catch(() => {
+          setUserId(null);
+          setUserName("사용자");
+          setProfileImageUrl(null);
+        });
+    };
+
+    loadUser();
+    window.addEventListener(userSessionUpdatedEvent, loadUser);
+    return () => window.removeEventListener(userSessionUpdatedEvent, loadUser);
   }, []);
 
   useEffect(() => {
