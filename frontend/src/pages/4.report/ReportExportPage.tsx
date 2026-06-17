@@ -46,7 +46,7 @@ const exportFormats: Array<{
 const includedData: Array<{ name: string; description: string; emoji: string }> = [
   {
     name: "주간 리포트 본문",
-    description: "AI가 생성한 한 주간 건강 분석 전체 텍스트",
+    description: "한 주간 건강 분석 전체 텍스트",
     emoji: "📝",
   },
   {
