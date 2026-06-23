@@ -4,6 +4,14 @@
 
 본 프로젝트는 고혈압, 당뇨, 만성신장질환 등 주요 만성질환을 중심으로 건강설문, 혈압/혈당, 지질 지표, 신장 지표, 운동, 식단, 생활습관 데이터를 수집하고 이를 기반으로 개인화된 건강 관리 경험을 제공합니다.
 
+개인 포트폴리오 저장소:
+
+```text
+https://github.com/knh8412863/Chronic-Life-Challenge
+```
+
+> 교육 프로젝트 종료로 인해 기존 시연 서버와 외부 API 키는 비활성화될 수 있습니다. 실행 시 `.env` 계열 파일에 개인 환경 변수를 별도로 설정해야 합니다.
+
 ---
 
 ## 주요 기능
@@ -374,7 +382,7 @@ docs/api-security-operation.md
 
 ## 배포 구조
 
-현재 배포는 EC2 단일 인스턴스 기준입니다.
+배포 구성은 EC2 단일 인스턴스 기준으로 설계했습니다. 교육 프로젝트 종료 후 실제 시연 서버는 중지 또는 삭제될 수 있으며, 아래 내용은 재배포 시 참고용입니다.
 
 - Nginx가 `/` 요청에 대해 프론트엔드 정적 파일을 제공합니다.
 - Nginx가 `/api/` 요청을 FastAPI 컨테이너로 프록시합니다.
@@ -410,10 +418,10 @@ scp -r -i ~/.ssh/all4health.pem frontend/dist/* ubuntu@{ip주소}:~/ai_project/f
 ssh -i ~/.ssh/all4health.pem ubuntu@{ip주소} "cd ~/ai_project && docker compose up -d --force-recreate nginx"
 ```
 
-배포 확인:
+배포 확인 예시:
 
 ```bash
-curl -I https://all4health.kro.kr/api/docs
+curl -I https://{배포도메인}/api/docs
 ```
 
 `curl -I`는 HEAD 요청이므로 FastAPI docs에서 `405 Method Not Allowed`가 나올 수 있습니다. `allow: GET`이 보이면 서버가 응답 중인 상태입니다.
@@ -465,10 +473,10 @@ npm run build
 http://127.0.0.1:8000/api/docs
 ```
 
-배포:
+배포 환경:
 
 ```text
-https://all4health.kro.kr/api/docs
+https://{배포도메인}/api/docs
 ```
 
 ---
@@ -492,6 +500,7 @@ https://all4health.kro.kr/api/docs
 
 ## 현재 운영상 주의사항
 
+- 교육 프로젝트 종료 후 EC2, Elastic IP, SES/SMTP, Google OAuth, Gemini/OpenAI, CLOVA OCR 등 외부 리소스는 비활성화될 수 있습니다.
 - 프로필 이미지는 현재 URL 저장 구조이며, 실제 이미지 파일 업로드를 안정적으로 운영하려면 S3 또는 서버 볼륨 기반 업로드 API가 필요합니다.
 - Docker 컨테이너 재생성 시 유지되어야 하는 파일은 Docker volume으로 관리해야 합니다.
 - 실제 운영 환경에서는 `.env` 값을 서버에서만 관리하고 GitHub에 커밋하지 않습니다.
